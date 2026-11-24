@@ -27,6 +27,18 @@
     },
     "api/keeper/[fn].js": {
       "maxDuration": 60
+    },
+    "api/status/index.js": {
+      "maxDuration": 30,
+      "includeFiles": "{sdk/dist/**,sdk/package.json,verifier/dist/BUILD.json}"
+    },
+    "api/status/history.js": {
+      "maxDuration": 30,
+      "includeFiles": "{sdk/dist/**,sdk/package.json,verifier/dist/BUILD.json}"
+    },
+    "api/status/sample.js": {
+      "maxDuration": 60,
+      "includeFiles": "{sdk/dist/**,sdk/package.json,verifier/dist/BUILD.json}"
     }
   },
   "rewrites": [
