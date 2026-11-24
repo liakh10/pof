@@ -59,3 +59,18 @@ test('units', () => {
   assert.equal(C.parseUnits('1.5', 9), 1_500_000_000n); assert.equal(C.formatUnits(1_500_000_000n, 9), '1.5');
   assert.equal(C.formatUnits(100_000_000n, 6), '100'); assert.throws(() => C.parseUnits('1.1234567', 6));
 });
+
+test('the POF-REVOKE1 v2 vector (shared with the Verifier and the program): the client builds the same 156 bytes', async () => {
+  const R = JSON.parse(fs.readFileSync(new URL('./vectors/revoke-v2.json', import.meta.url)));
+  const { createPofClient } = await import('../pof-client.js');
+  const pof = await createPofClient({ network: 'local', rpc: ['http://127.0.0.1:1'], wallet: { state: () => ({}) }, storage: new Map(), programId: R.program });
+  const att = new Uint8Array(240);
+  att.set(C.utf8('POF1'), 0); att.set(C.unhex(R.subjectHash), 37); att[69] = R.asset; att.set(C.unhex(R.nullsetHash), 112);
+  new DataView(att.buffer).setBigUint64(144, BigInt(R.issuedSlot), true);
+  const r = await pof.revokeBytesOf({ programId: R.program, attestation: C.hex(att) }, { validUntil: BigInt(R.validUntil) });
+  assert.equal(r.certificate, R.certificate);
+  assert.equal(r.bytes.length, 156);
+  assert.equal(C.hex(r.bytes), R.bytes);
+  const V = await import('../../verifier/dist/pof-verifier.mjs');
+  if (V.revokeBytesV2) assert.equal(C.hex(V.revokeBytesV2(C.b58decode(R.program, 32), C.b58decode(R.certificate, 32), C.unhex(R.subjectHash), R.asset, C.unhex(R.nullsetHash), BigInt(R.issuedSlot), BigInt(R.validUntil))), R.bytes);
+});

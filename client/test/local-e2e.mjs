@@ -106,15 +106,22 @@ test('local: vault → shield → sync → pick → §4 → the real Verifier si
     const subjB = await pof.subject({ kind: 2, asset: 0, tier: 1, payer, from: 'vault' });
     const ansB = await pof.attest(JSON.parse(JSON.stringify(pof.disclose({ subject: subjB, asset: 0, tier: 1, notes: [notes.find(n => n.amount === 3_000_000_000n)], payer, from: 'vault' }))), { from: 'vault', subject: subjB });
     assert.equal(ansB.attestation.length, 480);
-    const kit = pof.kits.list().find(k => k.attestation === ansB.attestation);
+    const kit = (await pof.kits.list()).find(k => k.attestation === ansB.attestation);
     assert.equal(kit.subject.kind, 2); assert.equal(kit.revoke.length, 1); assert.equal(kit.controller, subjB.value);
     const opened = await pof.kits.open(kit, 'vault');
     assert.equal(opened.badgeSecret, subjB.badgeSecret);
     const nkKey = await C.sha256(C.utf8('pof:kit:v1'), C.unhex(pkg.ring.nk));
     const k = await crypto.webcrypto.subtle.importKey('raw', nkKey, 'AES-GCM', false, ['decrypt']);
     await assert.rejects(crypto.webcrypto.subtle.decrypt({ name: 'AES-GCM', iv: C.unhex(kit.sealed.iv) }, k, C.unhex(kit.sealed.ct)), 'a key built from nk does not open the kit');
-    const exported = await pof.kits.export();
-    assert.equal(JSON.parse(exported).kits.length, pof.kits.list().length);
+    // kits at rest and in the export file are sealed (audit2): no salt, nullifier or subject in clear on the device
+    const exported = JSON.parse(await pof.kits.export());
+    assert.equal(exported.v, 2); assert.equal(exported.owner, v.owner); assert.ok(!JSON.stringify(exported).includes(kit.revoke[0].salt));
+    const atRest = [...kitStore.values()].join('\n');
+    assert.ok(!atRest.includes(kit.revoke[0].salt) && !atRest.includes(subjB.value), 'the device storage holds no kit field in clear');
+    const plain = JSON.parse(await pof.kits.export({ plain: true }));
+    assert.equal(plain.kits.length, (await pof.kits.list()).length);
+    // a sealed export goes back into the same vault and nowhere else
+    assert.equal(await pof.kits.import(JSON.stringify(exported)), (await pof.kits.list()).length);
     // the controller of the badge kit signs as the badge
     const ctl = await pof.controllerOf(kit);
     assert.equal(ctl.publicKey, subjB.value);

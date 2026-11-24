@@ -41,6 +41,8 @@ export async function createPofClient(opts = {}) {
     programId: opts.programId || null,
     vaultDomain: opts.vaultDomain || VAULT_DOMAIN,
     relayer: opts.relayer || null,   // the relayer's address (GET /api/attest facts); X and badge certificates go through it
+    // a random wait before certify by default off the lab (audit2): the attestation's slot then says less about the moment
+    defaultDelaySlots: opts.defaultDelaySlots || (net === 'local' ? [0, 0] : [75, 750]),
     minAgeSlots: BigInt(opts.minAgeSlots ?? 150),
     tree: C.RINGS.tree,
     mints: { 0: C.ASSETS[0].mint, 1: opts.usdcMint || C.ASSETS[1].mint },
@@ -410,8 +412,29 @@ export async function createPofClient(opts = {}) {
   }
 
   /* ---------------------------------------------------------------- the revoke kit, kept locally (export/import) */
-  const KITS = 'pof:kits:v1';
-  const readKits = () => { try { return JSON.parse(get(KITS) || '[]'); } catch { return []; } };
+  /* Kits are kept encrypted at rest (audit2 info): the whole list of a vault or Ring is one AES-GCM box under its kit key
+     (from the vault seed or the Ring's derivation signature, never from nk), so the device's storage shows no salt,
+     nullifier, handle or vault. Kits stored in clear by older builds (pof:kits:v1) are moved into the box on first open. */
+  const KITS_LEGACY = 'pof:kits:v1';
+  const KITS = owner => 'pof:kits:v2:' + owner;
+  async function readKits(from = 'vault') {
+    const id = who(from);
+    let list = [];
+    const raw = get(KITS(id.owner));
+    if (raw) list = await unseal(JSON.parse(raw), id.kitKey);
+    const legacyRaw = get(KITS_LEGACY);
+    if (legacyRaw) {
+      let legacy = []; try { legacy = JSON.parse(legacyRaw); } catch {}
+      const mine = legacy.filter(k => k.ringOwner === id.owner), rest = legacy.filter(k => k.ringOwner !== id.owner);
+      if (mine.length) {
+        for (const k of mine) if (!list.some(x => x.attestation === k.attestation)) list.push(k);
+        await writeKits(list, from);
+        if (rest.length) put(KITS_LEGACY, JSON.stringify(rest)); else del(KITS_LEGACY);
+      }
+    }
+    return list;
+  }
+  async function writeKits(list, from = 'vault') { const id = who(from); put(KITS(id.owner), JSON.stringify(await seal(list, id.kitKey))); }
   async function seal(obj, key) {
     const k = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -434,8 +457,8 @@ export async function createPofClient(opts = {}) {
       // the openings (amounts) and a badge secret, sealed with a key only this vault or Ring can rebuild
       sealed: await seal({ notes: pkg.notes, badgeSecret: subj?.badgeSecret || null }, id.kitKey),
     };
-    const all = readKits().filter(k => k.attestation !== kit.attestation);
-    all.push(kit); put(KITS, JSON.stringify(all));
+    const all = (await readKits(from)).filter(k => k.attestation !== kit.attestation);
+    all.push(kit); await writeKits(all, from);
     return kit;
   }
   /* a passphrase box for the export file (PBKDF2-SHA256 600k → AES-GCM), so a lost device does not lose a random vault key */
@@ -451,24 +474,33 @@ export async function createPofClient(opts = {}) {
     try { return await unseal(box, key); } catch { throw Object.assign(Error('That passphrase does not open the vault backup.'), { code: 'BAD_PASSPHRASE' }); }
   }
   const kits = {
-    list: () => readKits(),
-    /* the export file: the kits, and, when this device holds a random vault key, that key under a passphrase */
-    async export({ passphrase } = {}) {
-      const out = { kind: 'pof-kits', v: 1, kits: readKits() };
-      if (vault && vault.mode === 'random') {
-        out.vaultBackup = { wallet: vault.wallet, owner: vault.owner, box: vault.box };
-      }
+    list: (from = 'vault') => readKits(from),
+    /* the export file: the kits sealed under this vault's kit key (only this vault opens it again), and, when this device
+       holds a random vault key, that key's passphrase box. { plain: true } writes the kits in clear instead, for a holder
+       who wants anyone holding the file to be able to revoke on a spend; it shows the handle and the vault together. */
+    async export({ from = 'vault', plain = false } = {}) {
+      const id = who(from);
+      const list = await readKits(from);
+      const out = plain ? { kind: 'pof-kits', v: 1, kits: list } : { kind: 'pof-kits', v: 2, owner: id.owner, box: await seal(list, id.kitKey) };
+      if (vault && vault.mode === 'random') out.vaultBackup = { wallet: vault.wallet, owner: vault.owner, box: vault.box };
       return JSON.stringify(out, null, 1);
     },
-    async import(text, { passphrase } = {}) {
+    async import(text, { passphrase, from = 'vault' } = {}) {
       const j = typeof text === 'string' ? JSON.parse(text) : text;
-      const add = (j.kind === 'pof-kits' ? j.kits : [j]).filter(k => k && k.v === 1 && /^[0-9a-f]{480}$/.test(k.attestation));
-      const all = readKits(); for (const k of add) if (!all.some(x => x.attestation === k.attestation)) all.push(k);
-      put(KITS, JSON.stringify(all));
       if (j.vaultBackup && passphrase) {
         await passOpen(j.vaultBackup.box, passphrase);   // proves the passphrase before the box is kept
         put(VRANDOM(j.vaultBackup.wallet), JSON.stringify({ box: j.vaultBackup.box, backedUp: true, at: new Date().toISOString() }));
       }
+      const id = from === 'ring' ? ring : vault;
+      if (!id) return 0;   // a backup-only import before the vault is open: the kits come in on the next import
+      let incoming = [];
+      if (j.kind === 'pof-kits' && j.v === 2) {
+        if (j.owner !== id.owner) throw Object.assign(Error('These kits belong to another vault.'), { code: 'OTHER_VAULT' });
+        incoming = await unseal(j.box, id.kitKey);
+      } else incoming = j.kind === 'pof-kits' ? j.kits : [j];
+      const add = incoming.filter(k => k && k.v === 1 && /^[0-9a-f]{480}$/.test(k.attestation));
+      const all = await readKits(from); for (const k of add) if (!all.some(x => x.attestation === k.attestation)) all.push(k);
+      await writeKits(all, from);
       return add.length;
     },
     /* open a kit; a kit sealed under the old nk-derived key (before audit POF-10) is re-sealed under the vault-seed key */
@@ -477,13 +509,13 @@ export async function createPofClient(opts = {}) {
       try { return await unseal(kit.sealed, id.kitKey); }
       catch {
         const o = await unseal(kit.sealed, id.kitKeyLegacy);
-        const all = readKits(); const k = all.find(x => x.attestation === kit.attestation);
-        if (k) { k.sealed = await seal(o, id.kitKey); put(KITS, JSON.stringify(all)); }
+        const all = await readKits(from); const k = all.find(x => x.attestation === kit.attestation);
+        if (k) { k.sealed = await seal(o, id.kitKey); await writeKits(all, from); }
         return o;
       }
     },
-    async download({ passphrase, filename = `pof-kits-${new Date().toISOString().slice(0, 10)}.json` } = {}) {
-      const text = await kits.export({ passphrase });
+    async download({ from = 'vault', plain = false, filename = `pof-kits-${new Date().toISOString().slice(0, 10)}.json` } = {}) {
+      const text = await kits.export({ from, plain });
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
       if (vault && vault.mode === 'random') { vault.needsBackup = false; put(VRANDOM(vault.wallet), JSON.stringify({ box: vault.box, backedUp: true, at: new Date().toISOString() })); }
     },
@@ -621,29 +653,35 @@ export async function createPofClient(opts = {}) {
   /* ---------------------------------------------------------------- the relayed revoke (X and badge certificates)
      The controller signs the 148 POF-REVOKE1 bytes (CONTRACT, verifier contract.ts revokeBytes) and the relayer submits
      [ed25519(controller, bytes), revoke_signed()], so no wallet pays and no wallet appears. */
-  async function revokeBytesOf(kit) {
+  /* 156 bytes since program 74654cb (audit RV-01 / audit2 A2-01): ... ‖ issued_slot u64 LE ‖ valid_until u64 LE, the last
+     slot the signature may be used at. Default: the current slot + 1500 (about ten minutes); where the chain cannot be read
+     and none is given, the certificate's own expiry slot (the signature dies with the certificate either way). */
+  async function revokeBytesOf(kit, { validUntil } = {}) {
     const att = C.unhex(kit.attestation, 240);
     const { PublicKey } = await import('./dist/web3.js');
     const programId = new PublicKey(kit.programId || cfg.programId);
     const subjectHash = att.slice(37, 69), asset = att[69], nullset = att.slice(112, 144), issued = att.slice(144, 152);
+    let vu = validUntil;
+    if (vu === undefined) { try { vu = (await chainSlot()) + 1500n; } catch { vu = new DataView(att.buffer, att.byteOffset).getBigUint64(152, true); } }
+    const vuBytes = new Uint8Array(8); new DataView(vuBytes.buffer).setBigUint64(0, BigInt(vu), true);
     const [cert] = PublicKey.findProgramAddressSync([C.utf8('cert'), subjectHash, Uint8Array.of(asset)], programId);
-    const out = new Uint8Array(148); let o = 0;
-    for (const part of [C.utf8('POF-REVOKE1'), programId.toBytes(), cert.toBytes(), subjectHash, Uint8Array.of(asset), nullset, issued]) { out.set(part, o); o += part.length; }
-    return { bytes: out, certificate: cert.toBase58(), subjectHash: C.hex(subjectHash), asset };
+    const out = new Uint8Array(156); let o = 0;
+    for (const part of [C.utf8('POF-REVOKE1'), programId.toBytes(), cert.toBytes(), subjectHash, Uint8Array.of(asset), nullset, issued, vuBytes]) { out.set(part, o); o += part.length; }
+    return { bytes: out, certificate: cert.toBase58(), subjectHash: C.hex(subjectHash), asset, validUntil: BigInt(vu) };
   }
   async function revokeRelayed(kit, from = 'vault') {
     if (kit.subject.kind === 0) throw Object.assign(Error('a wallet certificate is revoked by the wallet itself (revoke_by_holder)'), { code: 'RELAY_NOT_FOR_WALLETS' });
     const ctl = await controllerOf(kit, from);
-    const r = await revokeBytesOf(kit);
+    const validUntil = (await chainSlot()) + 1500n;
+    const r = await revokeBytesOf(kit, { validUntil });
     const sigBytes = await ctl.sign(r.bytes);
     if (ctl.verify && !ctl.verify(r.bytes, sigBytes)) throw Object.assign(Error('the controller signature did not verify'), { code: 'BAD_SIGNATURE' });
     const signature = C.hex(sigBytes);
     status('revoke', { phase: 'send', certificate: r.certificate });
-    const ans = await jsonCall(relayUrl('revoke'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subjectHash: r.subjectHash, asset: r.asset, signature }) });
+    const ans = await jsonCall(relayUrl('revoke'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subjectHash: r.subjectHash, asset: r.asset, validUntil: String(validUntil), signature }) });
     status('revoke', { phase: 'done', signature: ans.signature });
     return ans;
   }
-
   /* the controller key of a kit, as a signer ({ publicKey, sign(message) }) for revoke_by_holder and room joins: the
      wallet itself (kind 0, signs through the wallet), the badge key (kind 2, from the sealed kit), or the X key (kind 1) */
   async function controllerOf(kit, from = 'vault') {
@@ -653,6 +691,8 @@ export async function createPofClient(opts = {}) {
     const k = await xController(id, kit.subject.value);
     return { publicKey: C.b58encode(k.publicKey().ed25519()), sign: m => k.sign(new Uint8Array(m)), verify: (m, sg) => k.verify(new Uint8Array(m), sg) };
   }
+
+
 
   /* ---------------------------------------------------------------- the whole flow in one call (the /get page drives it step by step) */
   /* The relayer (audit POF-12): an X or badge certificate is paid and submitted by the relayer, so no wallet appears in
@@ -682,7 +722,7 @@ export async function createPofClient(opts = {}) {
     return (await withdraw({ asset: 0, amount: lamports, to: quote.payTo, from })).signature;
   }
   async function certify({ asset, tier, subjectKind = 0, handle, linkId, payer, relay, allowWalletPayer = false, payNow = false, from = 'vault', delaySlots, signal }) {
-    if (delaySlots) await randomDelay(delaySlots, signal);
+    await randomDelay(delaySlots ?? cfg.defaultDelaySlots, signal);
     const pick = await choose({ asset, tier, from });
     if (!pick.ready) throw Object.assign(Error(pick.waitSlots ? `your newest note needs ${pick.waitSlots} more slots before it can be certified` : 'not enough in the vault for that tier'), { code: pick.waitSlots ? 'NOTE_TOO_NEW' : 'BELOW_TIER', pick });
     const useRelay = relay ?? subjectKind !== 0;

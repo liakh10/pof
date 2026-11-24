@@ -179,13 +179,17 @@ test('local: USDC shield, sync, tiers with 6 decimals, attestation; mixed assets
     const pv2 = await R.privacy({ subjectKind: 2, pick: await R.choose({ asset: 1, tier: 1 }) });
     assert.ok(!pv2.warnings.some(w => w.code === 'NO_CREDIT'));
     // the relayed revoke: the client's 148 bytes equal the Verifier's revokeBytes, signed by the badge key
-    const kit = R.kits.list().find(k => k.attestation === done.attestation);
+    const kit = (await R.kits.list()).find(k => k.attestation === done.attestation);
     const rb = await R.revokeBytesOf(kit);
     const a = V.decodeAttestation(C.unhex(kit.attestation));
-    assert.equal(C.hex(rb.bytes), C.hex(V.revokeBytes(programId, V.fromB58(rb.certificate, 32, 'cert'), a.subjectHash, a.asset, a.nullsetHash, a.issuedSlot)));
+    assert.equal(rb.bytes.length, 156);
+    assert.equal(C.hex(rb.bytes), C.hex(V.revokeBytesV2(programId, V.fromB58(rb.certificate, 32, 'cert'), a.subjectHash, a.asset, a.nullsetHash, a.issuedSlot, rb.validUntil)));
     const rr = await R.revokeRelayed(kit);
     assert.equal(rr.signature, 'stub-revoke');
-    assert.ok(V.verifySig(C.unhex(seen.revoke[0].signature), rb.bytes, V.fromB58(kit.controller, 32, 'controller')), 'the controller (badge key) signed the revoke bytes');
+    const sent = seen.revoke[0];
+    assert.ok(/^\d+$/.test(sent.validUntil), 'validUntil is sent');
+    const sentBytes = (await R.revokeBytesOf(kit, { validUntil: BigInt(sent.validUntil) })).bytes;
+    assert.ok(V.verifySig(C.unhex(sent.signature), sentBytes, V.fromB58(kit.controller, 32, 'controller')), 'the controller (badge key) signed the 156 bytes with that validUntil');
     await assert.rejects(R.revokeRelayed({ ...kit, subject: { kind: 0, value: 'x' } }), e => e.code === 'RELAY_NOT_FOR_WALLETS');
   } finally { srv.close(); }
   void v;

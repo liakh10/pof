@@ -63,3 +63,14 @@ test('keys come from HELIUS_KEYS or HELIUS_API_KEY', () => {
   assert.deepEqual(keysFromEnv({ HELIUS_API_KEY: 'c' }), ['c']);
   assert.deepEqual(keysFromEnv({}), []);
 });
+
+test('A2-10: an upstream answer is always rebuilt: no raw headers, key-bearing URLs scrubbed, even with its own CORS header', async () => {
+  stub(() => new Response(JSON.stringify({ error: { message: 'see https://mainnet.helius-rpc.com/v1/spr/x?api-key=key-one-SECRET' } }), { status: 400, headers: { 'content-type': 'application/json', 'access-control-allow-origin': 'https://evil.example', 'set-cookie': 'a=b', 'x-upstream': 'leak' } }));
+  const r = await sprProxy(req('https://pof.test/api/spr/getUserRecords', { method: 'POST', body: rpcBody('getUserRecords') }), { keys: KEYS });
+  assert.equal(r.status, 400);
+  assert.equal(r.headers.get('access-control-allow-origin'), '*'); assert.equal(r.headers.get('set-cookie'), null); assert.equal(r.headers.get('x-upstream'), null);
+  assert.ok(!(await r.text()).includes('SECRET'));
+  stub(() => new Response('upstream says api-key=key-two-SECRET', { status: 200, headers: { 'content-type': 'text/plain', 'access-control-allow-origin': '*' } }));
+  const p = await proverProxy(new Request('https://pof.test/api/spr/prover?path=health', { headers: { 'x-real-ip': '203.0.113.9' } }), { keys: KEYS });
+  assert.ok(!(await p.text()).includes('SECRET'));
+});

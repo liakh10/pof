@@ -16,8 +16,14 @@ const shaOf = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(
 const WASM_SHA = { simd: shaOf('hasher_wasm_simd_bg.wasm'), sisd: shaOf('light_wasm_hasher_bg.wasm') };
 // the relay credit key and house ring each network's relayer uses (audit CR-01), pinned into the build from the file the
 // Verifier publishes; a network without an entry cannot buy credits from this build
+// it is read as COMMITTED (git show HEAD:…), so another agent's uncommitted key change never reaches a build
 const pinsFile = path.join(root, '../verifier/lib/credit-pins.json');
-const CREDIT_PINS = fs.existsSync(pinsFile) ? JSON.parse(fs.readFileSync(pinsFile, 'utf8')).networks || {} : {};
+const { execFileSync } = await import('node:child_process');
+let pinsText = null;
+try { pinsText = execFileSync('git', ['show', 'HEAD:verifier/lib/credit-pins.json'], { cwd: path.join(root, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch {}
+if (pinsText === null && fs.existsSync(pinsFile)) pinsText = fs.readFileSync(pinsFile, 'utf8');
+if (pinsText !== null && fs.existsSync(pinsFile) && fs.readFileSync(pinsFile, 'utf8') !== pinsText) console.warn('note: verifier/lib/credit-pins.json has uncommitted changes; the build uses the committed version');
+const CREDIT_PINS = pinsText ? JSON.parse(pinsText).networks || {} : {};
 const common = { bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true, legalComments: 'none', define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __POF_WASM_SHA256__: JSON.stringify(WASM_SHA), __POF_CREDIT_PINS__: JSON.stringify(CREDIT_PINS) }, logLevel: 'warning' };
 for (const f of fs.readdirSync(dist)) if (/^chunk-.*\.js$/.test(f)) fs.rmSync(path.join(dist, f));
 const spr = await esbuild.build({ ...common, entryPoints: { spr: path.join(root, 'src/spr-entry.js'), 'spr-spend': path.join(root, 'src/spend-entry.js') }, outdir: dist, splitting: true, chunkNames: 'chunk-[hash]', plugins: [hasherAlias], metafile: true });

@@ -17,9 +17,9 @@ test('every imported chunk exists and is tracked', () => {
 });
 test('blind.mjs and the credit pins are the Verifier\'s', async () => {
   assert.equal(fs.readFileSync(new URL('blind.mjs', dist), 'utf8'), fs.readFileSync(new URL('../../verifier/lib/blind.mjs', import.meta.url), 'utf8'));
-  const file = new URL('../../verifier/lib/credit-pins.json', import.meta.url);
   const { CREDIT_PINS } = await import('../dist/pins.js');
-  const want = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')).networks : {};
+  let committed = null; try { committed = execFileSync('git', ['show', 'HEAD:verifier/lib/credit-pins.json'], { cwd: new URL('../..', import.meta.url), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch {}
+  const want = committed ? JSON.parse(committed).networks : {};
   assert.deepEqual(JSON.parse(JSON.stringify(CREDIT_PINS)), want, 'rebuild client/dist after the pins change (npm run build)');
   const sha = async s => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))), x => x.toString(16).padStart(2, '0')).join('');
   for (const [net, p] of Object.entries(CREDIT_PINS)) {

@@ -1,0 +1,12 @@
+{
+ "note": "POF-REVOKE1 v2 (156 bytes): \"POF-REVOKE1\" ‖ program ‖ certificate ‖ subject_hash ‖ asset u8 ‖ nullset_hash ‖ issued_slot u64 LE ‖ valid_until u64 LE; certificate = PDA [\"cert\", subject_hash, [asset]] under program",
+ "program": "pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT",
+ "certificate": "DJunEXsKDBjVxf8WzqVcVaaW17umn6eEaG6nT1RCB48w",
+ "subjectHash": "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f01010101010101010101010101010101",
+ "asset": 1,
+ "nullsetHash": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+ "issuedSlot": "473512345",
+ "validUntil": "473513845",
+ "bytes": "504f462d5245564f4b45310c3f0f013a78e7ef1619eff2289e1c525a3853bc805b8dbb331851e99f10347cb6e2cb973c31791c46652bbdc4eedacb4717662b8face16be5cc360267a6d9787f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f0101010101010101010101010101010101a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a59939391c00000000753f391c00000000",
+ "length": 156
+}

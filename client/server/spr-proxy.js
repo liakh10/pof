@@ -35,8 +35,9 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
 const json = (status, error, extra = {}) => new Response(JSON.stringify({ error }), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS, ...extra } });
 let turn = 0;
 
+/* the upstream call: { own } for an answer this proxy wrote, { up } for Helius's; the caller always rebuilds the latter */
 async function upstream(keys, build) {
-  if (!keys.length) return json(503, { code: 'NO_KEY', message: 'the Rings proxy is not configured on this deployment' });
+  if (!keys.length) return { own: json(503, { code: 'NO_KEY', message: 'the Rings proxy is not configured on this deployment' }) };
   let last = 0;
   for (let a = 0; a < keys.length; a++) {
     const key = keys[(turn + a) % keys.length];
@@ -44,10 +45,22 @@ async function upstream(keys, build) {
       const r = await build(key);
       if (r.status === 429 || r.status >= 500) { last = r.status; continue; }
       turn = (turn + a) % keys.length;
-      return r;
+      return { up: r };
     } catch (e) { last = e && e.name === 'TimeoutError' ? 504 : 502; }
   }
-  return json(502, { code: 'RINGS_UNAVAILABLE', message: `Helius Privacy Rings did not answer (${last || 'no answer'}); try again in a moment` });
+  return { own: json(502, { code: 'RINGS_UNAVAILABLE', message: `Helius Privacy Rings did not answer (${last || 'no answer'}); try again in a moment` }) };
+}
+/* audit2 A2-10: an upstream answer is never passed through. A new Response is built from its status, the allowlisted
+   headers only, and its body: text bodies are scrubbed of anything key-bearing, binary ones (the prover's encrypted
+   envelopes) are copied as bytes. */
+const TEXTY = /^(application\/(json|problem\+json)|text\/)/i;
+async function rebuild(r, allow) {
+  const headers = { 'cache-control': 'no-store', ...CORS };
+  for (const h of allow) { const v = r.headers.get(h); if (v !== null) headers[h] = h === 'content-type' ? v.split(',')[0].slice(0, 100) : v.slice(0, 2048); }
+  const type = r.headers.get('content-type') || '';
+  const status = r.status >= 200 && r.status <= 599 ? r.status : 502;
+  if (!type || TEXTY.test(type)) return new Response(scrub(await r.text()), { status, headers: { 'content-type': 'application/json', ...headers } });
+  return new Response(await r.arrayBuffer(), { status, headers });
 }
 
 /* POST /api/spr/<method>?net= */
@@ -66,8 +79,8 @@ export async function sprProxy(req, { keys = keysFromEnv() } = {}) {
   let j; try { j = JSON.parse(body); } catch { return json(400, { code: 'BAD_JSON', message: 'the body is not JSON' }); }
   if (!j || j.jsonrpc !== '2.0' || j.method !== method) return json(400, { code: 'METHOD_MISMATCH', message: 'a JSON-RPC 2.0 body whose method matches the path' });
   const r = await upstream(keys, key => fetch(`https://${net}.helius-rpc.com/v1/spr/${method}?api-key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(LIMITS.timeoutMs) }));
-  if (!(r instanceof Response) || r.headers.get('access-control-allow-origin')) return r;
-  return new Response(scrub(await r.text()), { status: r.status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS } });
+  if (r.own) return r.own;
+  return rebuild(r.up, ['content-type']);
 }
 
 /* ANY /api/spr-prover/<route>?net=  (rewritten to /api/spr/prover?path=<route>&net= on Vercel) */
@@ -86,7 +99,6 @@ export async function proverProxy(req, { keys = keysFromEnv(), route } = {}) {
   const q = new URLSearchParams(url.searchParams); q.delete('net'); q.delete('path');
   const headers = {}; for (const h of PASS_UP) { const v = req.headers.get(h); if (v !== null) headers[h] = v; }
   const r = await upstream(keys, key => { q.set('api-key', key); return fetch(`https://${net}.helius-rpc.com/v1/spr${path}?${q}`, { method: req.method, headers, body, signal: AbortSignal.timeout(LIMITS.timeoutMs) }); });
-  if (r.headers.get('access-control-allow-origin')) return r;
-  const out = { 'cache-control': 'no-store', ...CORS }; for (const h of PASS_DOWN) { const v = r.headers.get(h); if (v !== null) out[h] = v; }
-  return new Response(await r.arrayBuffer(), { status: r.status, headers: out });
+  if (r.own) return r.own;
+  return rebuild(r.up, PASS_DOWN);
 }
