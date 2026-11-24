@@ -1,0 +1,28 @@
+[package]
+name = "pof_gate"
+version = "0.1.0"
+description = "Proof of Funds Rooms: on-chain rooms that admit a subject only with a live POF certificate (through the require_certificate CPI) and let anyone evict a member whose certificate is revoked or expired"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "pof_gate"
+
+[features]
+default = []
+quick = ["pof/quick"]
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "pof/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { version = "1.2.0" }
+pof = { path = "../pof", features = ["cpi"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

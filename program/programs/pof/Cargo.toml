@@ -1,0 +1,29 @@
+[package]
+name = "pof"
+version = "0.1.0"
+description = "Proof of Funds: live certificates that a subject holds at least a tier of SOL or USDC in a Helius Privacy Ring, signed by the Verifier, revoked on chain the moment a disclosed note is spent"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "pof"
+
+[features]
+default = []
+quick = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
+solana-sha256-hasher = "3"
+solana-poseidon = "3"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
