@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Get certified · Proof of Funds</title>
 <meta name="description" content="Shield into your POF vault, choose a tier and a subject, and get a public certificate that never shows the amount.">
-<link rel="canonical" href="https://pof-dun.vercel.app/get">
+<link rel="canonical" href="https://proofoffunds.vercel.app/get">
 <meta name="theme-color" content="#f3efe6">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
@@ -15,10 +15,10 @@
 <meta property="og:site_name" content="Proof of Funds">
 <meta property="og:title" content="Get certified · Proof of Funds">
 <meta property="og:description" content="Shield into your POF vault, choose a tier and a subject, and get a public certificate that never shows the amount.">
-<meta property="og:url" content="https://pof-dun.vercel.app/get">
-<meta property="og:image" content="https://pof-dun.vercel.app/api/card/proof-of-funds.png">
+<meta property="og:url" content="https://proofoffunds.vercel.app/get">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://pof-dun.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
 
 <script src="/config.js"></script>
 <script type="module" src="/ui/app.js"></script>
@@ -123,6 +123,7 @@
           <p class="label">The relayer</p>
           <p>For an X handle or a badge, the relayer pays and submits the certificate, so no wallet appears on it. You pay the relayer from the vault with a private transfer. The vault key pays that transfer's network fee itself, so it needs a little SOL of its own.</p>
           <div class="row"><button class="btn ghost small" type="button" data-act="fund">Add 0.005 SOL to the vault key for fees</button><button class="btn ghost small" type="button" data-act="credits">Buy relay credits ahead of time</button><span class="small quiet" data-credits></span></div>
+          <p class="small">Credits are signed blind by the relayer's credit key, so the relayer cannot tell which credit pays for which certificate. The key's fingerprint is <span class="mono" data-credit-fp>a8bc 7d7b 1acc 34e0 7619 e00e 4dd8 b625</span>. It is pinned in the source, shown on <a href="/status">Status</a>, and checked against the relayer's answer before you pay.</p>
         </div>
         <div class="stack" data-privacy>
           <p class="label">Before you certify</p>

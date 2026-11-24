@@ -177,7 +177,10 @@ pages.add('/reports');
 const art = s => s
   .replace(/<!--seal:(\w+)(?::(\w+))?-->/g, (_, state, extra) => sealSVG({ state, title: extra === 'title' ? 'The Proof of Funds seal' : undefined }).replace('class="seal ', `class="seal ${extra === 'draw' ? 'draw ' : ''}`))
   .replace(/<!--mark:(\w+)-->/g, (_, state) => markSVG({ state }))
-  .replace(/<!--cardart-->/g, () => cardArtSVG());
+  .replace(/<!--cardart-->/g, () => cardArtSVG())
+  .replace(/<!--credit-fp-->/g, () => CREDIT_FP || 'published at launch');
+/** the relay credit key's fingerprint, pinned in the repo (verifier/lib/credit-pins.json), shown where credits are bought */
+const CREDIT_FP = (() => { try { return JSON.parse(read('verifier/lib/credit-pins.json')).networks.mainnet.fingerprint; } catch { return ''; } })();
 
 const APP = [
   { file: 'home', out: 'index.html', url: '/', nav: 'wall', title: '', scripts: ['/ui/home.js'], bodyClass: 'page-home' },

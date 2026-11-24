@@ -63,6 +63,7 @@ export async function certifyInstructions(answer, { payer, client }) {
   });
   const keys = sdk.resolveAccounts(sdk.POF_IDL, 'certify', { payer, config, treasury, certificate, prior_payer: prior, holder_token: holder });
   keys[0].isSigner = true; keys[0].isWritable = true;
+  if (prior === PROGRAM) keys[4].isWritable = false;   // the absent optional account is the program id, never writable
   const verifier = answer.verifierKey;
   return { certificate, instructions: [ed25519Instruction(verifier, sdk.fromHex(answer.signature), att), ix(PROGRAM, keys, data)] };
 }

@@ -89,6 +89,7 @@
           <p class="label">The relayer</p>
           <p>For an X handle or a badge, the relayer pays and submits the certificate, so no wallet appears on it. You pay the relayer from the vault with a private transfer. The vault key pays that transfer's network fee itself, so it needs a little SOL of its own.</p>
           <div class="row"><button class="btn ghost small" type="button" data-act="fund">Add 0.005 SOL to the vault key for fees</button><button class="btn ghost small" type="button" data-act="credits">Buy relay credits ahead of time</button><span class="small quiet" data-credits></span></div>
+          <p class="small">Credits are signed blind by the relayer's credit key, so the relayer cannot tell which credit pays for which certificate. The key's fingerprint is <span class="mono" data-credit-fp><!--credit-fp--></span>. It is pinned in the source, shown on <a href="/status">Status</a>, and checked against the relayer's answer before you pay.</p>
         </div>
         <div class="stack" data-privacy>
           <p class="label">Before you certify</p>

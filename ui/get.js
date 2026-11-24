@@ -274,7 +274,9 @@ $('[data-act="credits"]').addEventListener('click', async e => {
     const o = await pof.credits.offer();
     const n = o.bundles?.[0];
     if (!n) throw Object.assign(Error('The relayer sells no credits right now.'), { code: 'RELAY_OFF' });
-    if (!confirm(`Buy ${n} relay credits for ${fmtUnits(BigInt(o.unitLamports) * BigInt(n), 0)} SOL, paid privately from the vault?`)) return;
+    const pinned = $('[data-credit-fp]').textContent.trim();
+    if (o.fingerprint && pinned && o.fingerprint !== pinned) throw Object.assign(Error(`The relayer's credit key (${o.fingerprint}) is not the pinned one (${pinned}). Nothing was paid.`), { code: 'CREDIT_KEY_MISMATCH' });
+    if (!confirm(`Buy ${n} relay credits for ${fmtUnits(BigInt(o.unitLamports) * BigInt(n), 0)} SOL, paid privately from the vault?\n\nCredit key fingerprint: ${o.fingerprint || pinned}`)) return;
     busy(b, true, 'Buying');
     await pof.credits.buy({ count: n });
     await credits();

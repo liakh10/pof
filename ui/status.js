@@ -20,6 +20,8 @@ async function run() {
     </article>`).join('');
     const facts = await fetch('/api/attest').then(x => x.json()).catch(() => null);
     const pub = r.published?.bundleHash;
+    const pinned = $('[data-credit-pinned]').textContent.trim(), liveFp = facts?.credits?.fingerprint;
+    $('[data-credit-live]').textContent = liveFp ? `${liveFp}${liveFp === pinned ? ' · matches' : ' · DIFFERS from the pinned key'}` : 'not served here';
     $('[data-verifier]').innerHTML = `<div><dt>Published bundle sha256</dt><dd>${esc(pub || 'not published')}</dd></div>`
       + (facts && !facts.error ? `<div><dt>Running bundle sha256</dt><dd>${esc(facts.bundleHash)}${pub ? (facts.bundleHash === pub ? ' · matches' : ' · DIFFERS') : ''}</dd></div><div><dt>Verifier key</dt><dd>${esc(facts.verifierKey)}</dd></div><div><dt>Minimum note age</dt><dd>${num(facts.minAgeSlots)} slots</dd></div><div><dt>Keeps</dt><dd>${esc(facts.keeps || '')}</dd></div>` : `<div><dt>Verifier</dt><dd>not reachable from here</dd></div>`);
     if (r.history && r.history.days && r.history.days.length) {
