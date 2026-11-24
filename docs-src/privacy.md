@@ -51,8 +51,8 @@ no wallet appears in the certificate, its event or its log entry. How you pay th
 - **With relay credits (when credits are available).** You buy credits ahead of time by a private transfer from the vault
   into the relayer's house ring, and each certificate later spends one. Nothing is paid next to the certificate and no
   amount carries a tag. The transfer is still visible as a transaction the vault signed (amount and recipient hidden).
-  The relayer's side signs credits blind (RSA blind signatures), so when a credit is spent it cannot tell which purchase
-  paid for it; until the client uses that blind form, the operator can link each credit to the vault that bought it.
+  Credits are blind-signed (RSA blind signatures, checked in the page before they are kept), so when a credit is spent
+  the relayer cannot tell which purchase paid for it. It still sees that the vault bought credits.
 - **Paying at certify time.** The fee is a withdrawal from the vault, a spend signed by the vault key that lands shortly
   before the relayer's `certify`. Someone watching both can pair the vault with the certificate by timing.
 - **From your wallet.** That names the wallet as payer; the client asks for explicit consent before it does it.
@@ -84,8 +84,8 @@ Even when every habit above is followed:
 - **the vault and the wallet**, in public, through the vault's registration, its shields and its fee funding;
 - **the vault's activity**: its private transfers are visible as transactions the vault signed (amounts and recipients
   hidden);
-- **subject, vault and wallet, for the operator**: the Verifier learns them together at attest time, and the relayer can
-  link a credit to the purchase that paid for it until credits are spent in their blind form;
+- **subject, vault and wallet, for the operator**: the Verifier learns them together at attest time, and the relayer
+  sees which vaults buy credits (not which certificate each credit later pays for);
 - **a certificate and its vault, in public, after a revocation by spend**: the revealed nullifier matches a spend the
   vault signed. Revoke first, then move, and this one does not happen.
 
