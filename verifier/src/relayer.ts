@@ -70,14 +70,15 @@ export class Relayer {
     if (used + cost > this.cfg.dailyCapLamports) throw new PofError('RELAY_CAP', 'the relayer reached its spend cap for the last 24 hours; your payment stays valid, try later or certify from your own wallet', 429);
     if ((await this.chain.relayerBalance()) < cost + this.cfg.balanceFloorLamports) throw new PofError('RELAY_LOW', 'the relayer is low on SOL; your payment stays valid, try later', 503);
 
+    const attId = crypto.createHash('sha256').update(att).digest('hex'); // the whole 240 bytes: nonce and nullset included
     let paid: string | null = null, creditMark: string | null = null;
     if (!this.cfg.free && input.credit !== undefined) {
       if (!this.credits) throw new PofError('CREDITS_OFF', 'relay credits are not configured here; use a quote', 503);
-      creditMark = await this.credits.spend(input.credit, hex(att).slice(0, 64));
+      creditMark = await this.credits.spend(input.credit, attId);
     } else if (!this.cfg.free) {
       const quote = this.parseQuote(input.quote);
       const inc = await this.chain.incoming(quote.slot - 150n);
-      const mark = new Uint8Array(Buffer.from(hex(att).slice(0, 64)));
+      const mark = new Uint8Array(Buffer.from('for:' + attId)); // bound to this exact attestation (POF-30)
       for (const t of inc) {
         if (t.lamports !== quote.lamports) continue;
         if (await this.store.create(`relay/paid/${t.signature}`, mark)) { paid = t.signature; break; }

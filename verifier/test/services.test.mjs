@@ -284,3 +284,16 @@ test('relayed holder revoke: the controller signs the revoke bytes, the relayer 
   await rej(c.relayer.revoke({ subjectHash: sh, asset: 0, signature: 'ab'.repeat(64) }), 'PROGRAM_NOT_READY');
   assert.equal(V.revokeBytes(new Uint8Array(32), new Uint8Array(32), new Uint8Array(32), 1, new Uint8Array(32), 5n).length, 148);
 });
+
+test('POF-30: one payment pays one certificate even when two attestations race for it', async () => {
+  const c = makeCtx();
+  const ctl = ring();
+  const mk = async (h) => { const r = ring(); c.rings.register(r); return c.verifier.attest(pkg(c, r, [c.rings.note(r, 3n * SOL)], { kind: 1, value: h, proof: c.verifier.linkToken(h, Math.floor(Date.now() / 1000) + 600, ctl.owner), relay: true, controller: ctl.owner })); };
+  const [a, b] = [await mk('race_a'), await mk('race_b')];
+  const q = await c.relayer.quote();
+  c.chain.inbox.push({ signature: 'payRace', slot: c.rings.slotNow, lamports: BigInt(q.lamports) });
+  const body = (o) => ({ attestation: o.attestation, signature: o.signature, logIndex: o.logIndex, quote: q.quote, hashes: o.hashes });
+  const r = await Promise.allSettled([c.relayer.certify(body(a)), c.relayer.certify(body(b))]);
+  assert.equal(r.filter(x => x.status === 'fulfilled').length, 1);
+  assert.equal(r.find(x => x.status === 'rejected').reason.code, 'NOT_PAID');
+});
