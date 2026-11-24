@@ -68,21 +68,57 @@ needs a key that can revoke it and join rooms, and the relayer pays for it. `tre
 The transparency log leaf (§7) carries these 240 bytes.
 
 ## §4 The disclosure package (owner: verifier; producer: rings client)
-What the browser sends to `POST /api/attest`. It carries the openings of the chosen notes only, over TLS, never stored.
+What the browser sends to `POST /api/attest`. It carries the openings of the chosen notes only, over TLS; the Verifier keeps
+none of it (no amount, no opening, no `nk` is stored or logged; `nk` lives in memory for the one request).
 
 ```json
 {
   "v": 1,
-  "subject": { "kind": 0, "value": "<base58 wallet | handle | base58 badge pubkey>", "proof": "<wallet signature | link id | badge signature>" },
+  "subject": { "kind": 0, "value": "<base58 wallet | handle | base58 badge pubkey>",
+               "proof": "<hex or base58 ed25519 signature (kind 0, 2) | link id from /api/link/check (kind 1)>",
+               "slot": "<u64 decimal: the recent slot named in the signed message (kind 0, 2)>" },
   "asset": 0,
   "tier": 3,
-  "notes": [ { "opening": "TBD(rings): the fields that recompute the commitment", "leafIndex": 0, "tree": "<pubkey>" } ],
+  "ring": { "owner": "<base58 Ed25519 key that owns the notes>", "nk": "<hex 31: the ring's nullifier secret>" },
+  "notes": [ { "tree": "<base58>", "leafIndex": "<u64 decimal>", "asset": "<base58 mint, SOL = 1111…1111>",
+               "amount": "<u64 decimal>", "blinding": "<hex 32>", "sig": "<base58 signature of the transaction that created it>",
+               "dataHash": "<hex 32, only if present>", "ringDataHash": "<hex 32, only if present>", "ringProgramId": "<base58, only if present>" } ],
   "payer": "<base58>",
-  "relay": true
+  "relay": true,
+  "controller": "<base58, kind 1 only: the key the client keeps to revoke and join rooms>"
 }
 ```
-The answer: `{ attestation: <hex 208 bytes>, signature: <hex 64>, verifierKey, salts: [hex], nullifiers: [hex], logIndex }`.
-The salts and nullifiers go back to the browser, which saves them (the holder's own revoke kit).
+**The subject message** (kind 0 by the wallet, kind 2 by the badge key) is these UTF-8 lines joined with `\n`, signed raw
+(Phantom `signMessage`):
+```
+Proof of Funds: subject proof
+program: <pof program id base58>
+subject: <wallet|x|badge> <value>
+ring: <ring.owner>
+asset: <SOL|USDC> tier: <tier>
+payer: <payer>
+slot: <subject.slot>
+```
+The `ring:` line is the vault link: a wallet may certify from a separate vault ring (RINGS §5), and the one signature binds
+both. The slot must be within 1,500 slots of the Verifier's read.
+
+**What the Verifier checks**, in order, each with its own error code (`verifier/src/verify.ts`): the version, asset, tier,
+1..8 notes; the subject proof (kind 1: the link id is the Verifier's own signature over the handle and an expiry); a User
+Registry record for `ring.owner` and `Poseidon(nk) == npk`; per note the asset's mint, the commitment recomputed with the SDK
+(`ownerUtxoHash`), the indexer's Merkle path re-hashed with the SDK's Poseidon to a root in the tree account's on-chain
+history, at the stated leaf index; all notes in one tree; every nullifier derived from `nk` and unspent (no PDA, and the
+indexer's non-inclusion path re-hashed to an on-chain nullifier root); each note's creating transaction (`sig`) older than
+the minimum age (150 slots); the sum ≥ the tier (never returned); `root_slot` within 9,000 slots; no note behind another live
+certificate (a keyed index of nullifiers, no amounts). `relay: true` requires `payer` = the relayer.
+
+**The answer**: `{ attestation: hex240, signature: hex64, verifierKey, salts: [hex32], nullifiers: [hex32] (same order as
+notes), hashes: [hex32] (sorted, the certificate's list), logIndex, subjectHash, controller, issuedSlot, expirySlot,
+bundleHash, certificate: { seeds } }`. The salts and nullifiers are the holder's own revoke kit: the client saves them.
+**Errors**: `{ error: { code, message, details? } }` with the HTTP status; codes are listed in `verifier/README.md`.
+`certify` must land within `max_attest_age` (300 slots) of `issued_slot`: pay the relayer before attesting.
+
+2026-11-25 (verifier): the package fixed from RINGS §9 (`ring.owner` + `ring.nk`, per-note `asset` and `sig`), the subject
+message with the `ring:` line (vault mode), `controller` for kind 1, the answer and the checks written out.
 
 ## §5 Salted nullifiers and revocation (owner: verifier, with program)
 - For each disclosed note: `salt` = 32 random bytes; `h = sha256("pof:null:" ‖ salt ‖ nullifier)`.
@@ -99,6 +135,8 @@ The salts and nullifiers go back to the browser, which saves them (the holder's 
   (on the certificate: `revealed_index`, `revealed_salt`, `revealed_nullifier`, and in the `Revoked` event).
 
 2026-11-25 (program): the on-chain check of revoke_spent fixed (both paths, built and unit-tested against a real mainnet path).
+2026-11-25 (verifier): the keeper seals each kit with AES-256-GCM (key name as associated data) in Blob, revokes by the PDA
+path and falls back to path (b) when the PDA is gone; one note backs one live certificate (keyed nullifier index).
 
 ## §6 Accounts and API (owner: program for accounts, devx for HTTP)
 - Program ids: `pof` = `pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`, `pof_gate` = `gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU`.
@@ -145,16 +183,16 @@ The salts and nullifiers go back to the browser, which saves them (the holder's 
 An append-only Merkle log of every attestation the Verifier signs, per RFC 9162 (Certificate Transparency v2) hashing.
 It holds no amounts, no openings, no nullifiers, no salts: only the §3 bytes (which carry the salted `nullset_hash`).
 
-**Leaf data** (fixed 345 bytes, all integers little-endian):
+**Leaf data** (fixed 377 bytes, all integers little-endian):
 ```
 offset size field
 0      1    version        0x01
-1      208  attestation    the exact §3 bytes
-209    64   signature      the Verifier's ed25519 signature over the attestation
-273    32   verifier_key   the ed25519 public key that signed
-305    32   bundle_hash    sha256 of the Verifier bundle that produced it (pof/verifier/dist/BUILD.json)
-337    8    logged_slot    u64, the slot the Verifier read when it appended the entry
-345         total
+1      240  attestation    the exact §3 bytes
+241    64   signature      the Verifier's ed25519 signature over the attestation
+305    32   verifier_key   the ed25519 public key that signed
+337    32   bundle_hash    sha256 of the Verifier bundle that produced it (pof/verifier/dist/BUILD.json)
+369    8    logged_slot    u64, the slot the Verifier read when it appended the entry
+377         total
 ```
 - `leaf_hash = sha256(0x00 ‖ leaf_data)`; `node = sha256(0x01 ‖ left ‖ right)`; the tree over n leaves is RFC 9162 §2.1.1
   (split at the largest power of two below n); the empty tree's root is `sha256("")`.
@@ -167,7 +205,10 @@ offset size field
   relayed `certify` transaction, and a periodic memo from the keeper (off before launch). Anyone can match a head to a slot.
 - **Entry id**: the leaf index (u64, from 0). `logIndex` in the §4 answer and on the Certificate is this index.
 - HTTP (served by `pof/api/attest/log*`, devx may proxy under `/v1/log/*`): `GET /api/attest/log?head` → STH JSON;
-  `GET /api/attest/log?entry=<i>` → `{ index, leaf: hex345, leafHash }`; `GET /api/attest/log?proof=<i>&size=<n>` →
-  `{ index, treeSize, rootHash, path: [hex] }`; `GET /api/attest/log?from=<i>&to=<j>` → entries (≤ 256).
+  `GET /api/attest/log?entry=<i>` → `{ index, leaf: hex377, leafHash, attestation, signature, verifierKey, bundleHash, loggedSlot }`; `GET /api/attest/log?proof=<i>&size=<n>` →
+  `{ index, treeSize, rootHash, leafHash, path: [hex] }`; `GET /api/attest/log?consistency=<m>&size=<n>` →
+  `{ first, second, firstRoot, secondRoot, path }`; `GET /api/attest/log?from=<i>&to=<j>` → entries (≤ 256).
+  The X linker: `GET /api/link?id=<link id>` → `{ verified, handle, expiresAt }` or `{ verified: false, handle, reason }`.
 
 2026-11-25 (verifier): §7 added: RFC 9162 hashing as devx proposed, 345-byte leaf, 80-byte signed head, memo anchor.
+2026-11-25 (verifier): the leaf is 377 bytes now (it embeds the 240-byte §3); offsets above updated; anchor_log takes the 80-byte STH.
