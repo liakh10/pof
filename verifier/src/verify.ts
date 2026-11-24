@@ -70,7 +70,7 @@ export interface Disclosure {
 
 export interface AttestResult {
   attestation: string; signature: string; verifierKey: string; salts: string[]; nullifiers: string[]; hashes: string[];
-  logIndex: number; subjectHash: string; certificate: { seeds: string[] }; issuedSlot: number; expirySlot: number; bundleHash: string; controller: string;
+  logIndex: number | null; attestationId: string; subjectHash: string; certificate: { seeds: string[] }; issuedSlot: number; expirySlot: number; bundleHash: string; controller: string;
 }
 
 export class Verifier {
@@ -232,13 +232,16 @@ export class Verifier {
         payer: payerBytes, controller, nonce: new Uint8Array(crypto.randomBytes(16)),
       });
       const sig = this.signer.sign(att);
-      const logIndex = await this.log.append(logLeaf(att, sig, this.signer.publicKey, this.cfg.bundleHash, slot));
+      // held privately until the certificate lands (A2-06): an attestation that is never submitted never becomes public
+      const attId = crypto.createHash('sha256').update(att).digest('hex');
+      await this.log.hold(attId, logLeaf(att, sig, this.signer.publicKey, this.cfg.bundleHash, slot));
+      const logIndex = null;
       const kit = { subjectHash: hex(sHash), asset, tree, expirySlot: Number(slot + this.cfg.validitySlots), attestation: hex(att), kit: notes.map((_, k) => ({ h: hex(hs[k]), salt: hex(salts[k]), nullifier: hex(nullifiers[k]) })) };
       if (this.keeper) await this.keeper.hold(kit);
-      if (this.escrow) await this.escrow.put(kit);
+      // the escrow is published by the keeper once the certificate lands (A2-06), not here
       return {
         attestation: hex(att), signature: hex(sig), verifierKey: this.signer.address,
-        salts: salts.map(hex), nullifiers: nullifiers.map(hex), hashes: sorted.map(hex), logIndex,
+        salts: salts.map(hex), nullifiers: nullifiers.map(hex), hashes: sorted.map(hex), logIndex, attestationId: attId,
         subjectHash: hex(sHash), certificate: { seeds: ['cert', hex(sHash), String(asset)] },
         issuedSlot: Number(slot), expirySlot: Number(slot + this.cfg.validitySlots), bundleHash: hex(this.cfg.bundleHash),
         controller: toB58(controller),

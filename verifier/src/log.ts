@@ -89,4 +89,26 @@ export class TransparencyLog {
     for (let i = a; i < b; i++) out.push(await this.entry(i));
     return { treeSize: n, entries: out };
   }
+
+  /* Only certified attestations are published (audit A2-06): the Verifier keeps each signed leaf privately under
+     log/pending/<attestation id>, and the relayer (when its certify lands) or the keeper (when it sees the certificate on
+     chain) publishes it. log/published/<id> is taken by create-if-absent, so a leaf is appended once. */
+  async hold(attId: string, leaf: Uint8Array) { await this.store.put(`log/pending/${attId}`, leaf); }
+  async drop(attId: string) { await this.store.del(`log/pending/${attId}`); }
+  /** appends the pending leaf of this attestation if it is not in the log yet; returns its index (null while another
+   *  instance is appending it, or when nothing is pending) */
+  async publish(attId: string): Promise<number | null> {
+    const mark = `log/published/${attId}`;
+    const was = await this.store.get(mark);
+    if (was) { const v = Buffer.from(was).toString(); return /^\d+$/.test(v) ? Number(v) : null; }
+    const leaf = await this.store.get(`log/pending/${attId}`);
+    if (!leaf) return null;
+    if (!(await this.store.create(mark, new Uint8Array(Buffer.from('appending'))))) return this.publish(attId);
+    try {
+      const i = await this.append(leaf);
+      await this.store.put(mark, new Uint8Array(Buffer.from(String(i))));
+      await this.store.del(`log/pending/${attId}`);
+      return i;
+    } catch (e) { await this.store.del(mark).catch(() => {}); throw e; }
+  }
 }

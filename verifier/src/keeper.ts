@@ -13,6 +13,8 @@ import type { RingsSource } from './rings.js';
 export interface Kit { subjectHash: string; asset: number; tree: string; expirySlot: number; attestation: string; kit: { h: string; salt: string; nullifier: string }[] }
 
 export class Keeper {
+  /** the log and the escrow publish a kit's attestation once its certificate is seen on chain (A2-06) */
+  publishers: { log?: { publish(id: string): Promise<number | null>; drop(id: string): Promise<void> }; escrow?: { put(k: Kit): Promise<unknown>; remove(k: Kit): Promise<void> } } = {};
   constructor(private store: Store, private sealKey: Uint8Array, private rings: RingsSource | null = null, private chain: PofChain | null = null, private maxAttestAge = 300n) {
     if (sealKey.length !== 32) throw new PofError('KEY_MISSING', 'POF_SEAL_KEY must be 32 bytes of hex', 500);
   }
@@ -52,15 +54,19 @@ export class Keeper {
         const canLand = slot <= issued + landWindow;
         const cert = await this.chain.certificate(unhex(k.subjectHash, 32), k.asset);
         const mine = !!cert && cert.hashes.length === k.kit.length && k.kit.every(x => cert.hashes.includes(x.h));
+        const attId = hex(sha256(unhex(k.attestation)));
+        const gone = async () => { await this.store.del(name); report.dropped++; await this.publishers.log?.drop(attId).catch(() => {}); await this.publishers.escrow?.remove(k).catch(() => {}); };
         if (!mine) {
           if (canLand) { report.pending++; continue; }
-          await this.store.del(name); report.dropped++; continue;
+          await gone(); continue;
         }
-        if (cert!.status !== STATUS.live || slot > cert!.expirySlot + graceSlots) {
-          if (canLand) { report.pending++; continue; } // a certify from a sibling attestation may still remake it
-          await this.store.del(name); report.dropped++; continue;
-        }
+        // its own certificate is revoked or expired: this attestation can never certify again (a remake needs a newer
+        // issued slot), so the kit, its pending leaf and its escrow go now (A2-06 retention)
+        if (cert!.status !== STATUS.live || slot > cert!.expirySlot + graceSlots) { await gone(); continue; }
         report.live++;
+        // it landed: its attestation goes into the public log, and its kit into the keeper escrow (once each)
+        if (this.publishers.log) await this.publishers.log.publish(attId).catch(e => report.errors.push(`log: ${String(e?.code || e?.message).slice(0, 60)}`));
+        if (this.publishers.escrow) await this.publishers.escrow.put(k).catch(e => report.errors.push(`escrow: ${String(e?.code || e?.message).slice(0, 60)}`));
         const spent = await this.rings.spent(k.tree, k.kit.map(x => unhex(x.nullifier, 32)));
         const at = spent.findIndex(Boolean);
         if (at < 0 || report.revoked.length >= maxRevokes) continue;
@@ -70,6 +76,7 @@ export class Keeper {
         report.revoked.push({ certificate: cert!.address, index, signature: r.signature });
         report.live--;
         await this.store.del(name);
+        await this.publishers.escrow?.remove(k).catch(() => {});
       } catch (e: any) { report.errors.push(`${k.subjectHash.slice(0, 8)}: ${String(e?.code || e?.message).slice(0, 80)}`); }
     }
     (report as any).complete = !stoppedAt;

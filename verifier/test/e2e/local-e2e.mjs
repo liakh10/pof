@@ -115,6 +115,7 @@ try {
   const chain = await V.makeProgramChain({ web3, rpcUrl: RPC, programId: PROGRAM, relayer: keys.relayer, verifier: keys.verifier, rings });
   const log = new V.TransparencyLog(store, keys.verifier, programId);
   const keeper = new V.Keeper(store, sealKey, rings, chain);
+  keeper.publishers = { log: new V.TransparencyLog(store, keys.verifier, programId) };
   const locks = new V.NoteLocks(store, V.sha256(sealKey), 300n, chain);
   const verifier = new V.Verifier({ programId, minAgeSlots: 2n, validitySlots: BigInt(cfg.params.validity_slots), subjectProofSlots: 1500n, maxRootAgeSlots: 150n, maxRootLagSlots: BigInt(cfg.params.max_root_lag), relayer: keys.relayer.address, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, keys.verifier, rings, log, keeper, locks);
   const relayer = new V.Relayer({ address: keys.relayer.address, verifierKey: keys.verifier.publicKey, programId, dailyCapLamports: 2_000_000_000n, balanceFloorLamports: 50_000_000n, quoteTtlSec: 1800, free: true, hmacKey: V.sha256(sealKey, Uint8Array.of(1)) }, store, chain, log);
@@ -130,14 +131,15 @@ try {
   const pkg = JSON.parse(JSON.stringify(pof.disclose({ subject: subj, asset: 0, tier: 1, notes: pick.notes, payer: keys.relayer.address, relay: true, from: 'vault' })));
   const ans = await verifier.attest(pkg);
   const att = V.decodeAttestation(Buffer.from(ans.attestation, 'hex'));
-  ok(ans.attestation.length === 480 && att.subjectKind === 1 && V.toB58(att.payer) === keys.relayer.address, 'the Verifier signed a 240-byte attestation for @e2e_anon, payer = the relayer', `log index ${ans.logIndex}, controller ${ans.controller.slice(0, 8)}…`);
+  ok(ans.attestation.length === 480 && att.subjectKind === 1 && V.toB58(att.payer) === keys.relayer.address && ans.logIndex === null && (await log.head()).treeSize === 0, 'the Verifier signed a 240-byte attestation for @e2e_anon, payer = the relayer; nothing public before it lands', `controller ${ans.controller.slice(0, 8)}…`);
 
   // the relayer certifies on chain
   const rel = await relayer.certify({ attestation: ans.attestation, signature: ans.signature, logIndex: ans.logIndex, hashes: ans.hashes });
   const cert = await chain.certificate(att.subjectHash, 0);
-  ok(cert && cert.status === 0 && cert.tier === 1 && JSON.stringify(cert.hashes) === JSON.stringify(ans.hashes), 'certify landed through the relayer: the certificate is live, tier 1, with the salted hashes', `tx ${rel.signature.slice(0, 12)}…, ${cert.address}`);
+  ok(cert && cert.status === 0 && cert.tier === 1 && JSON.stringify(cert.hashes) === JSON.stringify(ans.hashes) && rel.logIndex === 0, 'certify landed through the relayer: the certificate is live, tier 1, with the salted hashes, and its attestation is now in the log', `tx ${rel.signature.slice(0, 12)}…, ${cert.address}, log index ${rel.logIndex}`);
   const raw = V.decodeAccount('Certificate', (await conn.getAccountInfo(new PublicKey(cert.address))).data);
-  ok(raw.controller === ans.controller && BigInt(raw.log_index) === BigInt(ans.logIndex), 'the certificate carries the controller key and the log index');
+  ok(raw.controller === ans.controller && BigInt(raw.log_index) === V.UNKNOWN_LOG_INDEX, 'the certificate carries the controller key (the log entry is found by its bytes)');
+  ans.logIndex = rel.logIndex;
 
   // the keeper: live, nothing spent
   let rep = await keeper.scan();

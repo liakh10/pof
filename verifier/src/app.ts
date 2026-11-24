@@ -83,6 +83,7 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
   const keeper = new Keeper(store, sealKey, rings, chain, certifyWindow);
   const locks = new NoteLocks(store, sha256(text('pof:locks:'), sealKey), certifyWindow, chain);
   const escrow = new Escrow(store);
+  keeper.publishers = { log, escrow };
   const mints: Record<number, string> = { 0: ASSETS[0].mint, 1: env.POF_USDC_MINT || ASSETS[1].mint };
   const verifier = new Verifier({
     programId, minAgeSlots: BigInt(env.POF_MIN_AGE_SLOTS ?? 150), validitySlots: BigInt(env.POF_VALIDITY_SLOTS ?? 216_000),

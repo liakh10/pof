@@ -46,10 +46,16 @@ export class Escrow {
   async put(kit: { subjectHash: string; asset: number; tree: string; expirySlot: number; attestation: string; kit: { h: string; salt: string; nullifier: string }[] }) {
     if (!this.keys.length) return null;
     const attHash = sha256(unhex(kit.attestation));
+    if (await this.store.get(`escrow/${kit.subjectHash}-${kit.asset}/${hex(attHash)}.json`)) return null; // once
     const plain = new Uint8Array(Buffer.from(JSON.stringify(kit)));
     const name = `escrow/${kit.subjectHash}-${kit.asset}/${hex(attHash)}.json`;
     await putJson(this.store, name, { v: 1, subjectHash: kit.subjectHash, asset: kit.asset, tree: kit.tree, expirySlot: kit.expirySlot, attestationHash: hex(attHash), attestation: kit.attestation, envelopes: this.keys.map(k => sealTo(k, attHash, plain)) });
     return name;
+  }
+
+  /** a dead kit leaves the escrow at once (A2-06 retention): revoked, expired, or never landed */
+  async remove(kit: { subjectHash: string; asset: number; attestation: string }) {
+    await this.store.del(`escrow/${kit.subjectHash}-${kit.asset}/${hex(sha256(unhex(kit.attestation)))}.json`);
   }
 
   /** the public listing: names after a cursor, at most `limit`, with their envelopes */

@@ -29,12 +29,20 @@ test('happy path: two notes reach tier 2, the answer carries no amount and the s
   // no amount anywhere in the answer
   const s = JSON.stringify(out);
   for (const n of ['6000000000', '4000000000', '10000000000']) assert.ok(!new RegExp(`[^0-9a-f]${n}[^0-9a-f]`).test(s.replace(/"(logIndex|issuedSlot|expirySlot)":\d+/g, '')), n);
-  assert.equal(out.logIndex, 0);
+  assert.equal(out.logIndex, null, 'nothing is public before the certificate lands (A2-06)');
+  assert.equal((await c.log.head()).treeSize, 0);
 });
 
-test('the log entry is the §7 leaf of exactly this attestation', async () => {
+test('the log entry is the §7 leaf of exactly this attestation, published once, when it is certified (A2-06)', async () => {
   const c = makeCtx(); const r = ring(); c.rings.register(r);
   const out = await c.verifier.attest(pkg(c, r, [c.rings.note(r, 2n * SOL)]));
+  assert.equal((await c.log.head()).treeSize, 0);
+  await c.chain.certify({ attestation: Buffer.from(out.attestation, 'hex'), signature: Buffer.from(out.signature, 'hex'), logIndex: 0, hashes: out.hashes.map(h => Buffer.from(h, 'hex')) });
+  await c.keeper.scan();                                                // the keeper sees it on chain and publishes it
+  await c.keeper.scan();                                                // once
+  assert.equal((await c.log.head()).treeSize, 1);
+  out.logIndex = await c.log.publish(out.attestationId);
+  assert.equal(out.logIndex, 0);
   const e = await c.log.entry(out.logIndex);
   assert.equal(e.attestation, out.attestation); assert.equal(e.signature, out.signature);
   assert.equal(e.verifierKey, hex(c.signer.publicKey)); assert.equal(e.bundleHash, hex(V.bundleHash()));

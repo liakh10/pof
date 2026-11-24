@@ -129,6 +129,7 @@ test('HTTP: routes answer JSON, every rejection has a code, limits answer 429, c
   res = await V.areas.attest()(req('/api/attest', { method: 'POST', body: JSON.stringify(pkg(c, r, [c.rings.note(r, 2n * SOL)])), ip: 2 }));
   const ok = await res.json();
   assert.equal(res.status, 200, JSON.stringify(ok)); assert.equal(ok.attestation.length, 480);
+  assert.equal(await c.log.publish(ok.attestationId), 0);             // what the relayer or the keeper does once it lands
   res = await V.areas.log()(req('/api/attest/log?proof=0'));
   assert.equal((await res.json()).treeSize, 1);
   res = await V.areas.log()(req('/api/attest/log?proof=x'));
@@ -162,6 +163,9 @@ test('keeper escrow (POF-01): every kit is sealed to each registered keeper, who
   const r = ring(); c.rings.register(r);
   const a = c.rings.note(r, 2n * SOL);
   const out = await c.verifier.attest(pkg(c, r, [a]));
+  assert.equal((await c.escrow.list()).entries.length, 0, 'no escrow before the certificate lands (A2-06)');
+  await c.chain.certify({ attestation: Buffer.from(out.attestation, 'hex'), signature: Buffer.from(out.signature, 'hex'), logIndex: 0, hashes: out.hashes.map(h => Buffer.from(h, 'hex')) });
+  await c.keeper.scan();
   const res = await V.areas.keeper()(new Request('https://pof.test/api/keeper/escrow'));
   const list = await res.json();
   assert.equal(list.entries.length, 1); assert.equal(list.keepers[0].kid, 'witness-test');
@@ -173,13 +177,13 @@ test('keeper escrow (POF-01): every kit is sealed to each registered keeper, who
   assert.throws(() => V.openEnvelope(new Uint8Array(32).fill(1), 'witness-test', Buffer.from(e.attestationHash, 'hex'), e.envelopes[0]));
   assert.throws(() => V.openEnvelope(c.witnessSecret, 'other', Buffer.from(e.attestationHash, 'hex'), e.envelopes[0]));
   // the witness revokes with what it opened, through the same permissionless instruction
-  await c.chain.certify({ attestation: Buffer.from(out.attestation, 'hex'), signature: Buffer.from(out.signature, 'hex'), logIndex: out.logIndex, hashes: out.hashes.map(h => Buffer.from(h, 'hex')) });
   c.rings.spend(a.nullifier);
   const cert = await c.chain.certificate(V.subjectHash(0, r.owner), 0);
   await c.chain.revokeSpent({ subjectHash: Buffer.from(kit.subjectHash, 'hex'), asset: kit.asset, index: cert.hashes.indexOf(kit.kit[0].h), salt: Buffer.from(kit.kit[0].salt, 'hex'), nullifier: Buffer.from(kit.kit[0].nullifier, 'hex'), tree: kit.tree });
   assert.equal((await c.chain.certificate(V.subjectHash(0, r.owner), 0)).status, 1);
-  // expired entries are swept
-  assert.equal(await c.escrow.sweep(BigInt(kit.expirySlot) + 10_000n), 1);
+  // a revoked certificate's kit leaves the escrow at the next scan; expired entries are swept too
+  await c.keeper.scan();
+  assert.equal((await c.escrow.list()).entries.length, 0);
   V.setContext(null);
 });
 

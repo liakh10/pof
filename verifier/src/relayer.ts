@@ -12,6 +12,7 @@ import { getJson, putJson, type Store } from './store.js';
 import type { PofChain } from './chain.js';
 import type { TransparencyLog } from './log.js';
 import type { Credits } from './credits.js';
+export const UNKNOWN_LOG_INDEX = 18446744073709551615n; // u64::MAX: the SDK reads it as "unknown"
 
 export interface RelayConfig {
   address: string; verifierKey: Uint8Array; programId: Uint8Array;
@@ -62,8 +63,8 @@ export class Relayer {
     if (!Array.isArray(input.hashes) || input.hashes.length !== a.noteCount) throw new PofError('BAD_HASHES', `send the ${a.noteCount} salted nullifier hashes that came with the attestation`);
     const hashes = input.hashes.map((h, i) => unhex(h, 32, `hashes[${i}]`));
     if (hex(nullsetHash(sortHashes(hashes))) !== hex(a.nullsetHash)) throw new PofError('BAD_HASHES', 'those hashes do not match the attestation');
-    const logIndex = Number(input.logIndex);
-    if (!Number.isInteger(logIndex) || logIndex < 0) throw new PofError('BAD_LOG_INDEX', 'logIndex comes with the attestation');
+    // the log index is not known before the certificate lands (A2-06): certify carries u64::MAX ("look it up by the bytes")
+    const logIndex = UNKNOWN_LOG_INDEX;
 
     /* every refusal that does not depend on the payment comes first, so a refused request never uses up a payment (POF-08) */
     const spend = await this.spend();
@@ -109,7 +110,8 @@ export class Relayer {
     if (creditMark) await this.store.put(creditMark, new Uint8Array(Buffer.from('done:' + r.signature)));
     spend.push([Math.floor(Date.now() / 1000), String(r.lamports)]);
     await putJson(this.store, 'relay/spend.json', spend);
-    return { signature: r.signature, payment: paid, credit: creditMark ? 'spent' : null, certificate: (await this.chain.certificate(a.subjectHash, a.asset))?.address ?? null };
+    const published = await this.log.publish(attId).catch(() => null);
+    return { signature: r.signature, payment: paid, credit: creditMark ? 'spent' : null, logIndex: published, certificate: (await this.chain.certificate(a.subjectHash, a.asset))?.address ?? null };
   }
 
 
