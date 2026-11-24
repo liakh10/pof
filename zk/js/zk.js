@@ -11,6 +11,7 @@
 export const N = 4;
 export const STATE_H = 32;
 export const NULL_H = 40;
+export const REG_H = 20;
 export const FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 export const BASE_Q = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const enc = new TextEncoder();
@@ -18,6 +19,7 @@ const big = bytes => { let x = 0n; for (const b of bytes) x = (x << 8n) | BigInt
 export const TAG_DOMAIN = big(enc.encode('pof:zk:tag:v1'));
 export const ESC_DOMAIN = big(enc.encode('pof:zk:esc:v1'));
 export const CTX_DOMAIN = enc.encode('pof:zk:ctx:v1');
+export const OWN_DOMAIN = big(enc.encode('pof:zk:own:v1'));
 
 /* ------------------------------------------------------------------ encodings */
 export const toBig = b => big(b);
@@ -45,6 +47,19 @@ export function noteHashes(P, { ownerId: oid, nk, asset, amount, blinding, dataH
   const commitment = P([3n, 0n, asset, BigInt(amount), dataHash, rt ?? P([0n, 0n]), P([owner, blinding])]);
   const nullifier = P([commitment, blinding, nk]);
   return { npk, owner, commitment, nullifier, tag: P([TAG_DOMAIN, nullifier]) };
+}
+
+/* the ring owner's registration (audit ZK-04). ownerSecret never leaves the device and is never shown to a phase 1 Verifier;
+   derive it from the vault seed so the wallet alone recovers it: ownerSecretFrom(seed32) = sha256("pof:zk:own:v1" ‖ seed),
+   top 3 bits cleared. The owner signs register_zk_owner(Poseidon(OWN_DOMAIN, ownerSecret)); the program appends
+   Poseidon(ownerId(owner), that commitment) to the owner registry tree (height 20). */
+export const ownerCommitment = (P, ownerSecret) => P([OWN_DOMAIN, BigInt(ownerSecret)]);
+export const registryLeaf = (P, oid, ownerSecret) => P([oid, ownerCommitment(P, ownerSecret)]);
+export async function ownerSecretFrom(seed32) {
+  const msg = new Uint8Array(13 + seed32.length); msg.set(enc.encode('pof:zk:own:v1')); msg.set(seed32, 13);
+  const d = new Uint8Array(await (globalThis.crypto?.subtle ?? (await import('node:crypto')).webcrypto.subtle).digest('SHA-256', msg));
+  d[0] &= 0x1f;
+  return big(d);
 }
 
 /* the context: sha256("pof:zk:ctx:v1" ‖ program ‖ kind ‖ subject_hash ‖ asset ‖ tier ‖ controller ‖ payer ‖ nonce), its top three
@@ -96,14 +111,15 @@ export function openEscrow(P, secret, eph, cts, tags) {
 }
 
 /* ------------------------------------------------------------------ the circuit's inputs
-   ring:   { ownerId (bigint) | ownerKey (32 bytes), nk (bigint | 31 bytes) }
+   ring:   { ownerId (bigint) | ownerKey (32 bytes), nk (bigint | 31 bytes), ownerSecret (bigint) }
+   registry: { root, index, path[20] }: the ring owner's leaf in the POF owner registry
    notes:  1..N of { amount, blinding, dataHash?, ringTerm?, leafIndex, statePath[32], lowValue, nextValue, lowIndex, nullPath[40] }
            (paths as bigints or 32-byte arrays, siblings from the leaf up)
    pub:    { stateRoot, nullRoot, mint (32 bytes) | assetHash, minAmount, ctx, escrow: [x, y] }
    r:      the ephemeral escrow scalar (ephemeralScalar()).
    Returns { input, publicSignals (as the circuit orders them), notes: [{ tag, nullifier, commitment }] sorted by tag }. */
 const F = v => (v instanceof Uint8Array ? big(v) : BigInt(v));
-export function buildInputs(P, { ring, notes, pub, r }) {
+export function buildInputs(P, { ring, notes, pub, r, registry }) {
   if (!notes.length || notes.length > N) throw Error(`1..${N} notes`);
   const oid = ring.ownerId != null ? F(ring.ownerId) : ownerId(P, ring.ownerKey);
   const nk = F(ring.nk);
@@ -121,7 +137,8 @@ export function buildInputs(P, { ring, notes, pub, r }) {
   const input = {
     stateRoot: F(pub.stateRoot).toString(), nullRoot: F(pub.nullRoot).toString(), assetHash: asset.toString(), minAmount: BigInt(pub.minAmount).toString(),
     ctx: F(pub.ctx).toString(), escrowX: F(pub.escrow[0]).toString(), escrowY: F(pub.escrow[1]).toString(), ephX: R[0].toString(), ephY: R[1].toString(),
-    tag: [], ct: [], ownerId: oid.toString(), nk: nk.toString(), r: BigInt(r).toString(),
+    tag: [], ct: [], registryRoot: F(registry.root).toString(), ownerId: oid.toString(), nk: nk.toString(), r: BigInt(r).toString(),
+    ownerSecret: BigInt(ring.ownerSecret ?? 0n).toString(), regIndex: BigInt(registry.index).toString(), regPath: registry.path.map(x => F(x).toString()),
     enabled: [], amount: [], blinding: [], dataHash: [], ringTerm: [], leafIndex: [], statePath: [], lowValue: [], nextValue: [], lowIndex: [], nullPath: [],
   };
   for (let i = 0; i < N; i++) {
@@ -148,7 +165,8 @@ export function buildInputs(P, { ring, notes, pub, r }) {
     input.lowIndex.push(BigInt(n.lowIndex).toString());
     input.nullPath.push(n.nullPath.map(x => F(x).toString()));
   }
-  const publicSignals = [input.stateRoot, input.nullRoot, input.assetHash, input.minAmount, input.ctx, input.escrowX, input.escrowY, input.ephX, input.ephY, ...input.tag, ...input.ct];
+  if (registry.path.length !== REG_H) throw Error('a registry path has 20 siblings');
+  const publicSignals = [input.stateRoot, input.nullRoot, input.assetHash, input.minAmount, input.ctx, input.escrowX, input.escrowY, input.ephX, input.ephY, ...input.tag, ...input.ct, input.registryRoot];
   return { input, publicSignals, notes: rich.map(({ h }) => ({ tag: h.tag, nullifier: h.nullifier, commitment: h.commitment })) };
 }
 
@@ -163,7 +181,7 @@ export function proofBytes(proof) {
   put(proof.pi_c[0], 192); put(proof.pi_c[1], 224);
   return out;
 }
-/* the instruction's zk part: proof, the two roots, R, the tags and ciphertexts (all 32-byte BE), 640 bytes in total */
+/* the instruction's zk part: proof, the three roots, R, the tags and ciphertexts (all 32-byte BE) */
 export function certifyZkArgs(proof, publicSignals) {
   const ps = publicSignals.map(BigInt);
   return {
@@ -171,6 +189,7 @@ export function certifyZkArgs(proof, publicSignals) {
     stateRoot: be32(ps[0]), nullRoot: be32(ps[1]),
     eph: [be32(ps[7]), be32(ps[8])],
     tags: ps.slice(9, 9 + N).map(be32), cts: ps.slice(9 + N, 9 + 2 * N).map(be32),
+    registryRoot: be32(ps[9 + 2 * N]),
     noteCount: ps.slice(9, 9 + N).filter(x => x !== 0n).length,
   };
 }

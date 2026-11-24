@@ -1,0 +1,979 @@
+diff -ruN a/program/programs/pof/Cargo.toml b/program/programs/pof/Cargo.toml
+--- a/program/programs/pof/Cargo.toml	2026-11-25 01:27:23
++++ b/program/programs/pof/Cargo.toml	2026-11-25 01:29:11
+@@ -24,6 +24,7 @@
+ anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
+ solana-sha256-hasher = "3"
+ solana-poseidon = "3"
++solana-bn254 = "3.2.1"
+ 
+ [lints.rust]
+ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+diff -ruN a/program/programs/pof/src/errors.rs b/program/programs/pof/src/errors.rs
+--- a/program/programs/pof/src/errors.rs	2026-11-25 01:27:23
++++ b/program/programs/pof/src/errors.rs	2026-11-25 01:29:11
+@@ -96,4 +96,32 @@
+     NoRotationDue,
+     #[msg("arithmetic overflow")]
+     Overflow,
++    #[msg("certify_zk is turned off")]
++    ZkDisabled,
++    #[msg("certify_zk takes a wallet or badge subject (its key signs)")]
++    ZkSubjectKind,
++    #[msg("pass one writable note lock [\"znote\", tag] per tag, in order")]
++    ZkLockMissing,
++    #[msg("the state root is not in the Rings tree's root history")]
++    ZkStateRootUnknown,
++    #[msg("the nullifier root is not the Rings tree's newest nullifier root (prove again against it)")]
++    ZkNullRootNotNewest,
++    #[msg("the owner registry root is not in its recent history")]
++    ZkRegistryRootUnknown,
++    #[msg("the owner registry is full")]
++    ZkRegistryFull,
++    #[msg("the revocation key is not a Baby Jubjub point")]
++    ZkBadEscrowKey,
++    #[msg("this build has no verifying key")]
++    ZkNoVerifyingKey,
++    #[msg("the zk certificate is still settling (its nullifiers may be queued spends)")]
++    ZkSettling,
++    #[msg("a public input is not a canonical field element")]
++    ZkInputNotInField,
++    #[msg("the proof does not verify for this certificate")]
++    ZkProofInvalid,
++    #[msg("a note is already behind another certificate")]
++    ZkNoteLocked,
++    #[msg("the lock's certificate is still live with this note")]
++    ZkNoteStillLive,
+ }
+diff -ruN a/program/programs/pof/src/groth16.rs b/program/programs/pof/src/groth16.rs
+--- a/program/programs/pof/src/groth16.rs	1970-01-01 03:00:00
++++ b/program/programs/pof/src/groth16.rs	2026-11-25 01:29:11
+@@ -0,0 +1,112 @@
++//! Groth16 over BN254 with Solana's alt_bn128 syscalls (solana-bn254): the check
++//!   e(-A, B) · e(alpha, beta) · e(vk_x, gamma) · e(C, delta) == 1,   vk_x = IC_0 + sum_i x_i · IC_(i+1)
++//! Every point is big-endian (G1: x ‖ y, G2: x.c1 ‖ x.c0 ‖ y.c1 ‖ y.c0), the layout of the syscalls and of
++//! `proofBytes` in js/zk.js (which negates A). Public inputs must be canonical field elements (below r), so one statement
++//! has one byte encoding: a value x + r would pass the pairing and break every uniqueness check built on the inputs.
++//! On a non-Solana target the same crate runs arkworks, so this file is unit-tested natively against snarkjs proofs.
++use solana_bn254::prelude::{alt_bn128_g1_addition_be, alt_bn128_g1_multiplication_be, alt_bn128_pairing_be};
++
++use super::vk::{VK_ALPHA_G1, VK_BETA_G2, VK_DELTA_G2, VK_GAMMA_G2, VK_HASH, VK_IC, NPUB};
++
++const fn nonzero(b: &[u8]) -> bool {
++    let mut i = 0;
++    while i < b.len() {
++        if b[i] != 0 {
++            return true;
++        }
++        i += 1;
++    }
++    false
++}
++const fn vk_is_real() -> bool {
++    if !nonzero(&VK_HASH) || !nonzero(&VK_ALPHA_G1) || !nonzero(&VK_BETA_G2) || !nonzero(&VK_GAMMA_G2) || !nonzero(&VK_DELTA_G2) {
++        return false;
++    }
++    let mut i = 0;
++    while i < VK_IC.len() {
++        if !nonzero(&VK_IC[i]) {
++            return false;
++        }
++        i += 1;
++    }
++    true
++}
++// Audit ZK-03: a stub verifying key (any point at infinity) would verify every proof. Such a build does not compile.
++const _: () = assert!(vk_is_real(), "vk.rs is a stub or has a point at infinity: run scripts/vk-rs.mjs from the ceremony's key");
++
++/// The BN254 scalar field modulus r, big-endian.
++pub const FIELD_R: [u8; 32] = [
++    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d, 0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91,
++    0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
++];
++
++#[derive(Debug, PartialEq, Eq, Clone, Copy)]
++pub enum Groth16Error {
++    /// A public input is not below r.
++    InputNotInField,
++    /// A syscall refused a point (not on the curve, not in the subgroup, malformed).
++    BadPoint,
++    /// The pairing product is not one: the proof does not verify for these inputs.
++    Invalid,
++}
++
++/// x < r, big-endian.
++pub fn in_field(x: &[u8; 32]) -> bool {
++    x < &FIELD_R
++}
++
++fn g1_add(a: &[u8; 64], b: &[u8; 64]) -> Result<[u8; 64], Groth16Error> {
++    let mut buf = [0u8; 128];
++    buf[..64].copy_from_slice(a);
++    buf[64..].copy_from_slice(b);
++    let r = alt_bn128_g1_addition_be(&buf).map_err(|_| Groth16Error::BadPoint)?;
++    r.as_slice().try_into().map_err(|_| Groth16Error::BadPoint)
++}
++
++fn g1_mul(p: &[u8; 64], s: &[u8; 32]) -> Result<[u8; 64], Groth16Error> {
++    let mut buf = [0u8; 96];
++    buf[..64].copy_from_slice(p);
++    buf[64..].copy_from_slice(s);
++    let r = alt_bn128_g1_multiplication_be(&buf).map_err(|_| Groth16Error::BadPoint)?;
++    r.as_slice().try_into().map_err(|_| Groth16Error::BadPoint)
++}
++
++/// The linear combination of the public inputs (zero inputs cost nothing: unused note slots are zero).
++pub fn prepare_inputs(inputs: &[[u8; 32]; NPUB]) -> Result<[u8; 64], Groth16Error> {
++    let mut acc = VK_IC[0];
++    for (i, x) in inputs.iter().enumerate() {
++        if !in_field(x) {
++            return Err(Groth16Error::InputNotInField);
++        }
++        if x.iter().all(|b| *b == 0) {
++            continue;
++        }
++        let term = g1_mul(&VK_IC[i + 1], x)?;
++        acc = g1_add(&acc, &term)?;
++    }
++    Ok(acc)
++}
++
++/// Verifies a 256-byte proof (A negated ‖ B ‖ C) for these public inputs.
++pub fn verify(proof: &[u8; 256], inputs: &[[u8; 32]; NPUB]) -> Result<(), Groth16Error> {
++    // A or C at infinity is never an honest proof (ZK-03)
++    if !nonzero(&proof[0..64]) || !nonzero(&proof[64..192]) || !nonzero(&proof[192..256]) {
++        return Err(Groth16Error::BadPoint);
++    }
++    let vk_x = prepare_inputs(inputs)?;
++    let mut buf = vec![0u8; 4 * 192];
++    buf[0..64].copy_from_slice(&proof[0..64]); // -A
++    buf[64..192].copy_from_slice(&proof[64..192]); // B
++    buf[192..256].copy_from_slice(&VK_ALPHA_G1);
++    buf[256..384].copy_from_slice(&VK_BETA_G2);
++    buf[384..448].copy_from_slice(&vk_x);
++    buf[448..576].copy_from_slice(&VK_GAMMA_G2);
++    buf[576..640].copy_from_slice(&proof[192..256]); // C
++    buf[640..768].copy_from_slice(&VK_DELTA_G2);
++    let out = alt_bn128_pairing_be(&buf).map_err(|_| Groth16Error::BadPoint)?;
++    if out.len() == 32 && out[..31].iter().all(|b| *b == 0) && out[31] == 1 {
++        Ok(())
++    } else {
++        Err(Groth16Error::Invalid)
++    }
++}
+diff -ruN a/program/programs/pof/src/lib.rs b/program/programs/pof/src/lib.rs
+--- a/program/programs/pof/src/lib.rs	2026-11-25 01:27:23
++++ b/program/programs/pof/src/lib.rs	2026-11-25 01:29:11
+@@ -36,7 +36,10 @@
+ 
+ pub mod errors;
+ pub mod ext;
++pub mod zk;
+ 
++pub use zk::*;
++
+ use errors::PofError;
+ 
+ declare_id!("pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT");
+@@ -477,6 +480,8 @@
+ pub fn gate(cert: &Certificate, asset: u8, min_tier: u8, slot: u64) -> Result<CertView> {
+     require!(cert.asset == asset, PofError::AssetMismatch);
+     require!(cert.status == STATUS_LIVE, PofError::NotLive);
++    // a zk certificate settles first (its issued_slot is ahead): refused until then (audit ZK-02); signed ones issue in the past
++    require!(slot >= cert.issued_slot, PofError::ZkSettling);
+     require!(slot <= cert.expiry_slot, PofError::CertificateExpired);
+     require!(cert.tier >= min_tier, PofError::TierTooLow);
+     Ok(CertView { subject_kind: cert.subject_kind, tier: cert.tier, expiry_slot: cert.expiry_slot, controller: cert.controller })
+@@ -497,7 +502,9 @@
+ fn revoke_with_pair(c: &Config, t: &mut Treasury, cert: &mut Certificate, index: u8, salt: [u8; 32], nullifier: [u8; 32], slot: u64, by: Pubkey, path: u8) -> Result<()> {
+     require!(cert.status == STATUS_LIVE, PofError::NotLive);
+     require!(index < cert.note_count, PofError::BadIndex);
+-    require!(ext::salted_nullifier(&salt, &nullifier) == cert.null_hashes[index as usize], PofError::NullifierMismatch);
++    // a zk certificate stores Poseidon(TAG_DOMAIN, nullifier) per note (no salt); a Verifier one the salted sha256
++    let h = if cert.verifier == zk::ZK_CONFIG { zk::tag_of(&nullifier)? } else { ext::salted_nullifier(&salt, &nullifier) };
++    require!(h == cert.null_hashes[index as usize], PofError::NullifierMismatch);
+     revoke(c, t, cert, STATUS_REVOKED_SPENT, slot);
+     cert.revealed_index = index;
+     cert.revealed_salt = salt;
+@@ -722,6 +729,26 @@
+         Ok(())
+     }
+ 
++    /// Phase 2: certify from a Groth16 proof of funds (pof/zk) instead of the Verifier's signature. See zk.rs.
++    pub fn certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkArgs) -> Result<()> {
++        zk::handle_certify_zk(ctx, args)
++    }
++
++    /// Admin: turn certify_zk on or off and set the revocation (escrow) key; records the build's verifying key hash.
++    pub fn set_zk(ctx: Context<SetZk>, enabled: bool, escrow: [[u8; 32]; 2]) -> Result<()> {
++        zk::handle_set_zk(ctx, enabled, escrow)
++    }
++
++    /// The ring owner registers its zk owner commitment (the consent certify_zk proves).
++    pub fn register_zk_owner(ctx: Context<RegisterZkOwner>, commitment: [u8; 32]) -> Result<()> {
++        zk::handle_register_zk_owner(ctx, commitment)
++    }
++
++    /// Anyone: close a note lock whose certificate is no longer live.
++    pub fn release_note_lock(ctx: Context<ReleaseNoteLock>) -> Result<()> {
++        zk::handle_release_note_lock(ctx)
++    }
++
+     /// A fresh attestation on the same notes (same salted hashes), subject, asset and controller: new root, slots and tier.
+     pub fn renew(ctx: Context<Renew>, att: Attestation) -> Result<()> {
+         let slot = Clock::get()?.slot;
+@@ -737,6 +764,8 @@
+         let cert = &mut a.certificate;
+         require!(cert.status == STATUS_LIVE, PofError::NotLive);
+         require!(slot <= cert.expiry_slot, PofError::CertificateExpired);
++        // a zk certificate carries tags, not the Verifier's salted hashes: it is remade by certify_zk, never renewed
++        require_keys_neq!(cert.verifier, zk::ZK_CONFIG, PofError::RenewMismatch);
+         let n = att.null_hashes.len();
+         require!(
+             cert.subject_kind == att.subject_kind && cert.controller == att.controller && n == cert.note_count as usize && cert.null_hashes[..n] == att.null_hashes[..],
+diff -ruN a/program/programs/pof/src/vk.rs b/program/programs/pof/src/vk.rs
+--- a/program/programs/pof/src/vk.rs	1970-01-01 03:00:00
++++ b/program/programs/pof/src/vk.rs	2026-11-25 01:29:11
+@@ -0,0 +1,29 @@
++//! GENERATED by scripts/vk-rs.mjs from setup/verification_key.json (the DEVELOPMENT setup, setup/TRANSCRIPT.md). Do not edit.
++//! VK_HASH = sha256(alpha ‖ beta ‖ gamma ‖ delta ‖ IC_0 ‖ … ‖ IC_18) = f360e49748d1483c9a6c868811af2ff7765d7cd768d23dbc0cad4eb1eb04a406
++pub const NPUB: usize = 18;
++pub const VK_HASH: [u8; 32] = [0xf3, 0x60, 0xe4, 0x97, 0x48, 0xd1, 0x48, 0x3c, 0x9a, 0x6c, 0x86, 0x88, 0x11, 0xaf, 0x2f, 0xf7, 0x76, 0x5d, 0x7c, 0xd7, 0x68, 0xd2, 0x3d, 0xbc, 0x0c, 0xad, 0x4e, 0xb1, 0xeb, 0x04, 0xa4, 0x06];
++pub const VK_ALPHA_G1: [u8; 64] = [0x0a, 0x2d, 0x34, 0xc7, 0xcf, 0x6a, 0x8d, 0xc3, 0x7d, 0x06, 0x80, 0x58, 0x4e, 0x6f, 0x0d, 0xcb, 0xdc, 0x97, 0xce, 0x75, 0x41, 0x40, 0x61, 0xc8, 0x2f, 0x21, 0x38, 0x00, 0x23, 0x79, 0x72, 0x73, 0x01, 0x7e, 0x60, 0x61, 0x27, 0x82, 0x07, 0x28, 0x93, 0xab, 0xae, 0xda, 0x8a, 0x4c, 0xde, 0x18, 0xb3, 0x95, 0xba, 0x59, 0x96, 0xf8, 0xe6, 0x5c, 0x4c, 0xb7, 0x33, 0x2b, 0x42, 0xc6, 0x8c, 0x12];
++pub const VK_BETA_G2: [u8; 128] = [0x18, 0x0f, 0xeb, 0xdd, 0xfb, 0xa0, 0xaa, 0xb4, 0x36, 0xfa, 0x8c, 0x24, 0x55, 0xa8, 0x8d, 0x24, 0x13, 0x8e, 0xae, 0xb5, 0x0d, 0x1e, 0x08, 0x9f, 0xa7, 0xed, 0x24, 0x6c, 0x75, 0x74, 0xa9, 0x56, 0x06, 0x85, 0x59, 0x9e, 0x1a, 0xe7, 0xab, 0x8b, 0xd8, 0xbe, 0xef, 0xc8, 0x2e, 0x85, 0xe5, 0x79, 0x9d, 0x43, 0x77, 0x30, 0x68, 0xeb, 0xa9, 0xbf, 0x65, 0x0f, 0x30, 0xa2, 0x5c, 0xa0, 0xa6, 0x3c, 0x17, 0x15, 0x7e, 0xf7, 0x0e, 0x48, 0x14, 0xa5, 0xf5, 0x73, 0x7a, 0xb9, 0x24, 0x8e, 0x1d, 0x05, 0x41, 0x8a, 0x30, 0x74, 0x1d, 0x7d, 0xe4, 0x9d, 0xa1, 0xca, 0xca, 0xf2, 0xae, 0xf2, 0x91, 0x43, 0x24, 0x3a, 0x81, 0x20, 0x1d, 0x2d, 0x22, 0x2c, 0x09, 0x72, 0xd8, 0x71, 0x46, 0x6d, 0x35, 0x05, 0xa7, 0xa4, 0x66, 0xfe, 0x0c, 0xa9, 0x1b, 0x56, 0x5b, 0x8f, 0xd5, 0xf1, 0x12, 0x78, 0x94, 0xca];
++pub const VK_GAMMA_G2: [u8; 128] = [0x19, 0x8e, 0x93, 0x93, 0x92, 0x0d, 0x48, 0x3a, 0x72, 0x60, 0xbf, 0xb7, 0x31, 0xfb, 0x5d, 0x25, 0xf1, 0xaa, 0x49, 0x33, 0x35, 0xa9, 0xe7, 0x12, 0x97, 0xe4, 0x85, 0xb7, 0xae, 0xf3, 0x12, 0xc2, 0x18, 0x00, 0xde, 0xef, 0x12, 0x1f, 0x1e, 0x76, 0x42, 0x6a, 0x00, 0x66, 0x5e, 0x5c, 0x44, 0x79, 0x67, 0x43, 0x22, 0xd4, 0xf7, 0x5e, 0xda, 0xdd, 0x46, 0xde, 0xbd, 0x5c, 0xd9, 0x92, 0xf6, 0xed, 0x09, 0x06, 0x89, 0xd0, 0x58, 0x5f, 0xf0, 0x75, 0xec, 0x9e, 0x99, 0xad, 0x69, 0x0c, 0x33, 0x95, 0xbc, 0x4b, 0x31, 0x33, 0x70, 0xb3, 0x8e, 0xf3, 0x55, 0xac, 0xda, 0xdc, 0xd1, 0x22, 0x97, 0x5b, 0x12, 0xc8, 0x5e, 0xa5, 0xdb, 0x8c, 0x6d, 0xeb, 0x4a, 0xab, 0x71, 0x80, 0x8d, 0xcb, 0x40, 0x8f, 0xe3, 0xd1, 0xe7, 0x69, 0x0c, 0x43, 0xd3, 0x7b, 0x4c, 0xe6, 0xcc, 0x01, 0x66, 0xfa, 0x7d, 0xaa];
++pub const VK_DELTA_G2: [u8; 128] = [0x29, 0x1b, 0x39, 0xdd, 0xea, 0x18, 0xad, 0x4c, 0x1e, 0x76, 0x7e, 0xa4, 0xf7, 0xf0, 0xb4, 0x7b, 0x2e, 0x53, 0x63, 0xd6, 0x77, 0x65, 0xc0, 0xec, 0x20, 0x79, 0xab, 0x82, 0xbc, 0xae, 0x62, 0xc4, 0x18, 0xeb, 0x04, 0x0f, 0xcb, 0x44, 0x10, 0xb6, 0x35, 0x66, 0x1f, 0x0a, 0x6a, 0x45, 0x2c, 0x1d, 0x8b, 0x27, 0x81, 0x50, 0x05, 0x3f, 0xd8, 0x48, 0x08, 0xdc, 0xd3, 0x71, 0x3c, 0x48, 0x9f, 0xbd, 0x28, 0xe1, 0xc9, 0x7a, 0x83, 0xb8, 0x74, 0x94, 0x69, 0x76, 0x0a, 0x7f, 0x21, 0xe5, 0xc7, 0x64, 0xb0, 0x3d, 0xc3, 0x1a, 0xcd, 0x52, 0x88, 0x97, 0x31, 0xf4, 0x7c, 0x93, 0xd0, 0x4a, 0x66, 0xf5, 0x23, 0xf0, 0xc5, 0x29, 0xb7, 0xf2, 0x8a, 0x0d, 0x1b, 0xe4, 0x50, 0xa1, 0x5e, 0xc3, 0x78, 0x8a, 0x37, 0xcc, 0x9b, 0x08, 0x5c, 0xe6, 0x80, 0xc0, 0x57, 0x71, 0xe9, 0xad, 0x56, 0xb9, 0x58, 0xe2];
++pub const VK_IC: [[u8; 64]; 19] = [
++    [0x2e, 0x42, 0xf9, 0x04, 0x35, 0x98, 0x47, 0x15, 0x61, 0x4b, 0xc9, 0x1d, 0x5f, 0x07, 0xa1, 0xb2, 0x77, 0xe1, 0x02, 0x1b, 0x85, 0x5a, 0x2e, 0xcf, 0x1e, 0x9c, 0x12, 0x27, 0xc7, 0xe0, 0x25, 0xac, 0x01, 0x44, 0x2a, 0xe7, 0x49, 0x8f, 0x82, 0x27, 0x60, 0xed, 0x6a, 0xb9, 0x62, 0x7c, 0x88, 0x26, 0x63, 0x4d, 0x85, 0x88, 0x63, 0x55, 0xc4, 0xfe, 0xd5, 0xda, 0x15, 0x7c, 0x5f, 0x04, 0x97, 0xb4],
++    [0x18, 0x2c, 0x3a, 0xa5, 0xa9, 0x41, 0x28, 0x0b, 0x86, 0x18, 0xcc, 0xf8, 0x6b, 0x2f, 0xaa, 0xa7, 0x29, 0x56, 0xf8, 0x36, 0xfd, 0x0d, 0xbe, 0x8b, 0x4e, 0x22, 0xd8, 0xd8, 0x4b, 0x88, 0xbc, 0xb0, 0x07, 0x27, 0x0a, 0x72, 0x69, 0x83, 0xa7, 0x5c, 0x9b, 0x79, 0x8d, 0xdf, 0xa8, 0x02, 0x98, 0x66, 0xbc, 0x7b, 0xbb, 0x81, 0xb7, 0x39, 0xe8, 0x4d, 0x3a, 0xc9, 0xec, 0x92, 0x2c, 0x15, 0x76, 0xcd],
++    [0x2e, 0xb5, 0xf8, 0xfb, 0xcb, 0xba, 0xc4, 0x4b, 0xd2, 0xcd, 0x6a, 0x6e, 0x87, 0x8f, 0x00, 0x95, 0x3c, 0x05, 0x2f, 0x67, 0x76, 0xae, 0x46, 0x0d, 0x3a, 0xaa, 0xa3, 0xb3, 0x8a, 0x23, 0x6f, 0x2d, 0x16, 0xa5, 0x3c, 0xe7, 0x04, 0x89, 0xb1, 0x2f, 0x2c, 0x7c, 0x97, 0xc1, 0xe6, 0x55, 0x4d, 0x0e, 0xc0, 0x26, 0xdb, 0x3c, 0xce, 0x12, 0xb2, 0x18, 0x5f, 0xaa, 0x12, 0xb3, 0x00, 0xa7, 0x3e, 0xf9],
++    [0x25, 0x20, 0x58, 0x1b, 0x30, 0xbd, 0x48, 0xdd, 0xb8, 0x04, 0x24, 0x9d, 0xc8, 0x96, 0x06, 0xf2, 0xb3, 0x69, 0xe3, 0xc5, 0xe0, 0x44, 0xbb, 0x56, 0x5a, 0x52, 0xa4, 0xc3, 0xae, 0x81, 0x83, 0x8f, 0x28, 0xab, 0x64, 0xff, 0x35, 0x48, 0x78, 0x92, 0x42, 0x7c, 0x79, 0xac, 0x22, 0x69, 0x2a, 0x36, 0x26, 0x6e, 0xa9, 0x25, 0xf9, 0x4b, 0x8b, 0x99, 0xa9, 0xc8, 0x37, 0x66, 0x91, 0xc9, 0x50, 0x34],
++    [0x17, 0x02, 0x58, 0xb9, 0x13, 0xb6, 0xce, 0x73, 0xba, 0xc2, 0x6a, 0xa0, 0x8f, 0x18, 0xcb, 0xcb, 0x2a, 0x54, 0xb4, 0x3f, 0x22, 0xea, 0x36, 0x3b, 0x61, 0xf6, 0x0f, 0x2d, 0xf4, 0xb4, 0xca, 0x71, 0x2e, 0x57, 0x64, 0xd9, 0x98, 0x85, 0x2a, 0x33, 0xe4, 0xbe, 0x9a, 0xd0, 0xcd, 0xbe, 0x62, 0xde, 0xfd, 0x5f, 0xe2, 0xa4, 0x00, 0x2d, 0x84, 0x64, 0x60, 0x11, 0x40, 0x40, 0xb2, 0x34, 0xa7, 0x06],
++    [0x19, 0xc2, 0xad, 0x89, 0x62, 0xdd, 0x08, 0xcc, 0x93, 0xb9, 0x56, 0x39, 0x4a, 0xbe, 0x92, 0x53, 0x72, 0x38, 0xc5, 0xe9, 0xdc, 0x64, 0xbc, 0x51, 0xd3, 0x20, 0x40, 0x67, 0xa8, 0x91, 0x28, 0x7a, 0x24, 0xb0, 0xe5, 0x3a, 0x0d, 0x58, 0xc2, 0xc1, 0x39, 0xdc, 0xdc, 0x94, 0xe4, 0xaa, 0x1a, 0x9c, 0x32, 0xa2, 0x85, 0xa0, 0xd0, 0x57, 0xfe, 0x1f, 0x84, 0x6b, 0x6a, 0x4c, 0xb4, 0xe6, 0x66, 0x4e],
++    [0x20, 0x03, 0x25, 0xdb, 0xe8, 0xc4, 0x1b, 0x48, 0xd5, 0x08, 0x2f, 0x80, 0x60, 0x77, 0x41, 0x39, 0x9b, 0x19, 0x72, 0x32, 0x98, 0x16, 0x97, 0xb0, 0xcb, 0xc3, 0x28, 0x12, 0x64, 0x3c, 0xb2, 0xe4, 0x1c, 0x24, 0xe6, 0x6d, 0x21, 0x5d, 0x75, 0x46, 0xb0, 0x8b, 0xdf, 0xc1, 0xe3, 0x83, 0x2d, 0x94, 0x7d, 0x96, 0x27, 0xd5, 0x93, 0xdf, 0xbc, 0x5b, 0x38, 0xe0, 0x15, 0xcc, 0x0d, 0x58, 0x48, 0xb1],
++    [0x08, 0x01, 0x3d, 0x8f, 0x5f, 0xde, 0xa6, 0xd2, 0x99, 0xb8, 0xc7, 0x46, 0x26, 0xa0, 0x29, 0xa9, 0x33, 0xae, 0x59, 0x98, 0xba, 0xfc, 0xc7, 0x76, 0xc0, 0x8d, 0xb1, 0x78, 0xea, 0xac, 0x90, 0x5c, 0x1c, 0x89, 0xf8, 0x5c, 0xdd, 0x8b, 0x20, 0xa6, 0x2e, 0xf7, 0x02, 0xc7, 0x66, 0x34, 0x02, 0xa5, 0xb2, 0x57, 0x36, 0x59, 0x9d, 0x1c, 0xc9, 0xe6, 0xad, 0x03, 0x8c, 0x26, 0x80, 0xe0, 0x1a, 0x4f],
++    [0x1d, 0xa1, 0xaf, 0xea, 0x1c, 0x3c, 0x4c, 0x3b, 0x5b, 0x63, 0xed, 0xce, 0xcc, 0x69, 0x06, 0x5a, 0x03, 0x06, 0x0e, 0xfa, 0x9d, 0x06, 0x9b, 0xc2, 0xa6, 0x40, 0xcc, 0x1a, 0x09, 0x91, 0x2f, 0xb6, 0x11, 0x06, 0x24, 0xeb, 0x87, 0xfe, 0xb3, 0x5e, 0xf3, 0xe6, 0x5d, 0x61, 0xc2, 0x55, 0x63, 0xe8, 0x9a, 0x72, 0xa5, 0x2a, 0x80, 0xe4, 0xfa, 0x14, 0x6a, 0x22, 0x75, 0x26, 0xac, 0xf3, 0x82, 0xfe],
++    [0x25, 0x12, 0xdd, 0x00, 0xed, 0x2f, 0xd0, 0x3b, 0x6c, 0x79, 0xc5, 0xf0, 0x6a, 0xa0, 0xd3, 0x6a, 0xda, 0x54, 0xe5, 0xcb, 0x51, 0x14, 0x61, 0x73, 0xca, 0xc6, 0xda, 0x79, 0x0a, 0x05, 0x8b, 0xb9, 0x24, 0x23, 0xb1, 0x61, 0x09, 0x16, 0xfc, 0xd3, 0xb3, 0xd0, 0x61, 0x7b, 0x5c, 0x5c, 0xc7, 0xcf, 0x2c, 0x54, 0x0a, 0xd3, 0xe8, 0x13, 0xc9, 0x1a, 0xb7, 0xfe, 0xb7, 0xeb, 0xdc, 0xd9, 0x64, 0xf5],
++    [0x1d, 0xa5, 0xbe, 0xee, 0x52, 0x68, 0xb1, 0x8f, 0x70, 0xcc, 0x23, 0x75, 0x47, 0xdf, 0x72, 0x35, 0x25, 0x0a, 0x55, 0xb9, 0xd5, 0x20, 0xaf, 0x4c, 0xfa, 0x22, 0x3a, 0xd4, 0xa9, 0xc9, 0x4f, 0xde, 0x30, 0x35, 0x61, 0x5a, 0x0f, 0xb4, 0xa3, 0x55, 0x3b, 0xe2, 0xcb, 0x14, 0x80, 0x34, 0xe4, 0x48, 0x93, 0x34, 0xdf, 0xe9, 0x0f, 0xb1, 0xa2, 0xe4, 0xcb, 0xcd, 0xd1, 0xfc, 0xd7, 0xce, 0x7e, 0x05],
++    [0x08, 0x54, 0xe6, 0xf7, 0x87, 0xd3, 0x4b, 0x71, 0x3c, 0x7f, 0x2c, 0xdb, 0xe6, 0xb7, 0xfe, 0x20, 0xe1, 0x44, 0xd3, 0xa6, 0x87, 0xa0, 0x93, 0x57, 0xbf, 0x06, 0x10, 0x03, 0xf0, 0xd8, 0x2e, 0x46, 0x24, 0x0b, 0x6c, 0x63, 0x75, 0x12, 0xbc, 0x5e, 0x47, 0xe0, 0x5a, 0x4b, 0x9b, 0xde, 0xeb, 0xb9, 0x27, 0xee, 0x6d, 0x95, 0x46, 0x8c, 0x82, 0x4c, 0xe0, 0x17, 0xb0, 0x2b, 0x3a, 0xb2, 0xa9, 0xc3],
++    [0x09, 0x6c, 0xc2, 0xa6, 0x8e, 0x2a, 0xcf, 0xad, 0xa8, 0x60, 0xa8, 0x2a, 0xad, 0xd9, 0xe8, 0x7c, 0x9b, 0x90, 0x46, 0xb1, 0xf2, 0xc2, 0xa4, 0xd4, 0x33, 0x30, 0x76, 0x22, 0x9b, 0xc7, 0xf6, 0xbc, 0x29, 0x53, 0xcf, 0x4f, 0xa5, 0x03, 0x1a, 0x54, 0x21, 0x7b, 0x83, 0x58, 0xf1, 0x52, 0x33, 0xf8, 0xc9, 0x1a, 0xe5, 0x00, 0xeb, 0x33, 0x0c, 0x94, 0x60, 0xbf, 0x66, 0x28, 0x22, 0xc9, 0x7b, 0xe0],
++    [0x28, 0xae, 0x0d, 0x99, 0xc7, 0x25, 0x08, 0x89, 0x6e, 0x6e, 0xd6, 0x4b, 0x92, 0x58, 0xbe, 0xfb, 0x5c, 0xaa, 0xa9, 0xbd, 0xf5, 0xb4, 0xec, 0x5f, 0x6c, 0x60, 0x8d, 0x6f, 0xd1, 0x72, 0x9c, 0xcd, 0x0d, 0xdf, 0xad, 0x3d, 0xd4, 0x46, 0x65, 0x34, 0xb0, 0x1e, 0x62, 0x21, 0xc7, 0xfd, 0x63, 0x9b, 0x63, 0xd8, 0xdf, 0x46, 0xe0, 0x03, 0x71, 0x8c, 0x46, 0xe5, 0x97, 0x89, 0x7c, 0x0b, 0xda, 0xa4],
++    [0x03, 0x52, 0x6b, 0x9d, 0x99, 0xd4, 0xd5, 0x81, 0x67, 0xf0, 0xa9, 0x55, 0x0c, 0xbf, 0x61, 0x29, 0xcd, 0xa0, 0xe4, 0x62, 0xe5, 0x45, 0xae, 0x25, 0x82, 0xc3, 0x5a, 0xc7, 0x93, 0x60, 0xcd, 0xf1, 0x1f, 0x11, 0xbe, 0x08, 0x3c, 0x2a, 0x28, 0x39, 0xef, 0x92, 0xb5, 0x52, 0x7a, 0x0c, 0xe4, 0x3e, 0x8d, 0x64, 0xae, 0x0d, 0x5c, 0xb6, 0xb7, 0x50, 0x6a, 0x24, 0xef, 0x87, 0x24, 0x5f, 0x7f, 0x1b],
++    [0x1b, 0xe6, 0xd5, 0x4e, 0x9f, 0x69, 0x0d, 0x3a, 0x83, 0xef, 0x62, 0x06, 0xbc, 0x09, 0x88, 0x2c, 0xb5, 0xb0, 0x54, 0x26, 0x73, 0x3a, 0x80, 0xa9, 0xae, 0x14, 0xc0, 0xcf, 0xd8, 0x84, 0x76, 0x52, 0x16, 0xdb, 0xad, 0xcd, 0x37, 0x93, 0x5b, 0xc1, 0x6e, 0x95, 0x4f, 0xb5, 0x6d, 0xe6, 0xb4, 0xf9, 0x89, 0x14, 0x3c, 0xd8, 0x96, 0x58, 0x2a, 0x0e, 0x12, 0x33, 0x2e, 0x3f, 0xda, 0xef, 0x25, 0x41],
++    [0x18, 0x23, 0xf2, 0xfc, 0xd7, 0x9f, 0x51, 0x02, 0x29, 0xe7, 0x65, 0x8a, 0xe7, 0x10, 0x10, 0xa9, 0x9d, 0x10, 0x79, 0xaf, 0x1b, 0x73, 0x4d, 0xbb, 0xb1, 0x37, 0x04, 0xeb, 0x46, 0x3e, 0x79, 0x61, 0x1b, 0xef, 0x91, 0x1c, 0xee, 0x4b, 0x4b, 0xed, 0x7f, 0xd5, 0x38, 0x39, 0xfb, 0x8d, 0xf8, 0x0a, 0x20, 0x9a, 0x8b, 0xe4, 0x65, 0x71, 0xa7, 0x9d, 0x94, 0x50, 0xc8, 0xea, 0xe3, 0x09, 0x10, 0x6a],
++    [0x00, 0xe9, 0x85, 0x49, 0x1b, 0x23, 0xff, 0xc1, 0xd3, 0x4a, 0xa2, 0xad, 0xd5, 0xe7, 0x61, 0x19, 0x4b, 0x47, 0x0c, 0xd4, 0x09, 0x57, 0xbf, 0xe4, 0x2e, 0xbb, 0x23, 0x98, 0x0d, 0x61, 0x6d, 0xd0, 0x03, 0x0a, 0xc3, 0x0f, 0x4c, 0xc0, 0xa0, 0xcc, 0xb4, 0x3e, 0x7e, 0xba, 0x49, 0x9d, 0xb2, 0x6d, 0x41, 0xf3, 0x16, 0xd9, 0xaf, 0x67, 0xd3, 0xab, 0xce, 0x10, 0x46, 0xf8, 0xe4, 0x2c, 0x9d, 0x3c],
++    [0x21, 0x01, 0x12, 0x2b, 0x0c, 0x34, 0xfa, 0x62, 0x74, 0xc9, 0x6e, 0xd2, 0x2f, 0x1f, 0xfe, 0xa3, 0x37, 0x2a, 0xa5, 0x2f, 0x05, 0x27, 0x44, 0x87, 0x8f, 0x21, 0x52, 0x18, 0xf3, 0xb3, 0xe2, 0x31, 0x05, 0x34, 0x45, 0x33, 0x61, 0x8c, 0xb5, 0x7a, 0xdf, 0x37, 0x54, 0xa5, 0x95, 0xc2, 0x3e, 0x6f, 0x2d, 0xe2, 0x61, 0x2d, 0x4b, 0x89, 0x27, 0x5e, 0x0e, 0xc0, 0xfb, 0xb0, 0x9c, 0x55, 0xcb, 0xac],
++];
+diff -ruN a/program/programs/pof/src/zk.rs b/program/programs/pof/src/zk.rs
+--- a/program/programs/pof/src/zk.rs	1970-01-01 03:00:00
++++ b/program/programs/pof/src/zk.rs	2026-11-25 01:29:11
+@@ -0,0 +1,709 @@
++//! Phase 2: `certify_zk`. A certificate made from a Groth16 proof instead of the Verifier's signature, so nobody off chain sees
++//! an amount, the nullifier key or the notes (pof/zk/circuits/pof.circom, pof/docs-src/zk.md).
++//!
++//! The proof shows: the prover knows 1..4 notes of one ring that are leaves of the Rings state tree under `state_root`, whose
++//! nullifiers are absent from the Rings nullifier tree under `null_root`, whose amounts in this asset sum to at least the tier's
++//! minimum, and the secret behind the ring owner's entry in the POF owner registry (the owner registered it with its own
++//! signature, so nk and the openings alone do not suffice: audit ZK-04). It publishes per note
++//! `tag = Poseidon("pof:zk:tag:v1", nullifier)` and the nullifier encrypted to the revocation key (Baby Jubjub). The program
++//! rebuilds or checks every public input itself:
++//!   state_root    in the 500-root state history of the Rings tree account
++//!   null_root     the NEWEST nullifier root of that account (ZK-01: the nullifier tree only grows, so an older root would
++//!                 show a long-spent note as absent)
++//!   asset_hash    Poseidon(mint[0..31], mint[31]) of the asset's mint in Config (Rings hashBytes)
++//!   min_amount    the tier's minimum from Config
++//!   ctx           sha256("pof:zk:ctx:v1" ‖ program ‖ kind ‖ subject_hash ‖ asset ‖ tier ‖ controller ‖ payer ‖ nonce), top 3
++//!                 bits cleared: the proof is bound to this one certificate (no replay to another subject, payer, tier)
++//!   escrow        the revocation key active now (ZkConfig)
++//!   registry_root in the owner registry's root history
++//!
++//! A nullifier spent but still queued in Rings (its PDA exists, not folded into the nullifier tree yet) passes the proof. So a
++//! zk certificate SETTLES first (ZK-02): its issued_slot is ZK_SETTLE_SLOTS ahead, `gate` (require_certificate, pof_gate)
++//! refuses it until then, and anyone who sees the nullifier PDA of a tag (tags are public, nullifiers become public when spent)
++//! or opens the escrow revokes it with revoke_spent in that window.
++//!
++//! One note backs one live zk certificate: a NoteLock PDA ["znote", tag] per note, released (anyone) once its certificate is
++//! not live. revoke_spent on a zk certificate (verifier = the ZkConfig address) checks Poseidon(TAG_DOMAIN, nullifier) == tag.
++use anchor_lang::prelude::*;
++use anchor_lang::system_program;
++
++use crate::errors::PofError;
++use crate::ext;
++use crate::*;
++
++#[path = "groth16.rs"]
++pub mod groth16;
++#[path = "vk.rs"]
++pub mod vk;
++
++pub const ZK_SEED: &[u8] = b"zk";
++pub const REGISTRY_SEED: &[u8] = b"zkreg";
++pub const LOCK_SEED: &[u8] = b"znote";
++/// The ZkConfig PDA ["zk"] of this program: also the `verifier` recorded on every zk certificate.
++pub const ZK_CONFIG: Pubkey = pubkey!("6q7PxLzgUtLHMfCDDHzkU4Ho54rC6b21VZmSFsD6Tsv1");
++/// Rings tree 0 (RINGS §1): the only state tree.
++pub const RINGS_TREE: Pubkey = pubkey!("777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor");
++pub const ZK_NOTES: usize = 4;
++pub const REG_H: usize = 20;
++pub const REG_ROOTS: usize = 12;
++/// Slots between certify_zk and the certificate passing `gate` (ZK-02): the keeper and anyone watching nullifier PDAs revoke
++/// a queued spend inside it. About a minute at mainnet speed.
++#[cfg(not(feature = "quick"))]
++pub const ZK_SETTLE_SLOTS: u64 = 150;
++#[cfg(feature = "quick")]
++pub const ZK_SETTLE_SLOTS: u64 = 20;
++/// "pof:zk:tag:v1" as a 32-byte big-endian field element.
++pub const TAG_DOMAIN: [u8; 32] = be_domain(b"pof:zk:tag:v1");
++pub const CTX_DOMAIN: &[u8] = b"pof:zk:ctx:v1";
++/// The root of the empty owner registry: the zero chain (empty leaf 0, Poseidon(z, z)) at height 20 (= ext::NULL_ZEROS
++/// continued; checked in the tests).
++pub const REG_EMPTY_ROOT: [u8; 32] = [
++    0x21, 0x34, 0xe7, 0x6a, 0xc5, 0xd2, 0x1a, 0xab, 0x18, 0x6c, 0x2b, 0xe1, 0xdd, 0x8f, 0x84, 0xee, 0x88, 0x0a, 0x1e, 0x46, 0xea, 0xf7, 0x12, 0xf9,
++    0xd3, 0x71, 0xb6, 0xdf, 0x22, 0x19, 0x1f, 0x3e,
++];
++
++const fn be_domain(s: &[u8]) -> [u8; 32] {
++    let mut o = [0u8; 32];
++    let mut i = 0;
++    while i < s.len() {
++        o[32 - s.len() + i] = s[i];
++        i += 1;
++    }
++    o
++}
++
++// tree account layout (RINGS §1)
++const TREE_LEN: usize = 40_080;
++const STATE_HISTORY_AT: usize = 1_152;
++const STATE_HISTORY_LEN_AT: usize = 114;
++const ROOT_SLOT_AT: usize = 120;
++const NULL_CURSOR_AT: usize = 17_224;
++const NULL_ROOTS_AT: usize = 17_232;
++const NULL_ROOTS: u64 = 100;
++
++#[account]
++#[derive(InitSpace)]
++pub struct ZkConfig {
++    /// certify_zk refuses while false. Turning it on, or changing the key, waits Config.params.rotation_delay (ZK-09);
++    /// turning it off is immediate.
++    pub enabled: bool,
++    /// The revocation key K = k·B8 on Baby Jubjub (x, y, 32-byte big-endian): the keeper holds k. On the curve (checked).
++    pub escrow: [[u8; 32]; 2],
++    /// Counts key changes; each note lock records the epoch it was encrypted under, so the keeper knows which k opens it.
++    pub escrow_epoch: u32,
++    /// A change waiting for next_slot (0: none). Takes over by itself at that slot (as the verifier key does).
++    pub next_enabled: bool,
++    pub next_escrow: [[u8; 32]; 2],
++    pub next_slot: u64,
++    /// sha256 of the verifying key compiled into this build (vk::VK_HASH), to match against the ceremony transcript.
++    pub vk_hash: [u8; 32],
++    pub certified: u64,
++    pub bump: u8,
++}
++
++impl ZkConfig {
++    /// (enabled, escrow key, epoch) in force at `slot`.
++    pub fn active(&self, slot: u64) -> (bool, [[u8; 32]; 2], u32) {
++        if self.next_slot != 0 && slot >= self.next_slot {
++            let epoch = if self.next_escrow != self.escrow { self.escrow_epoch + 1 } else { self.escrow_epoch };
++            (self.next_enabled, self.next_escrow, epoch)
++        } else {
++            (self.enabled, self.escrow, self.escrow_epoch)
++        }
++    }
++}
++
++/// The POF owner registry (ZK-04): an append-only Poseidon Merkle tree (height 20) of Poseidon(ownerId(owner), commitment), each
++/// appended by register_zk_owner under the ring owner's own signature, with its last 12 roots (Borsh decoding keeps it under the 4 KB frame).
++#[account]
++#[derive(InitSpace)]
++pub struct ZkRegistry {
++    pub next_index: u64,
++    pub filled: [[u8; 32]; REG_H],
++    pub roots: [[u8; 32]; REG_ROOTS],
++    pub cursor: u8,
++    pub bump: u8,
++}
++
++/// One note behind one live certificate, with what the keeper needs to open the escrow.
++#[account]
++#[derive(InitSpace)]
++pub struct NoteLock {
++    pub certificate: Pubkey,
++    pub tag: [u8; 32],
++    /// Paid the lock's rent (gets it back at release).
++    pub payer: Pubkey,
++    pub eph: [[u8; 32]; 2],
++    pub ct: [u8; 32],
++    pub escrow_epoch: u32,
++    pub locked_slot: u64,
++    pub bump: u8,
++}
++
++#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
++pub struct ZkArgs {
++    /// 0 wallet or 2 badge: the controller is that key and signs (an X handle needs the linker's proof: not in this version).
++    pub subject_kind: u8,
++    pub asset: u8,
++    pub tier: u8,
++    pub nonce: [u8; 16],
++    /// -A ‖ B ‖ C, big-endian (js/zk.js proofBytes).
++    pub proof: [u8; 256],
++    pub state_root: [u8; 32],
++    pub null_root: [u8; 32],
++    pub registry_root: [u8; 32],
++    pub eph: [[u8; 32]; 2],
++    /// One per used note, strictly ascending (distinct notes), 1..=4.
++    pub tags: Vec<[u8; 32]>,
++    pub cts: Vec<[u8; 32]>,
++}
++
++#[event]
++pub struct ZkCertified {
++    pub certificate: Pubkey,
++    pub subject_hash: [u8; 32],
++    pub asset: u8,
++    pub tier: u8,
++    pub settles_slot: u64,
++    pub tags: Vec<[u8; 32]>,
++    pub eph: [[u8; 32]; 2],
++    pub cts: Vec<[u8; 32]>,
++    pub escrow_epoch: u32,
++    pub state_root: [u8; 32],
++    pub null_root: [u8; 32],
++}
++
++#[event]
++pub struct ZkOwnerRegistered {
++    pub owner: Pubkey,
++    pub index: u64,
++    pub leaf: [u8; 32],
++    pub root: [u8; 32],
++}
++
++#[event]
++pub struct ZkConfigSet {
++    pub enabled: bool,
++    pub escrow: [[u8; 32]; 2],
++    pub takes_over_slot: u64,
++    pub vk_hash: [u8; 32],
++}
++
++#[event]
++pub struct NoteReleased {
++    pub tag: [u8; 32],
++    pub certificate: Pubkey,
++}
++
++/// Poseidon(TAG_DOMAIN, nullifier): what a zk certificate stores per note, and what revoke_spent checks for one.
++pub fn tag_of(nullifier: &[u8; 32]) -> Result<[u8; 32]> {
++    ext::poseidon2(&TAG_DOMAIN, nullifier).map_err(|_| error!(PofError::NullifierMismatch))
++}
++
++/// The context field element that binds a proof to one certificate.
++pub fn zk_context(subject_kind: u8, subject_hash: &[u8; 32], asset: u8, tier: u8, controller: &Pubkey, payer: &Pubkey, nonce: &[u8; 16]) -> [u8; 32] {
++    let mut h = ext::sha256(&[CTX_DOMAIN, crate::ID.as_ref(), &[subject_kind], subject_hash, &[asset], &[tier], controller.as_ref(), payer.as_ref(), nonce]);
++    h[0] &= 0x1f;
++    h
++}
++
++/// Rings hashBytes for 32 or 33 bytes: Poseidon(bytes[0..31], bytes[31..]) (both right-aligned in 32 bytes).
++fn hash_bytes_2(b: &[u8]) -> Result<[u8; 32]> {
++    let mut hi = [0u8; 32];
++    hi[1..].copy_from_slice(&b[..31]);
++    let mut lo = [0u8; 32];
++    let rest = &b[31..];
++    lo[32 - rest.len()..].copy_from_slice(rest);
++    ext::poseidon2(&hi, &lo).map_err(|_| error!(PofError::BadParams))
++}
++pub fn asset_hash(mint: &Pubkey) -> Result<[u8; 32]> {
++    hash_bytes_2(&mint.to_bytes())
++}
++/// Rings solanaOwnerIdentity: hashBytes(0x53 ‖ key).
++pub fn owner_id(key: &Pubkey) -> Result<[u8; 32]> {
++    let mut t = [0u8; 33];
++    t[0] = 0x53;
++    t[1..].copy_from_slice(key.as_ref());
++    hash_bytes_2(&t)
++}
++
++fn be_u64(v: u64) -> [u8; 32] {
++    let mut o = [0u8; 32];
++    o[24..].copy_from_slice(&v.to_be_bytes());
++    o
++}
++
++/// The Rings tree account: `state_root` in its state history, `null_root` its newest nullifier root (ZK-01). Returns the slot of
++/// the tree's last update (offset 120).
++pub fn check_roots(tree: &AccountInfo, state_root: &[u8; 32], null_root: &[u8; 32]) -> Result<u64> {
++    require_keys_eq!(tree.key(), RINGS_TREE, PofError::BadRingsAccounts);
++    require_keys_eq!(*tree.owner, ext::SPP_ID, PofError::BadRingsAccounts);
++    let d = tree.try_borrow_data()?;
++    require!(d.len() == TREE_LEN && d[0] == 1, PofError::BadRingsAccounts);
++    let len = (u16::from_le_bytes([d[STATE_HISTORY_LEN_AT], d[STATE_HISTORY_LEN_AT + 1]]) as usize).min(500);
++    let in_state = (0..len).any(|i| &d[STATE_HISTORY_AT + i * 32..STATE_HISTORY_AT + i * 32 + 32] == state_root);
++    require!(in_state, PofError::ZkStateRootUnknown);
++    let cursor = u64::from_le_bytes(d[NULL_CURSOR_AT..NULL_CURSOR_AT + 8].try_into().unwrap());
++    let newest = ((cursor % NULL_ROOTS + NULL_ROOTS - 1) % NULL_ROOTS) as usize;
++    let at = NULL_ROOTS_AT + newest * 32;
++    require!(null_root.iter().any(|b| *b != 0) && &d[at..at + 32] == null_root, PofError::ZkNullRootNotNewest);
++    Ok(u64::from_le_bytes(d[ROOT_SLOT_AT..ROOT_SLOT_AT + 8].try_into().unwrap()))
++}
++
++/// The public inputs in the circuit's order (circuits/pof.circom).
++pub fn public_inputs(c: &Config, escrow: &[[u8; 32]; 2], args: &ZkArgs, ctx: [u8; 32]) -> Result<[[u8; 32]; vk::NPUB]> {
++    let t = &c.assets[args.asset as usize];
++    let mut x = [[0u8; 32]; vk::NPUB];
++    x[0] = args.state_root;
++    x[1] = args.null_root;
++    x[2] = asset_hash(&t.mint)?;
++    x[3] = be_u64(tier_min(c, args.asset, args.tier));
++    x[4] = ctx;
++    x[5] = escrow[0];
++    x[6] = escrow[1];
++    x[7] = args.eph[0];
++    x[8] = args.eph[1];
++    for (i, tag) in args.tags.iter().enumerate() {
++        x[9 + i] = *tag;
++        x[9 + ZK_NOTES + i] = args.cts[i];
++    }
++    x[9 + 2 * ZK_NOTES] = args.registry_root;
++    Ok(x)
++}
++
++// ------------------------------------------------------------------------------------------------------------
++// Baby Jubjub on-curve check (ZK-09): a·x² + y² = 1 + d·x²·y² over the BN254 scalar field, 256-bit limbs (admin path only)
++
++type U256 = [u64; 4]; // little-endian limbs
++const P_R: U256 = [0x43e1f593f0000001, 0x2833e84879b97091, 0xb85045b68181585d, 0x30644e72e131a029];
++fn u256(b: &[u8; 32]) -> U256 {
++    let mut o = [0u64; 4];
++    for i in 0..4 {
++        o[3 - i] = u64::from_be_bytes(b[i * 8..i * 8 + 8].try_into().unwrap());
++    }
++    o
++}
++fn geq(a: &U256, b: &U256) -> bool {
++    for i in (0..4).rev() {
++        if a[i] != b[i] {
++            return a[i] > b[i];
++        }
++    }
++    true
++}
++fn sub(a: &U256, b: &U256) -> U256 {
++    let mut o = [0u64; 4];
++    let mut borrow = 0u64;
++    for i in 0..4 {
++        let (d1, b1) = a[i].overflowing_sub(b[i]);
++        let (d2, b2) = d1.overflowing_sub(borrow);
++        o[i] = d2;
++        borrow = (b1 | b2) as u64;
++    }
++    o
++}
++fn addmod(a: &U256, b: &U256) -> U256 {
++    let mut o = [0u64; 4];
++    let mut carry = 0u64;
++    for i in 0..4 {
++        let (s1, c1) = a[i].overflowing_add(b[i]);
++        let (s2, c2) = s1.overflowing_add(carry);
++        o[i] = s2;
++        carry = (c1 | c2) as u64;
++    }
++    if carry == 1 || geq(&o, &P_R) {
++        o = sub(&o, &P_R);
++    }
++    o
++}
++fn mulmod(a: &U256, b: &U256) -> U256 {
++    let mut r = [0u64; 4];
++    for i in (0..256).rev() {
++        r = addmod(&r, &r);
++        if (b[i / 64] >> (i % 64)) & 1 == 1 {
++            r = addmod(&r, a);
++        }
++    }
++    r
++}
++/// On the curve and not the identity (0, 1). (Subgroup membership is checked off chain by the key's maker: too costly here.)
++pub fn on_baby_jubjub(x: &[u8; 32], y: &[u8; 32]) -> bool {
++    if !groth16::in_field(x) || !groth16::in_field(y) {
++        return false;
++    }
++    let (x, y) = (u256(x), u256(y));
++    let a: U256 = [168700, 0, 0, 0];
++    let d: U256 = [168696, 0, 0, 0];
++    let x2 = mulmod(&x, &x);
++    let y2 = mulmod(&y, &y);
++    let lhs = addmod(&mulmod(&a, &x2), &y2);
++    let rhs = addmod(&[1, 0, 0, 0], &mulmod(&d, &mulmod(&x2, &y2)));
++    lhs == rhs && !(x == [0; 4] && y == [1, 0, 0, 0])
++}
++
++// ------------------------------------------------------------------------------------------------------------
++// instructions
++
++/// Admin. Turning certify_zk off with the same key is immediate; anything else (on, a new key) waits the rotation delay.
++pub fn handle_set_zk(ctx: Context<SetZk>, enabled: bool, escrow: [[u8; 32]; 2]) -> Result<()> {
++    let slot = Clock::get()?.slot;
++    let c = &ctx.accounts.config;
++    // the verifier rotation's delay, including a lowered delay still being waited out (POF-17)
++    let delay = if slot < c.held_until { c.params.rotation_delay.max(c.held_delay) } else { c.params.rotation_delay };
++    let z = &mut ctx.accounts.zk;
++    let r = &mut ctx.accounts.registry;
++    if z.bump == 0 {
++        z.bump = ctx.bumps.zk;
++        z.vk_hash = vk::VK_HASH;
++    }
++    if r.bump == 0 {
++        r.bump = ctx.bumps.registry;
++        r.roots[0] = REG_EMPTY_ROOT;
++    }
++    require!(on_baby_jubjub(&escrow[0], &escrow[1]), PofError::ZkBadEscrowKey);
++    require!(vk::VK_HASH != [0u8; 32], PofError::ZkNoVerifyingKey);
++    // fold a due change first
++    let (en, k, ep) = z.active(slot);
++    z.enabled = en;
++    z.escrow = k;
++    z.escrow_epoch = ep;
++    z.next_slot = 0;
++    let takes = if !enabled && escrow == z.escrow {
++        z.enabled = false;
++        slot
++    } else {
++        z.next_enabled = enabled;
++        z.next_escrow = escrow;
++        z.next_slot = slot.checked_add(delay.max(1)).ok_or(error!(PofError::Overflow))?;
++        z.next_slot
++    };
++    emit!(ZkConfigSet { enabled, escrow, takes_over_slot: takes, vk_hash: vk::VK_HASH });
++    Ok(())
++}
++
++/// The ring owner (it signs) appends Poseidon(ownerId(owner), commitment) to the owner registry, where commitment =
++/// Poseidon("pof:zk:own:v1", ownerSecret) and ownerSecret never leaves the owner's device.
++pub fn handle_register_zk_owner(ctx: Context<RegisterZkOwner>, commitment: [u8; 32]) -> Result<()> {
++    require!(groth16::in_field(&commitment) && commitment != [0u8; 32], PofError::BadParams);
++    let owner = ctx.accounts.owner.key();
++    let leaf = ext::poseidon2(&owner_id(&owner)?, &commitment).map_err(|_| error!(PofError::BadParams))?;
++    let r = &mut ctx.accounts.registry;
++    let index = r.next_index;
++    require!(index < (1u64 << REG_H), PofError::ZkRegistryFull);
++    let mut cur = leaf;
++    let mut idx = index;
++    for level in 0..REG_H {
++        if idx & 1 == 0 {
++            r.filled[level] = cur;
++            cur = ext::poseidon2(&cur, &ext::NULL_ZEROS[level]).map_err(|_| error!(PofError::BadParams))?;
++        } else {
++            cur = ext::poseidon2(&r.filled[level], &cur).map_err(|_| error!(PofError::BadParams))?;
++        }
++        idx >>= 1;
++    }
++    let at = (r.cursor as usize + 1) % REG_ROOTS;
++    r.cursor = at as u8;
++    r.roots[at] = cur;
++    r.next_index = index + 1;
++    emit!(ZkOwnerRegistered { owner, index, leaf, root: cur });
++    Ok(())
++}
++
++pub fn handle_certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkArgs) -> Result<()> {
++    let slot = Clock::get()?.slot;
++    let cert_key = ctx.accounts.certificate.key();
++    let a = ctx.accounts;
++    let c = &a.config;
++    require!(!c.closing, PofError::Closing);
++    require!(!c.paused, PofError::Paused);
++    let (enabled, escrow, epoch) = a.zk.active(slot);
++    require!(enabled, PofError::ZkDisabled);
++    require!(args.subject_kind == ext::KIND_WALLET || args.subject_kind == ext::KIND_BADGE, PofError::ZkSubjectKind);
++    let subject_hash = ext::key_subject_hash(args.subject_kind, &a.controller.key()).ok_or(error!(PofError::BadSubjectKind))?;
++    let t = c.assets.get(args.asset as usize).ok_or(error!(PofError::BadAsset))?;
++    require!(t.enabled, PofError::BadAsset);
++    require!(args.tier >= 1 && args.tier <= t.tiers(), PofError::BadTier);
++    let n = args.tags.len();
++    require!((1..=ZK_NOTES).contains(&n) && args.cts.len() == n, PofError::BadNoteCount);
++    require!(args.tags[0] != [0u8; 32] && args.tags.windows(2).all(|w| w[0] < w[1]), PofError::NullHashesUnsorted);
++    require!(ctx.remaining_accounts.len() == n, PofError::ZkLockMissing);
++
++    // the roots the proof must stand on, then the proof against inputs the program rebuilt
++    let root_slot = check_roots(&a.tree, &args.state_root, &args.null_root)?;
++    require!(args.registry_root != [0u8; 32] && a.registry.roots.contains(&args.registry_root), PofError::ZkRegistryRootUnknown);
++    let payer = a.payer.key();
++    let controller = a.controller.key();
++    let cx = zk_context(args.subject_kind, &subject_hash, args.asset, args.tier, &controller, &payer, &args.nonce);
++    let inputs = public_inputs(c, &escrow, &args, cx)?;
++    groth16::verify(&args.proof, &inputs).map_err(|e| match e {
++        groth16::Groth16Error::InputNotInField => error!(PofError::ZkInputNotInField),
++        _ => error!(PofError::ZkProofInvalid),
++    })?;
++
++    // the certificate (the remake rules of certify, POF-07 included)
++    let tinfo = a.treasury.to_account_info();
++    let t = &mut a.treasury;
++    let cert = &mut a.certificate;
++    let mut surplus = 0u64;
++    if cert.payer == Pubkey::default() {
++        t.open = add(t.open, 1)?;
++    } else {
++        require!(!cert.is_live(slot), PofError::AlreadyLive);
++        if cert.status == STATUS_LIVE {
++            unlive(c, t, cert);
++            t.expired += 1;
++        }
++        // the new payer buys the old payer out at exactly the rent-exempt minimum; lamports above it go to the treasury,
++        // moved after every CPI of this instruction (the note locks below create accounts)
++        let info = cert.to_account_info();
++        let rent = Rent::get()?.minimum_balance(info.data_len());
++        surplus = info.lamports().saturating_sub(rent);
++        if cert.payer != payer {
++            let prior = a.prior_payer.as_ref().ok_or(error!(PofError::PriorPayerMissing))?;
++            require_keys_eq!(prior.key(), cert.payer, PofError::PriorPayerMissing);
++            system_program::transfer(
++                CpiContext::new(a.system_program.key(), system_program::Transfer { from: a.payer.to_account_info(), to: prior.to_account_info() }),
++                rent,
++            )?;
++        }
++    }
++    let fee = take_fee(c, t, &a.payer, &tinfo, &a.holder_token, &a.system_program)?;
++    let settles = add(slot, ZK_SETTLE_SLOTS)?;
++    let expiry = add(slot, c.params.validity_slots)?;
++    cert.subject_kind = args.subject_kind;
++    cert.subject_hash = subject_hash;
++    cert.asset = args.asset;
++    cert.tier = args.tier;
++    cert.status = STATUS_LIVE;
++    cert.certified_slot = slot;
++    // a zk certificate's issued_slot is the slot it settles at: `gate` refuses it before (ZK-02)
++    cert.issued_slot = settles;
++    cert.expiry_slot = expiry;
++    cert.revoked_slot = 0;
++    cert.tree_root = args.state_root;
++    cert.root_slot = root_slot;
++    cert.note_count = n as u8;
++    cert.null_hashes = [[0u8; 32]; MAX_NOTES];
++    cert.null_hashes[..n].copy_from_slice(&args.tags);
++    cert.nullset_hash = nullset_hash(&args.tags);
++    cert.payer = payer;
++    cert.controller = controller;
++    cert.verifier = ZK_CONFIG;
++    cert.nonce = args.nonce;
++    cert.log_index = u64::MAX;
++    cert.renewals = 0;
++    cert.revealed_index = u8::MAX;
++    cert.revealed_salt = [0u8; 32];
++    cert.revealed_nullifier = [0u8; 32];
++    cert.bump = ctx.bumps.certificate;
++    t.certified += 1;
++    t.live += 1;
++    let i = args.asset as usize;
++    t.live_min[i] = add(t.live_min[i], tier_min(c, args.asset, args.tier))?;
++    a.zk.certified += 1;
++
++    // one lock per note
++    let space = 8 + NoteLock::INIT_SPACE;
++    let rent = Rent::get()?.minimum_balance(space);
++    for (k, lock) in ctx.remaining_accounts.iter().enumerate() {
++        let tag = args.tags[k];
++        let (pda, bump) = Pubkey::find_program_address(&[LOCK_SEED, &tag], &crate::ID);
++        require_keys_eq!(lock.key(), pda, PofError::ZkLockMissing);
++        require!(lock.is_writable, PofError::ZkLockMissing);
++        let value = NoteLock { certificate: cert_key, tag, payer, eph: args.eph, ct: args.cts[k], escrow_epoch: epoch, locked_slot: slot, bump };
++        if *lock.owner == crate::ID {
++            // an existing lock: only this certificate's own (remade over its revoked or expired self)
++            let old = {
++                let d = lock.try_borrow_data()?;
++                NoteLock::try_deserialize(&mut &d[..]).map_err(|_| error!(PofError::ZkNoteLocked))?
++            };
++            require_keys_eq!(old.certificate, cert_key, PofError::ZkNoteLocked);
++        } else {
++            // a fresh lock; lamports someone sent to the address first do not block it (ZK-07): top up, allocate, assign
++            require_keys_eq!(*lock.owner, system_program::ID, PofError::ZkNoteLocked);
++            let seeds: &[&[u8]] = &[LOCK_SEED, &tag, &[bump]];
++            if lock.lamports() == 0 {
++                system_program::create_account(
++                    CpiContext::new_with_signer(a.system_program.key(), system_program::CreateAccount { from: a.payer.to_account_info(), to: lock.clone() }, &[seeds]),
++                    rent,
++                    space as u64,
++                    &crate::ID,
++                )?;
++            } else {
++                let top = rent.saturating_sub(lock.lamports());
++                if top > 0 {
++                    system_program::transfer(CpiContext::new(a.system_program.key(), system_program::Transfer { from: a.payer.to_account_info(), to: lock.clone() }), top)?;
++                }
++                system_program::allocate(CpiContext::new_with_signer(a.system_program.key(), system_program::Allocate { account_to_allocate: lock.clone() }, &[seeds]), space as u64)?;
++                system_program::assign(CpiContext::new_with_signer(a.system_program.key(), system_program::Assign { account_to_assign: lock.clone() }, &[seeds]), &crate::ID)?;
++            }
++        }
++        let mut d = lock.try_borrow_mut_data()?;
++        value.try_serialize(&mut &mut d[..])?;
++    }
++
++    if surplus > 0 {
++        ext::shift(&a.certificate.to_account_info(), &tinfo, surplus)?;
++        a.treasury.fees_in = add(a.treasury.fees_in, surplus)?;
++    }
++
++    emit!(Certified {
++        subject_kind: args.subject_kind,
++        subject_hash,
++        asset: args.asset,
++        tier: args.tier,
++        certified_slot: slot,
++        expiry_slot: expiry,
++        note_count: n as u8,
++        payer,
++        controller,
++        verifier: ZK_CONFIG,
++        log_index: u64::MAX,
++        fee,
++    });
++    emit!(ZkCertified {
++        certificate: cert_key,
++        subject_hash,
++        asset: args.asset,
++        tier: args.tier,
++        settles_slot: settles,
++        tags: args.tags.clone(),
++        eph: args.eph,
++        cts: args.cts.clone(),
++        escrow_epoch: epoch,
++        state_root: args.state_root,
++        null_root: args.null_root,
++    });
++    Ok(())
++}
++
++/// Anyone: close a note lock whose certificate is gone, no longer live, or no longer carries the tag. Rent back to its payer.
++pub fn handle_release_note_lock(ctx: Context<ReleaseNoteLock>) -> Result<()> {
++    let slot = Clock::get()?.slot;
++    let a = &ctx.accounts;
++    let lock = &a.lock;
++    let info = a.certificate.to_account_info();
++    let dead = if info.lamports() == 0 || *info.owner != crate::ID {
++        true
++    } else {
++        let d = info.try_borrow_data()?;
++        match Certificate::try_deserialize(&mut &d[..]) {
++            Ok(cert) => !cert.is_live(slot) || cert.verifier != ZK_CONFIG || !cert.null_hashes[..cert.note_count as usize].contains(&lock.tag),
++            Err(_) => true,
++        }
++    };
++    require!(dead, PofError::ZkNoteStillLive);
++    emit!(NoteReleased { tag: lock.tag, certificate: lock.certificate });
++    Ok(())
++}
++
++#[derive(Accounts)]
++pub struct SetZk<'info> {
++    #[account(mut)]
++    pub admin: Signer<'info>,
++    #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = admin @ PofError::NotAdmin)]
++    pub config: Box<Account<'info, Config>>,
++    #[account(init_if_needed, payer = admin, space = 8 + ZkConfig::INIT_SPACE, seeds = [ZK_SEED], bump)]
++    pub zk: Box<Account<'info, ZkConfig>>,
++    #[account(init_if_needed, payer = admin, space = 8 + ZkRegistry::INIT_SPACE, seeds = [REGISTRY_SEED], bump)]
++    pub registry: Box<Account<'info, ZkRegistry>>,
++    pub system_program: Program<'info, System>,
++}
++
++#[derive(Accounts)]
++pub struct RegisterZkOwner<'info> {
++    /// The ring owner (the vault key): its signature is the consent the circuit later proves.
++    pub owner: Signer<'info>,
++    #[account(mut, seeds = [REGISTRY_SEED], bump = registry.bump)]
++    pub registry: Box<Account<'info, ZkRegistry>>,
++}
++
++#[derive(Accounts)]
++#[instruction(args: ZkArgs)]
++pub struct CertifyZk<'info> {
++    #[account(mut)]
++    pub payer: Signer<'info>,
++    /// The subject key (wallet or badge): it consents by signing; may be the payer.
++    pub controller: Signer<'info>,
++    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
++    pub config: Box<Account<'info, Config>>,
++    #[account(mut, seeds = [ZK_SEED], bump = zk.bump)]
++    pub zk: Box<Account<'info, ZkConfig>>,
++    #[account(seeds = [REGISTRY_SEED], bump = registry.bump)]
++    pub registry: Box<Account<'info, ZkRegistry>>,
++    #[account(mut, seeds = [TREASURY_SEED], bump = treasury.bump)]
++    pub treasury: Box<Account<'info, Treasury>>,
++    #[account(
++        init_if_needed,
++        payer = payer,
++        space = 8 + Certificate::INIT_SPACE,
++        seeds = [CERT_SEED, ext::key_subject_hash(args.subject_kind, controller.key).unwrap_or_default().as_ref(), &[args.asset]],
++        bump
++    )]
++    pub certificate: Box<Account<'info, Certificate>>,
++    /// CHECK: the payer of the certificate this one replaces (gets its rent back); only when remaking over another payer's
++    #[account(mut)]
++    pub prior_payer: Option<UncheckedAccount<'info>>,
++    /// CHECK: the payer's canonical $ROOT account (checked in take_fee)
++    pub holder_token: UncheckedAccount<'info>,
++    /// CHECK: Rings tree 0 (address, owner and layout checked in check_roots)
++    pub tree: UncheckedAccount<'info>,
++    pub system_program: Program<'info, System>,
++    // remaining accounts: the note locks ["znote", tag], writable, one per tag in the tags' order
++}
++
++#[derive(Accounts)]
++pub struct ReleaseNoteLock<'info> {
++    #[account(mut, close = payer, seeds = [LOCK_SEED, lock.tag.as_ref()], bump = lock.bump)]
++    pub lock: Box<Account<'info, NoteLock>>,
++    /// CHECK: the certificate the lock names (read, any state; closed counts as gone)
++    #[account(address = lock.certificate)]
++    pub certificate: UncheckedAccount<'info>,
++    /// CHECK: gets the lock's rent back
++    #[account(mut, address = lock.payer)]
++    pub payer: UncheckedAccount<'info>,
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_zk_config_address_is_the_pda() {
++        assert_eq!(Pubkey::find_program_address(&[ZK_SEED], &crate::ID).0, ZK_CONFIG);
++    }
++
++    #[test]
++    fn tag_domain_is_the_ascii_big_endian() {
++        assert_eq!(&TAG_DOMAIN[19..], b"pof:zk:tag:v1");
++        assert!(TAG_DOMAIN[..19].iter().all(|b| *b == 0));
++    }
++
++    #[test]
++    fn baby_jubjub_points() {
++        let hexb = |s: &str| -> [u8; 32] {
++            let mut o = [0u8; 32];
++            for i in 0..32 {
++                o[i] = u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap();
++            }
++            o
++        };
++        // B8 (circomlib)
++        let x = hexb("0bb77a6ad63e739b4eacb2e09d6277c12ab8d8010534e0b62893f3f6bb957051");
++        let y = hexb("25797203f7a0b24925572e1cd16bf9edfce0051fb9e133774b3c257a872d7d8b");
++        assert!(on_baby_jubjub(&x, &y));
++        let mut y2 = y;
++        y2[31] ^= 1;
++        assert!(!on_baby_jubjub(&x, &y2));
++        assert!(!on_baby_jubjub(&[0u8; 32], &be_u64(1)));
++    }
++
++    #[test]
++    fn the_empty_registry_root_is_the_zero_chain() {
++        let mut z = [0u8; 32];
++        for _ in 0..REG_H {
++            z = ext::poseidon2(&z, &z).unwrap();
++        }
++        assert_eq!(z, REG_EMPTY_ROOT);
++    }
++}

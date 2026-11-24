@@ -13,12 +13,15 @@ pragma circom 2.1.9;
 //   nullifier  = Poseidon(commitment, blinding, nk)
 //   state tree : height 32, node Poseidon(left, right), leaf = commitment
 //   nullifier tree (indexed): height 40, leaf Poseidon(value, nextValue); nf is absent iff a leaf has value < nf < nextValue
+//                (nextValue 0 marks the last element: then value < nf suffices)
 //   tag        = Poseidon(TAG_DOMAIN, nullifier)                        public, stored on the certificate (one per note)
 //   escrow     : R = r·B8 and S = r·K on Baby Jubjub (K = the revocation key), ct = nullifier + Poseidon(ESC_DOMAIN, Sx, Sy, i)
 //
 // Public inputs (in this order; the program rebuilds or checks each one):
 //   0 stateRoot   1 nullRoot   2 assetHash   3 minAmount   4 ctx   5 escrowX   6 escrowY   7 ephX   8 ephY
-//   9.. tag[N]    9+N.. ct[N]
+//   9.. tag[N]    9+N.. ct[N]    9+2N registryRoot
+//   registry   : the ring owner's registration leaf Poseidon(ownerId, Poseidon(OWN_DOMAIN, ownerSecret)) in the POF owner registry
+//                (height 20) at registryRoot: proves the ring owner consented, not just that nk is known (audit ZK-04)
 // A note slot that is not used has enabled = 0, tag = 0 and ct = 0; used slots come first.
 
 include "../node_modules/circomlib/circuits/poseidon.circom";
@@ -179,8 +182,12 @@ template Note(STATE_H, NULL_H, TAG_DOMAIN, ESC_DOMAIN, SLOT) {
     below.aLo <== hNf.lo;
     below.bHi <== hNext.hi;
     below.bLo <== hNext.lo;
+    // the last element of the indexed list has nextValue 0 (no upper bound): absent iff above it
+    component lastLeaf = IsZero();
+    lastLeaf.in <== nextValue;
+    signal belowOk <== lastLeaf.out + (1 - lastLeaf.out) * below.out;
     enabled * (1 - above.out) === 0;
-    enabled * (1 - below.out) === 0;
+    enabled * (1 - belowOk) === 0;
 
     // the public tag, and the nullifier escrowed to the revocation key
     component t = Poseidon(2);
@@ -195,10 +202,11 @@ template Note(STATE_H, NULL_H, TAG_DOMAIN, ESC_DOMAIN, SLOT) {
     ct <== enabled * (nf.out + pad.out);
 }
 
-template ProofOfFunds(N, STATE_H, NULL_H) {
-    // "pof:zk:tag:v1" and "pof:zk:esc:v1" as big-endian integers
+template ProofOfFunds(N, STATE_H, NULL_H, REG_H) {
+    // "pof:zk:tag:v1", "pof:zk:esc:v1" and "pof:zk:own:v1" as big-endian integers
     var TAG_DOMAIN = 0x706f663a7a6b3a7461673a7631;
     var ESC_DOMAIN = 0x706f663a7a6b3a6573633a7631;
+    var OWN_DOMAIN = 0x706f663a7a6b3a6f776e3a7631;
 
     // public
     signal input stateRoot;
@@ -212,11 +220,16 @@ template ProofOfFunds(N, STATE_H, NULL_H) {
     signal input ephY;
     signal input tag[N];
     signal input ct[N];
+    signal input registryRoot;
 
     // private: the ring
     signal input ownerId;
     signal input nk;
     signal input r;
+    // private: the ring owner's registration (ZK-04): the owner signed register_zk_owner with Poseidon(OWN_DOMAIN, ownerSecret)
+    signal input ownerSecret;
+    signal input regIndex;
+    signal input regPath[REG_H];
     // private: the notes
     signal input enabled[N];
     signal input amount[N];
@@ -246,6 +259,24 @@ template ProofOfFunds(N, STATE_H, NULL_H) {
             enabled[i] * (1 - enabled[i - 1]) === 0;
         }
     }
+
+    // spend authority (ZK-04): the ring owner registered Poseidon(ownerId, Poseidon(OWN_DOMAIN, ownerSecret)) with its own
+    // signature, so nk and the openings alone (which a phase 1 Verifier has seen) are not enough
+    component ownCommit = Poseidon(2);
+    ownCommit.inputs[0] <== OWN_DOMAIN;
+    ownCommit.inputs[1] <== ownerSecret;
+    component regLeaf = Poseidon(2);
+    regLeaf.inputs[0] <== ownerId;
+    regLeaf.inputs[1] <== ownCommit.out;
+    component regBits = Num2Bits(REG_H);
+    regBits.in <== regIndex;
+    component regRootOf = MerkleRoot(REG_H);
+    regRootOf.leaf <== regLeaf.out;
+    for (var i = 0; i < REG_H; i++) {
+        regRootOf.bits[i] <== regBits.out[i];
+        regRootOf.siblings[i] <== regPath[i];
+    }
+    regRootOf.root === registryRoot;
 
     // the ring's owner hash
     component npk = Poseidon(1);
@@ -313,4 +344,4 @@ template ProofOfFunds(N, STATE_H, NULL_H) {
     enough.out === 1;
 }
 
-component main {public [stateRoot, nullRoot, assetHash, minAmount, ctx, escrowX, escrowY, ephX, ephY, tag, ct]} = ProofOfFunds(4, 32, 40);
+component main {public [stateRoot, nullRoot, assetHash, minAmount, ctx, escrowX, escrowY, ephX, ephY, tag, ct, registryRoot]} = ProofOfFunds(4, 32, 40, 20);

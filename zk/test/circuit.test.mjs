@@ -11,7 +11,7 @@ const vkey = JSON.parse(fs.readFileSync(VKEY, 'utf8'));
 const timings = [];
 
 async function witnessFails(input, why) {
-  await assert.rejects(snarkjs.wtns.calculate(input, WASM, { type: 'mem' }), /Assert Failed|Error in template|Not enough values|Too many values/, why);
+  await assert.rejects(snarkjs.wtns.calculate(input, WASM, { type: 'mem' }), /Assert Failed|Error in template|Not enough values|Too many values|Not all inputs have been set/, why);
 }
 async function proveOk(s) {
   const b = Z.buildInputs(s.P, s);
@@ -104,6 +104,35 @@ test('malformed inputs: no witness', async () => {
   const big = await scenario({ amounts: [1n << 64n], minAmount: ONE_SOL });
   await witnessFails(Z.buildInputs(big.P, big).input, 'amount 2^64');
   assert.throws(() => Z.buildInputs(s.P, { ...s, notes: [s.notes[0], s.notes[0]] }), /the same note twice/);
+});
+
+test('spend authority (audit ZK-04): nk and the openings without the owner\'s registered secret give no witness', async () => {
+  const s = await scenario({ amounts: [10n * ONE_SOL] });
+  await witnessFails(Z.buildInputs(s.P, { ...s, ring: { ...s.ring, ownerSecret: s.ring.ownerSecret + 1n } }).input, 'a renter with nk only');
+  // a registry root the owner is not under
+  await witnessFails(Z.buildInputs(s.P, { ...s, registry: { ...s.registry, root: s.registry.root + 1n } }).input, 'another registry root');
+  // another owner's registry entry (index 2 holds someone else's leaf) does not stand in for this ring's owner
+  await witnessFails(Z.buildInputs(s.P, { ...s, registry: { root: s.registry.root, index: 2, path: s.reg.path(2) } }).input, 'another owner\'s entry');
+  const { publicSignals } = await proveOk(s);
+  assert.equal(publicSignals[17], s.registry.root.toString(), 'the registry root is the last public input');
+});
+
+test('the last element of the nullifier list (next = 0, as Rings marks it; audit ZK-10): a nullifier above it proves absent', async () => {
+  const s = await scenario({ amounts: [3n * ONE_SOL], extraNullifiers: 0 });
+  const nf = s.raw[0].h.nullifier;
+  // fill the list so that our nullifier is above every element: the low leaf is the last one, with next = 0
+  s.nulls.insert(nf - 1n);
+  s.nulls.insert(nf / 2n);
+  const ni = s.nulls.nonInclusion(nf);
+  assert.equal(ni.nextValue, 0n);
+  s.notes[0] = { ...s.notes[0], ...ni };
+  s.pub.nullRoot = s.nulls.root();
+  await proveOk(s);
+  // and a nullifier that IS the last element is still refused
+  const t = await scenario({ amounts: [3n * ONE_SOL], extraNullifiers: 0, spent: [0] });
+  const low = t.nulls.lowOf(t.raw[0].h.nullifier);
+  t.notes[0] = { ...t.notes[0], ...low };
+  await witnessFails(Z.buildInputs(t.P, t).input, 'the nullifier is the last element itself');
 });
 
 test('a changed proof does not verify', async () => {

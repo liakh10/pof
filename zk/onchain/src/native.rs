@@ -72,6 +72,15 @@ mod tests {
     }
 
     #[test]
+    fn a_zero_proof_never_verifies() {
+        // audit ZK-03: with a stub key a zero proof verified everything; the key is real (vk.rs compiles only then) and
+        // points at infinity in the proof are refused
+        let (_, inputs) = vectors().remove(0);
+        assert_eq!(verify(&[0u8; 256], &inputs), Err(Groth16Error::BadPoint));
+        assert_ne!(verify(&[0u8; 256], &[[0u8; 32]; NPUB]), Ok(()));
+    }
+
+    #[test]
     fn a_non_canonical_input_is_refused() {
         let (proof, inputs) = vectors().remove(0);
         // x + r for the first nonzero input that stays under 2^256

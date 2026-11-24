@@ -6,7 +6,33 @@
 //! On a non-Solana target the same crate runs arkworks, so this file is unit-tested natively against snarkjs proofs.
 use solana_bn254::prelude::{alt_bn128_g1_addition_be, alt_bn128_g1_multiplication_be, alt_bn128_pairing_be};
 
-use super::vk::{VK_ALPHA_G1, VK_BETA_G2, VK_DELTA_G2, VK_GAMMA_G2, VK_IC, NPUB};
+use super::vk::{VK_ALPHA_G1, VK_BETA_G2, VK_DELTA_G2, VK_GAMMA_G2, VK_HASH, VK_IC, NPUB};
+
+const fn nonzero(b: &[u8]) -> bool {
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] != 0 {
+            return true;
+        }
+        i += 1;
+    }
+    false
+}
+const fn vk_is_real() -> bool {
+    if !nonzero(&VK_HASH) || !nonzero(&VK_ALPHA_G1) || !nonzero(&VK_BETA_G2) || !nonzero(&VK_GAMMA_G2) || !nonzero(&VK_DELTA_G2) {
+        return false;
+    }
+    let mut i = 0;
+    while i < VK_IC.len() {
+        if !nonzero(&VK_IC[i]) {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+// Audit ZK-03: a stub verifying key (any point at infinity) would verify every proof. Such a build does not compile.
+const _: () = assert!(vk_is_real(), "vk.rs is a stub or has a point at infinity: run scripts/vk-rs.mjs from the ceremony's key");
 
 /// The BN254 scalar field modulus r, big-endian.
 pub const FIELD_R: [u8; 32] = [
@@ -63,6 +89,10 @@ pub fn prepare_inputs(inputs: &[[u8; 32]; NPUB]) -> Result<[u8; 64], Groth16Erro
 
 /// Verifies a 256-byte proof (A negated ‖ B ‖ C) for these public inputs.
 pub fn verify(proof: &[u8; 256], inputs: &[[u8; 32]; NPUB]) -> Result<(), Groth16Error> {
+    // A or C at infinity is never an honest proof (ZK-03)
+    if !nonzero(&proof[0..64]) || !nonzero(&proof[64..192]) || !nonzero(&proof[192..256]) {
+        return Err(Groth16Error::BadPoint);
+    }
     let vk_x = prepare_inputs(inputs)?;
     let mut buf = vec![0u8; 4 * 192];
     buf[0..64].copy_from_slice(&proof[0..64]); // -A

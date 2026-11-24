@@ -1,0 +1,101 @@
+{
+ "date": "2026-11-24T23:32:21.525Z",
+ "pass": 12,
+ "fail": 0,
+ "results": [
+  [
+   "ok",
+   "set_zk: admin only; the key must be on Baby Jubjub; turning on waits the rotation delay; turning off is immediate"
+  ],
+  [
+   "ok",
+   "certify_zk, one note, wallet subject: a live certificate whose verifier is the ZkConfig, tags stored, locks hold the escrow"
+  ],
+  [
+   "ok",
+   "certify_zk, four notes, tier 2 (10 SOL exactly), a badge subject signed by the badge key, relayed by another payer"
+  ],
+  [
+   "ok",
+   "certify_zk, USDC tier 1 (150 USDC against 100), with its lock address pre-funded by someone (ZK-07)"
+  ],
+  [
+   "ok",
+   "wrong root: a state root the tree account does not hold, an older nullifier root (ZK-01), an unknown registry root"
+  ],
+  [
+   "ok",
+   "a higher tier than the proof reached: refused (the minimum is a public input the program sets)"
+  ],
+  [
+   "ok",
+   "replay to another subject: a proof bound to wallet 3 submitted for wallet 4 (and with another payer or nonce) is refused"
+  ],
+  [
+   "ok",
+   "malformed: a changed proof, a non-canonical tag (tag + r), unsorted or duplicate tags, missing or wrong locks"
+  ],
+  [
+   "ok",
+   "one note backs one live certificate: the same note for another wallet is refused until the first is revoked and its lock released"
+  ],
+  [
+   "ok",
+   "revoke_spent on a zk certificate: the keeper opens the escrow from the lock, shows the nullifier, the PDA proves the spend"
+  ],
+  [
+   "ok",
+   "settle window (ZK-02): a gate in the same transaction as certify_zk refuses; after the settle slots it passes"
+  ],
+  [
+   "ok",
+   "the CPI gate reads a settled zk certificate like any other (require_certificate)"
+  ]
+ ],
+ "certify_zk": [
+  {
+   "ix": "set_zk",
+   "units": 390862
+  },
+  {
+   "ix": "register_zk_owner",
+   "units": 31448
+  },
+  {
+   "notes": 1,
+   "units": 248023,
+   "size": 843,
+   "proveMs": 5457
+  },
+  {
+   "notes": 4,
+   "units": 296464,
+   "size": 1230,
+   "proveMs": 5271
+  },
+  {
+   "notes": 1,
+   "units": 244548,
+   "size": 843,
+   "proveMs": 5302
+  },
+  {
+   "notes": 1,
+   "units": 239125,
+   "size": 843,
+   "proveMs": 5325
+  },
+  {
+   "notes": 1,
+   "units": 240373,
+   "size": 843,
+   "proveMs": 5981
+  },
+  {
+   "notes": 1,
+   "units": 240760,
+   "size": 843,
+   "proveMs": 5294
+  }
+ ]
+}

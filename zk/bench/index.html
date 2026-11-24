@@ -21,23 +21,27 @@ proof with snarkjs, then verifies it. Nothing leaves the page.</p>
 import { prove } from '../js/zk.js';
 const $ = id => document.getElementById(id);
 const log = s => { $('out').textContent += s + '\n'; };
-async function fetchBytes(url, label) {
+async function fetchBytes(url, label, gz = false) {
   const t0 = performance.now();
   const r = await fetch(url);
   const len = Number(r.headers.get('content-length') || 0);
-  const reader = r.body.getReader(); const parts = []; let got = 0;
-  for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); got += value.length; $('stage').textContent = `loading ${label} ${(got / 1e6).toFixed(1)}${len ? ' / ' + (len / 1e6).toFixed(1) : ''} MB`; }
+  let wire = 0;
+  const counted = r.body.pipeThrough(new TransformStream({ transform(c, ctl) { wire += c.length; $('stage').textContent = `loading ${label} ${(wire / 1e6).toFixed(1)}${len ? ' / ' + (len / 1e6).toFixed(1) : ''} MB`; ctl.enqueue(c); } }));
+  const body = gz ? counted.pipeThrough(new DecompressionStream('gzip')) : counted;
+  const reader = body.getReader(); const parts = []; let got = 0;
+  for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); got += value.length; }
   const out = new Uint8Array(got); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
-  return { bytes: out, ms: Math.round(performance.now() - t0) };
+  return { bytes: out, wire, ms: Math.round(performance.now() - t0) };
 }
 async function run() {
   $('go').disabled = true;
   const res = { ua: navigator.userAgent, cores: navigator.hardwareConcurrency, runs: [] };
   const wasm = await fetchBytes('../setup/pof.wasm', 'circuit');
-  const zkey = await fetchBytes('../setup/pof_final.zkey', 'proving key');
+  // the proving key ships gzipped (38.5 MB on the wire, 57.7 MB unpacked); the browser unpacks it as it streams
+  const zkey = await fetchBytes('../setup/pof_final.zkey.gz', 'proving key', true);
   const vkey = await (await fetch('../setup/verification_key.json')).json();
   const input = await (await fetch('input.json')).json();
-  res.load = { wasmBytes: wasm.bytes.length, wasmMs: wasm.ms, zkeyBytes: zkey.bytes.length, zkeyMs: zkey.ms };
+  res.load = { wasmBytes: wasm.bytes.length, wasmMs: wasm.ms, zkeyBytes: zkey.bytes.length, zkeyWire: zkey.wire, zkeyMs: zkey.ms };
   log(`loaded: circuit ${(wasm.bytes.length / 1e6).toFixed(2)} MB in ${wasm.ms} ms, key ${(zkey.bytes.length / 1e6).toFixed(1)} MB in ${zkey.ms} ms; ${navigator.hardwareConcurrency} cores`);
   const runs = Number(new URLSearchParams(location.search).get('runs') || 3);
   for (let i = 0; i < runs; i++) {

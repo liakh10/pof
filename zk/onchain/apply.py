@@ -30,6 +30,10 @@ edit(os.path.join(src, 'lib.rs'), [
      "    pub fn set_zk(ctx: Context<SetZk>, enabled: bool, escrow: [[u8; 32]; 2]) -> Result<()> {\n"
      "        zk::handle_set_zk(ctx, enabled, escrow)\n"
      "    }\n\n"
+     "    /// The ring owner registers its zk owner commitment (the consent certify_zk proves).\n"
+     "    pub fn register_zk_owner(ctx: Context<RegisterZkOwner>, commitment: [u8; 32]) -> Result<()> {\n"
+     "        zk::handle_register_zk_owner(ctx, commitment)\n"
+     "    }\n\n"
      "    /// Anyone: close a note lock whose certificate is no longer live.\n"
      "    pub fn release_note_lock(ctx: Context<ReleaseNoteLock>) -> Result<()> {\n"
      "        zk::handle_release_note_lock(ctx)\n"
@@ -39,6 +43,16 @@ edit(os.path.join(src, 'lib.rs'), [
      "    // a zk certificate stores Poseidon(TAG_DOMAIN, nullifier) per note (no salt); a Verifier one the salted sha256\n"
      "    let h = if cert.verifier == zk::ZK_CONFIG { zk::tag_of(&nullifier)? } else { ext::salted_nullifier(&salt, &nullifier) };\n"
      "    require!(h == cert.null_hashes[index as usize], PofError::NullifierMismatch);\n"),
+    ("    require!(cert.status == STATUS_LIVE, PofError::NotLive);\n    require!(slot <= cert.expiry_slot, PofError::CertificateExpired);\n",
+     "    require!(cert.status == STATUS_LIVE, PofError::NotLive);\n"
+     "    // a zk certificate settles first (its issued_slot is ahead): refused until then (audit ZK-02); signed ones issue in the past\n"
+     "    require!(slot >= cert.issued_slot, PofError::ZkSettling);\n"
+     "    require!(slot <= cert.expiry_slot, PofError::CertificateExpired);\n"),
+    ("        require!(slot <= cert.expiry_slot, PofError::CertificateExpired);\n        let n = att.null_hashes.len();\n",
+     "        require!(slot <= cert.expiry_slot, PofError::CertificateExpired);\n"
+     "        // a zk certificate carries tags, not the Verifier's salted hashes: it is remade by certify_zk, never renewed\n"
+     "        require_keys_neq!(cert.verifier, zk::ZK_CONFIG, PofError::RenewMismatch);\n"
+     "        let n = att.null_hashes.len();\n"),
 ])
 edit(os.path.join(src, 'errors.rs'), [
     ("    #[msg(\"arithmetic overflow\")]\n    Overflow,\n",
@@ -47,7 +61,12 @@ edit(os.path.join(src, 'errors.rs'), [
      "    #[msg(\"certify_zk takes a wallet or badge subject (its key signs)\")]\n    ZkSubjectKind,\n"
      "    #[msg(\"pass one writable note lock [\\\"znote\\\", tag] per tag, in order\")]\n    ZkLockMissing,\n"
      "    #[msg(\"the state root is not in the Rings tree's root history\")]\n    ZkStateRootUnknown,\n"
-     "    #[msg(\"the nullifier root is not in the Rings tree's nullifier root history\")]\n    ZkNullRootUnknown,\n"
+     "    #[msg(\"the nullifier root is not the Rings tree's newest nullifier root (prove again against it)\")]\n    ZkNullRootNotNewest,\n"
+     "    #[msg(\"the owner registry root is not in its recent history\")]\n    ZkRegistryRootUnknown,\n"
+     "    #[msg(\"the owner registry is full\")]\n    ZkRegistryFull,\n"
+     "    #[msg(\"the revocation key is not a Baby Jubjub point\")]\n    ZkBadEscrowKey,\n"
+     "    #[msg(\"this build has no verifying key\")]\n    ZkNoVerifyingKey,\n"
+     "    #[msg(\"the zk certificate is still settling (its nullifiers may be queued spends)\")]\n    ZkSettling,\n"
      "    #[msg(\"a public input is not a canonical field element\")]\n    ZkInputNotInField,\n"
      "    #[msg(\"the proof does not verify for this certificate\")]\n    ZkProofInvalid,\n"
      "    #[msg(\"a note is already behind another certificate\")]\n    ZkNoteLocked,\n"

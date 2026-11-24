@@ -1,3 +1,4 @@
 bench/last.json
 onchain/target/
 onchain/Cargo.lock
+setup/pof_final.zkey

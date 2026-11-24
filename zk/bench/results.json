@@ -1,0 +1,61 @@
+{
+ "date": "2026-11-24T23:26:47.191Z",
+ "profiles": {
+  "desktop": {
+   "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+   "cores": 10,
+   "runs": [
+    {
+     "witness": 199,
+     "prove": 4158,
+     "total": 4357,
+     "verified": true
+    },
+    {
+     "witness": 194,
+     "prove": 4291,
+     "total": 4485,
+     "verified": true
+    },
+    {
+     "witness": 191,
+     "prove": 4099,
+     "total": 4290,
+     "verified": true
+    }
+   ],
+   "load": {
+    "wasmBytes": 4618807,
+    "wasmMs": 18,
+    "zkeyBytes": 57686141,
+    "zkeyWire": 38512197,
+    "zkeyMs": 105
+   }
+  },
+  "cpu-4x-throttled": {
+   "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+   "cores": 10,
+   "runs": [
+    {
+     "witness": 847,
+     "prove": 6952,
+     "total": 7799,
+     "verified": true
+    },
+    {
+     "witness": 806,
+     "prove": 6489,
+     "total": 7294,
+     "verified": true
+    }
+   ],
+   "load": {
+    "wasmBytes": 4618807,
+    "wasmMs": 25,
+    "zkeyBytes": 57686141,
+    "zkeyWire": 38512197,
+    "zkeyMs": 412
+   }
+  }
+ }
+}

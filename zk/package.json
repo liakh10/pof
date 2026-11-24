@@ -6,7 +6,13 @@
   "scripts": {
     "build": "zsh scripts/build.sh",
     "setup": "zsh scripts/ceremony.sh",
-    "test": "node --test test/"
+    "test": "node --test test/parity.test.mjs test/circuit.test.mjs",
+    "vectors": "node test/vectors.mjs",
+    "unpack": "zsh scripts/unpack-zkey.sh",
+    "bench": "node bench/input.mjs && node bench/run.mjs",
+    "diff": "zsh scripts/patch-diff.sh",
+    "test:native": "node test/vectors.mjs && CARGO_TARGET_DIR=${POF_ZK_OUT:-/Users/artem/Desktop/sol/scratchpad/pof-zk}/native-target cargo test --manifest-path onchain/Cargo.toml",
+    "test:chain": "zsh onchain/test/run.sh"
   },
   "dependencies": {
     "snarkjs": "0.7.5"

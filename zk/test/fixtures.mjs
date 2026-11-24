@@ -49,7 +49,7 @@ export class Sparse {
 
 /* an indexed tree in the Rings layout: leaf Poseidon(value, nextValue); element 0 is (0, max) at start */
 export class Indexed {
-  constructor(P, height = Z.NULL_H) { this.P = P; this.tree = new Sparse(P, height); this.items = [{ value: 0n, next: Z.FIELD - 1n }]; this.items.push({ value: Z.FIELD - 1n, next: 0n }); this.sync(); }
+  constructor(P, height = Z.NULL_H) { this.P = P; this.tree = new Sparse(P, height); this.items = [{ value: 0n, next: 0n }]; this.sync(); }
   sync() { this.items.forEach((it, i) => this.tree.set(i, this.P([it.value, it.next]))); }
   insert(v) {
     v = BigInt(v);
@@ -62,7 +62,7 @@ export class Indexed {
   root() { return this.tree.root(); }
   nonInclusion(v) {
     v = BigInt(v);
-    const i = this.items.findIndex(it => it.value < v && v < it.next);
+    const i = this.items.findIndex(it => it.value < v && (v < it.next || it.next === 0n));
     if (i < 0) return null;
     return { lowValue: this.items[i].value, nextValue: this.items[i].next, lowIndex: i, nullPath: this.tree.path(i) };
   }
@@ -74,12 +74,18 @@ export const SOL_MINT = new Uint8Array(32);
 export const ONE_SOL = 1_000_000_000n;
 
 /* a ring, its notes in a state tree, an empty-ish nullifier tree, an escrow key: everything one proof needs */
-export async function scenario({ amounts = [3n * ONE_SOL], minAmount = ONE_SOL, spent = [], ctx = 12345n, extraNullifiers = 3, leafBase = 64_160, seed = 0n, mint = SOL_MINT } = {}) {
+export async function scenario({ amounts = [3n * ONE_SOL], minAmount = ONE_SOL, spent = [], ctx = 12345n, extraNullifiers = 3, leafBase = 64_160, seed = 0n, mint = SOL_MINT, regIndex = 3, ownerKey: key = null } = {}) {
   const P = await poseidon();
-  const ownerKey = Uint8Array.from({ length: 32 }, (_, i) => (i * 37 + 11) & 255);
+  const ownerKey = key || Uint8Array.from({ length: 32 }, (_, i) => (i * 37 + 11) & 255);
   const nk = 0x0badc0ffee0ddf00dn * 1_000_003n + 7n; // a 31-byte-ish secret
-  const ring = { ownerKey, nk };
+  const ownerSecret = 0x5ec2e7n * 1_000_000_007n + 3n;
+  const ring = { ownerKey, nk, ownerSecret };
   const oid = Z.ownerId(P, ownerKey);
+  // the POF owner registry: a few other owners, then ours
+  const reg = new Sparse(P, Z.REG_H);
+  for (let i = 0; i < regIndex; i++) reg.set(i, P([BigInt(i + 100), 5n]));
+  reg.set(regIndex, Z.registryLeaf(P, oid, ownerSecret));
+  const registry = { root: reg.root(), index: regIndex, path: reg.path(regIndex) };
   const asset = Z.assetHash(P, mint);
   const state = new Sparse(P, Z.STATE_H);
   // some other people's leaves around ours
@@ -100,5 +106,5 @@ export async function scenario({ amounts = [3n * ONE_SOL], minAmount = ONE_SOL, 
     return { amount: n.amount, blinding: n.blinding, leafIndex: n.leafIndex, statePath: state.path(n.leafIndex), ...ni };
   });
   const pub = { stateRoot: state.root(), nullRoot: nulls.root(), mint, minAmount, ctx, escrow: escrow.public };
-  return { P, ring, notes: full, raw: notes, pub, escrow, state, nulls, r: 1234567890123456789012345678901234567890n };
+  return { P, ring, notes: full, raw: notes, pub, escrow, state, nulls, registry, reg, r: 1234567890123456789012345678901234567890n };
 }

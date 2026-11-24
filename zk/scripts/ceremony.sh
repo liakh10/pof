@@ -19,7 +19,7 @@ SNARK="node --max-old-space-size=6144 node_modules/snarkjs/build/cli.cjs"
 POW=17
 LOG=$C/phase1.log
 ent() { head -c 64 /dev/urandom | xxd -p | tr -d '\n'; }
-step() { print -r -- "\n## $1" >> $LOG; shift; print -r -- "\$ ${(j: :)@}" | sed -E 's/-e=[0-9a-f]+/-e=<64 random bytes, discarded>/' >> $LOG; "$@" 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g' >> $LOG; }
+step() { print -r -- "" >> $LOG; print -r -- "## $1" >> $LOG; shift; print -r -- "\$ ${(j: :)@}" | sed -E 's/-e=[0-9a-f]+/-e=<64 random bytes, discarded>/' >> $LOG; "$@" 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g' >> $LOG; }
 
 # the public beacon: a finalized mainnet slot and its blockhash (anyone can read the same block again)
 if [[ -z "${BEACON_SLOT:-}" ]]; then
@@ -43,7 +43,7 @@ step "phase 1: beacon" $=SNARK powersoftau beacon $C/pot_0002.ptau $C/pot_beacon
 step "phase 1: prepare phase 2" $=SNARK powersoftau prepare phase2 $C/pot_beacon.ptau $C/pot_final.ptau
 step "phase 1: verify" $=SNARK powersoftau verify $C/pot_final.ptau
 rm -f $C/pot_0000.ptau $C/pot_0001.ptau $C/pot_0002.ptau
-print -r -- "\nseconds: $((SECONDS - T0))" >> $LOG
+print -r -- "" >> $LOG; print -r -- "seconds: $((SECONDS - T0))" >> $LOG
 [[ -n "${PHASE1_ONLY:-}" ]] && exit 0
 fi
 # phase 2
@@ -58,5 +58,5 @@ step "phase 2: beacon" $=SNARK zkey beacon $C/pof_0002.zkey $C/pof_final.zkey $B
 step "phase 2: verify against the r1cs and the ptau" $=SNARK zkey verify $B/pof.r1cs $C/pot_final.ptau $C/pof_final.zkey
 step "export the verification key" $=SNARK zkey export verificationkey $C/pof_final.zkey $C/verification_key.json
 rm -f $C/pof_0000.zkey $C/pof_0001.zkey $C/pof_0002.zkey
-print -r -- "\nseconds: $((SECONDS - T0))" >> $LOG
+print -r -- "" >> $LOG; print -r -- "seconds: $((SECONDS - T0))" >> $LOG
 node scripts/transcript.mjs $C $B $BEACON_SLOT $BEACON_HASH58 $BEACON_HEX
