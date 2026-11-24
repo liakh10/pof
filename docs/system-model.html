@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>System model · Proof of Funds</title>
+<meta name="description" content="The parties, what each one holds, what each one can do, and the accounts on chain.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/system-model">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="System model · Proof of Funds">
+<meta property="og:description" content="The parties, what each one holds, what each one can do, and the accounts on chain.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/system-model">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model" aria-current="page"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">The parties, what each one holds, what each one can do, and the accounts on chain.</p>
+    <h1 id="system-model">System model</h1>
+<figure class="diagram" data-kind="mermaid"><pre><code>flowchart LR
+  subgraph Browser[&quot;Holder's browser (pof-client)&quot;]
+    W[Wallet] --&gt; V[Vault ring keys]
+    V --&gt; K[Revoke kits, local]
+  end
+  subgraph Rings[&quot;Helius Privacy Rings&quot;]
+    SPP[Pool program ring1GaLC…]
+    REG[User Registry regy3WAe…]
+    T[(Tree 0 777pvSGe…)]
+    IDX[Indexer]
+  end
+  subgraph POF[&quot;POF services&quot;]
+    VER[Verifier]
+    LOG[(Transparency log)]
+    REL[Relayer]
+    KEEP[Keeper]
+    LNK[X linker]
+  end
+  subgraph Chain[&quot;pof programs&quot;]
+    P[pof: Config, Treasury, Certificates]
+    G[pof_gate: Rooms, Members]
+  end
+  W -- shield, register --&gt; SPP
+  Browser -- disclosure package --&gt; VER
+  VER -- reads roots, PDAs --&gt; T
+  VER -- paths, slots --&gt; IDX
+  VER -- append --&gt; LOG
+  VER -- sealed kit --&gt; KEEP
+  Browser -- attestation --&gt; P
+  Browser -- attestation + fee --&gt; REL --&gt; P
+  KEEP -- revoke_spent --&gt; P
+  KEEP -- anchor_log --&gt; P
+  P -- reads nullifier PDA / roots --&gt; T
+  G -- require_certificate CPI --&gt; P
+  Readers[API, SDK, MCP, bots] -- read --&gt; P</code></pre><figcaption>Diagram source</figcaption></figure>
+<h2 id="parties">Parties<a class="anchor" href="#parties" aria-label="Link to this section">#</a></h2>
+<p><strong>Holder.</strong> Has a Solana wallet and wants a certificate for a subject. Holds the wallet key, the vault ring keys derived
+from one wallet signature, and the revoke kits.</p>
+<p><strong>Subject.</strong> What the certificate is about: a wallet (kind 0), an X handle (kind 1) or a badge key made for this
+certificate (kind 2). On chain the subject is a 32-byte hash (CONTRACT §1).</p>
+<p><strong>Controller.</strong> The key that may revoke the certificate and join Rooms with it. For a wallet or a badge it is the subject
+key itself; for an X handle it is a key the client derives for that handle from the vault seed, so it can be rebuilt on any
+device by signing the same vault message again.</p>
+<p><strong>Browser client</strong> (<code>client/pof-client.js</code>). Runs the Rings SDK and its Poseidon WASM in the page. It derives the vault,
+registers it in the User Registry, shields SOL or USDC into it, syncs and decrypts its notes, picks the fewest notes that
+reach a tier, signs the subject statement, builds the disclosure package and keeps the revoke kits (exportable as a
+file). Nothing secret leaves the page except the package sent to the Verifier.</p>
+<p><strong>Vault ring.</strong> A Privacy Ring whose Ed25519 owner key is <code>sha256(&quot;pof/vault/v2&quot; ‖ signature)</code> over a fixed plain-text
+message the wallet signs (or a random key with a passphrase backup, for wallets that do not sign deterministically). It is
+separate from the wallet's own ring, so the nullifier key the Verifier sees is never the main ring's. The vault key signs
+the disclosure message in the page and pays the relayer by withdrawal.</p>
+<p><strong>Verifier</strong> (<code>verifier/</code>). Checks a disclosure package against chain state and signs the 240-byte attestation, or refuses
+with a specific error code. Appends each signed attestation to the transparency log. Holds the ed25519 signing key. Keeps
+no amount, no opening and no nullifier key.</p>
+<p><strong>Transparency log.</strong> An append-only Merkle log (RFC 9162 hashing) of every attestation the Verifier signs. Its signed
+tree head is anchored on chain with <code>anchor_log</code>. Holds no amounts, openings, nullifiers or salts.</p>
+<p><strong>Relayer.</strong> A funded key that submits <code>certify</code> for X-handle and badge subjects, so the holder's wallet never signs a
+public transaction that names the certificate. The holder pays it the fee, the rent and the network fee in one transfer,
+from any wallet or as a Ring withdrawal. It refuses wallet subjects (a wallet certificate is submitted by the wallet). It
+caps its own spend over a rolling 24-hour window and keeps a balance floor.</p>
+<p><strong>Keeper.</strong> Holds each certificate's revocation pairs (salt, nullifier), sealed with AES-256-GCM, watches whether any
+disclosed nullifier is spent and calls <code>revoke_spent</code> when one is. Also anchors the log head on chain. Off before launch.</p>
+<p><strong>X linker.</strong> Issues a one-time code and a secret for a handle, reads the post that carries the code through fxtwitter, and
+for the holder of the secret issues a link id: the Verifier's own signature over the handle, the controller key and an
+expiry. Keeps only hashes, for at most 30 minutes.</p>
+<p><strong><code>pof</code> program</strong> (<code>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code>). Rebuilds and checks attestations, keeps the
+certificates, the Config (keys, fee, tier tables) and the Treasury (fees and public counters), verifies spends against the
+Rings accounts, and offers the CPI gate <code>require_certificate</code>.</p>
+<p><strong><code>pof_gate</code> program</strong> (<code>gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</code>). Rooms with an asset and a minimum tier. A
+controller joins with a live certificate; anyone evicts a member whose certificate is no longer good enough. No fees, no
+admin. The bots read it.</p>
+<p><strong>Witnesses.</strong> Anyone running <code>witness/</code>: checks each signed log head against the chain and the heads before it, cosigns
+it or records an alarm (CONTRACT §8).</p>
+<p><strong>Readers.</strong> Anyone: the <code>/v1</code> API, <code>@pof/sdk</code>, the MCP server, the Telegram and Discord bots, other programs by CPI.</p>
+<h2 id="what-each-party-holds">What each party holds<a class="anchor" href="#what-each-party-holds" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>party</th><th>holds</th><th>can</th><th>cannot</th></tr></thead><tbody><tr><td>Holder</td><td>wallet key, vault keys, kits</td><td>certify, renew, revoke, spend</td><td>make a tier the notes do not reach</td></tr><tr><td>Someone who learned a ring's <code>nk</code></td><td><code>nk</code></td><td>see when that ring's deposits are spent, read its merge outputs</td><td>spend, or certify against the ring (the owner key signs every disclosure)</td></tr><tr><td>Verifier</td><td>signing key</td><td>sign attestations, append the log</td><td>move funds, revoke, keep a certificate alive after a spend is shown</td></tr><tr><td>Admin</td><td>admin key = program upgrade authority</td><td>pause, rotate the Verifier key after a delay, set the fee up to the cap, upgrade the program</td><td>sign attestations, change an issued tier's meaning</td></tr><tr><td>Relayer</td><td>relayer key</td><td>pay for and submit <code>certify</code></td><td>sign attestations; it can only submit one the Verifier signed naming it as payer</td></tr><tr><td>Keeper</td><td>seal key, kits</td><td>revoke a spent certificate, anchor the log</td><td>revoke an unspent one (the program checks the spend)</td></tr><tr><td>Anyone</td><td>the chain</td><td><code>revoke_spent</code> with a pair, <code>expire</code> after expiry, <code>evict</code> in Rooms, audit the log</td><td>revoke without a spent nullifier and its salt</td></tr></tbody></table></div>
+<h2 id="accounts-on-chain">Accounts on chain<a class="anchor" href="#accounts-on-chain" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>account</th><th>seeds (program)</th><th>holds</th></tr></thead><tbody><tr><td>Config</td><td><code>[&quot;config&quot;]</code> (pof)</td><td>admin, dev, relayer, verifier, next verifier and its slot, $ROOT mint, parameters, tier tables, paused, closing</td></tr><tr><td>Treasury</td><td><code>[&quot;treasury&quot;]</code> (pof)</td><td>the fees, and counters: certified, renewed, revoked, expired, live, sum of live tier minimums, relayed, exempt, the anchored log head</td></tr><tr><td>Certificate</td><td><code>[&quot;cert&quot;, subject_hash, [asset]]</code> (pof)</td><td>subject kind and hash, asset, tier, status, slots, tree root, the sorted salted nullifier hashes, payer, controller, the Verifier key that signed, the log index, and after a spend the revealed pair</td></tr><tr><td>Room</td><td><code>[&quot;room&quot;, creator, id]</code> (pof_gate)</td><td>asset, minimum tier, open, name, counters</td></tr><tr><td>Member</td><td><code>[&quot;member&quot;, room, subject_hash]</code> (pof_gate)</td><td>the certificate it joined with, the controller, the payer</td></tr></tbody></table></div>
+<p>One subject has at most one certificate per asset. The full field list is CONTRACT §6.</p>
+<h2 id="network-assumptions">Network assumptions<a class="anchor" href="#network-assumptions" aria-label="Link to this section">#</a></h2>
+<ul><li>Slots are the only clock. Every window in the protocol is a count of slots read from the chain.</li><li>The Solana RPC answers honestly about account state at <code>confirmed</code> commitment. A lying RPC can make the Verifier refuse
+or, together with a lying indexer, sign over a root that is not real; the program then rejects the attestation only if
+it fails its own checks (the root itself is bound by the Verifier's signature, not re-read on chain).</li><li>Rings tree 0 (<code>777pvSGe…</code>) is the only tree; all notes of one attestation must be in it.</li></ul>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/motivation"><span>Previous</span>Motivation</a><a class="next" href="/docs/protocol"><span>Next</span>The protocol</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#parties">Parties</a></li><li class="d2"><a href="#what-each-party-holds">What each party holds</a></li><li class="d2"><a href="#accounts-on-chain">Accounts on chain</a></li><li class="d2"><a href="#network-assumptions">Network assumptions</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

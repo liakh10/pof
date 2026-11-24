@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FAQ · Proof of Funds</title>
+<meta name="description" content="Short answers, each pointing to the page that has the long one.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/faq">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="FAQ · Proof of Funds">
+<meta property="og:description" content="Short answers, each pointing to the page that has the long one.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/faq">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq" aria-current="page"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">Short answers, each pointing to the page that has the long one.</p>
+    <h1 id="faq">FAQ</h1>
+<h2 id="if-you-are-new">If you are new<a class="anchor" href="#if-you-are-new" aria-label="Link to this section">#</a></h2>
+<p><strong>What is this, in one sentence?</strong>
+A public, live note on Solana that says &quot;this wallet, handle or badge holds at least this much SOL or USDC&quot;, without
+saying how much, which stops being valid when the money moves.</p>
+<p><strong>Do I have to show my wallet or my balance?</strong>
+No. You choose what the certificate is about: your wallet, an X handle, or a one-off badge. Nobody but the Verifier sees
+an amount, and it keeps none (<a href="/docs/trust">Trust points</a>).</p>
+<p><strong>Can Proof of Funds take my money?</strong>
+No. Your funds sit in your own Privacy Ring, the vault, and only the vault key can move them. The vault key comes from a
+signature your wallet makes on our site, and never leaves your browser. That is also why you must never sign the vault
+message on any other site.</p>
+<p><strong>Is my money locked while I hold a certificate?</strong>
+No. You can move it at any time. Moving the notes behind a certificate ends that certificate; revoke it first if the
+subject is a handle or a badge (<a href="/docs/guides/revoke-renew-move">Revoke, renew, move funds</a>).</p>
+<p><strong>Why does my wallet ask me to sign twice the first time?</strong>
+To check that your wallet makes the same signature each time, so your vault can be rebuilt later from the wallet alone.
+If it does not, the site makes a random vault key and asks you to back it up with a passphrase.</p>
+<p><strong>Why do I have to wait before certifying?</strong>
+So the certificate cannot be matched with the deposit you just made. The minimum is 150 slots (about a minute); longer
+is better.</p>
+<p><strong>What is a slot?</strong>
+Solana's clock: one slot is about 0.4 seconds. Every wait and every expiry here is counted in slots, because that is what
+the chain itself checks.</p>
+<p><strong>What if the site goes down?</strong>
+Your certificate and your funds are on chain and do not depend on the site. Anyone can still read the certificate with
+their own tools; the open-source client in the repository (<code>client/</code>) opens the same vault from the same wallet
+signature and can move your funds; and you can still revoke with your kit.
+What stops while the site is down is getting new certificates.</p>
+<p><strong>What should I keep safe?</strong>
+The backup file the site offers after your first certificate (and its passphrase, if it asked for one). Keep it as
+carefully as a seed phrase.</p>
+<h2 id="details">Details<a class="anchor" href="#details" aria-label="Link to this section">#</a></h2>
+<p><strong>Does a certificate show how much I hold?</strong>
+No. It shows a tier, a floor: &quot;at least 100 SOL&quot;. The Verifier compares the sum of your disclosed notes with the tier and
+answers yes or no. The amounts are seen by the Verifier for one request and kept nowhere (<a href="/docs/trust">Trust points</a>).</p>
+<p><strong>Who sees my amounts, then?</strong>
+The Verifier, for the notes you disclose, during the request. Nobody else. Phase 2 removes that too (<a href="/docs/phase-2">Phase 2</a>).</p>
+<p><strong>Is it anonymous?</strong>
+No. The subject is public, the vault is linked on chain to the wallet that funded it, and timing can pair a deposit with a
+certificate. What is private is the amount, which notes back the certificate, and the rest of your ring
+(<a href="/docs/privacy">Privacy guidance</a>).</p>
+<p><strong>What happens when I move the money?</strong>
+The certificate is revoked by spend as soon as someone holding its revoke kit shows the spend: the keeper after launch, or
+you. The program checks the spend against the Rings accounts itself (<a href="/docs/revocation">Revocation</a>). To keep a handle or badge
+certificate unlinked, revoke it yourself first, then move.</p>
+<p><strong>Can it be revoked when I did not spend?</strong>
+No. <code>revoke_spent</code> needs a salted nullifier that matches one stored on the certificate and a proof from the Rings
+accounts that it is spent. Only the controller can revoke it otherwise.</p>
+<p><strong>How long does a certificate last?</strong>
+Until it is revoked, or until its expiry slot: 216,000 slots after the Verifier signed by default (the program allows up to
+6,480,000). <code>renew</code> re-checks the same notes and extends it; short validity is what keeps a certificate from outliving
+its money if no keeper is watching.</p>
+<p><strong>Why a separate vault and not my main ring?</strong>
+To prove your notes are unspent, the Verifier must see the nullifier key of the ring they are in. With it, it could see
+when that ring's deposits are spent and read its merge outputs. The vault limits that to the funds you put there for
+certificates.</p>
+<p><strong>I lost my browser data. Is the certificate lost?</strong>
+No. The certificate lives on chain. Signing the vault message again rebuilds the vault and the X controller key (if your
+wallet does not sign deterministically, the vault key is in the passphrase-protected backup file instead). The revoke
+kit (salts and nullifiers) is only in the browser and in the file you exported; without it you can still revoke by
+controller, but not by spend.</p>
+<p><strong>Can I certify borrowed money?</strong>
+Yes, if you control the ring the notes are in. A certificate proves control at a slot, not ownership, and dies when the
+notes move (<a href="/docs/trust">Trust points</a>, item 6).</p>
+<p><strong>Can one deposit back many handles?</strong>
+Not at the same time. One note backs one live certificate; the Verifier keeps a keyed index of nullifiers to enforce it.</p>
+<p><strong>Why does certify fail with ROOT_TOO_OLD?</strong>
+The Rings tree only updates when someone transacts on Rings, and the program refuses a root more than 9,000 slots older than
+the attestation. Wait for the next Rings transaction; the <a href="/docs/status">status page</a> shows the root's age.</p>
+<p><strong>Why does it say NOTE_TOO_NEW?</strong>
+Notes younger than 150 slots are refused, so a certificate cannot point at the shield that just happened. The error says how
+many slots to wait.</p>
+<p><strong>What does it cost?</strong>
+A protocol fee per certify and renew (0.01 SOL at launch, never above 0.25 SOL), the certificate's rent (returned at
+expiry) and network fees. Holders of 1,000,000 $POF pay no protocol fee (<a href="/docs/fees">Fees</a>).</p>
+<p><strong>How do I check someone's certificate?</strong>
+At <code>/verify</code>, through <code>GET /v1/certificates/&lt;subject&gt;</code>, through the MCP server, or straight from chain with <code>@pof/sdk</code>
+(<a href="/developers">Developers</a>). Never from a screenshot.</p>
+<p><strong>How do I gate my program or my group?</strong>
+With the CPI <code>require_certificate(subject_hash, asset, min_tier)</code>, with a <code>pof_gate</code> Room, or with the Telegram and
+Discord bots (<a href="/developers">Developers</a>).</p>
+<p><strong>Has the code been audited?</strong>
+It has had an internal security review by a separate reviewer inside the POF build, not a third-party audit. Findings, their
+status and their failing tests are in <a href="https://github.com/liakh10/pof/blob/main/reports/audit.md" rel="noopener" target="_blank"><code>reports/audit.md</code></a>.
+To report a problem, see <a href="https://github.com/liakh10/pof/blob/main/SECURITY.md" rel="noopener" target="_blank"><code>SECURITY.md</code></a>.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/status"><span>Previous</span>Status</a><a class="next" href="/docs/glossary"><span>Next</span>Glossary</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#if-you-are-new">If you are new</a></li><li class="d2"><a href="#details">Details</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

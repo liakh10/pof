@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Docs · Proof of Funds</title>
+<meta name="description" content="A live, public certificate that a subject holds at least a tier of SOL or USDC in a Helius Privacy Ring, revoked on chain when the money moves.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Docs · Proof of Funds">
+<meta property="og:description" content="A live, public certificate that a subject holds at least a tier of SOL or USDC in a Helius Privacy Ring, revoked on chain when the money moves.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs" aria-current="page"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">A live, public certificate that a subject holds at least a tier of SOL or USDC in a Helius Privacy Ring, revoked on chain when the money moves.</p>
+    <section class="trust-first" aria-labelledby="trust-first-h"><p class="label" id="trust-first-h">Read this first: what you trust</p><ol><li><a href="/docs/trust#1-the-verifier-sees-the-notes-you-disclose"><strong>The Verifier sees the notes you disclose</strong><span>To check that your notes exist, are yours and are unspent, the Verifier receives, over TLS, for one request.</span></a></li><li><a href="/docs/trust#2-the-verifiers-signing-key-and-the-program-admin"><strong>The Verifier's signing key and the program admin</strong><span>The program accepts attestations signed by one ed25519 key at a time, stored in its Config.</span></a></li><li><a href="/docs/trust#3-helius-the-rings-programs-the-tree-and-the-indexer"><strong>Helius: the Rings programs, the tree and the indexer</strong><span>POF certifies notes held in Helius Privacy Rings, so it inherits their trust.</span></a></li><li><a href="/docs/trust#4-revocation-on-spend-depends-on-whoever-holds-the-revoke-kits"><strong>Revocation on spend depends on whoever holds the revoke kits</strong><span>revoke_spent is open to anyone on chain, but it needs a disclosed note's secret salt and its nullifier.</span></a></li><li><a href="/docs/trust#5-the-x-handle-check-relies-on-x"><strong>The X handle check relies on X</strong><span>A handle is linked by posting a one-time code from it.</span></a></li><li><a href="/docs/trust#6-a-certificate-proves-control-not-ownership"><strong>A certificate proves control, not ownership</strong><span>The Verifier sees openings and a nullifier key: that proves control of a ring, not who owns the money.</span></a></li><li><a href="/docs/trust#7-timing"><strong>Timing</strong><span>A deposit into a ring from a public wallet is public: the wallet, the amount and the recipient are in the transaction.</span></a></li><li><a href="/docs/trust#8-screenshots"><strong>Screenshots</strong><span>A card image proves nothing.</span></a></li><li><a href="/docs/trust#9-our-hosting"><strong>Our hosting</strong><span>The Verifier, the relayer, the keeper, the X linker, the API and the status page run as Vercel functions; the log, the
+keeper's sealed kits and the rate counters live in Vercel Blob.</span></a></li><li><a href="/docs/trust#10-open-findings"><strong>Open findings</strong><span>An internal security review of this code base (by a separate reviewer inside the POF build, not a third-party audit
+firm) is recorded in reports/audit.md
+with failing tests for each finding.</span></a></li></ol><a class="more" href="/docs/trust">All trust points, with what each party could do</a></section><h1 id="proof-of-funds">Proof of Funds</h1>
+<h2 id="abstract">Abstract<a class="anchor" href="#abstract" aria-label="Link to this section">#</a></h2>
+<p>Proof of Funds (POF) issues a public, on-chain certificate that a <strong>subject</strong> holds <strong>at least</strong> a tier of SOL or USDC in a
+Helius Privacy Ring. A subject is a Solana wallet, an X handle, or a fresh badge key. The certificate carries the tier
+(for example &quot;at least 1,000 SOL&quot;), never an amount. It stays live only while the notes behind it are unspent: when one of
+them is spent, anyone holding that note's revocation pair can prove the spend from chain state, and the program marks the
+certificate revoked at that slot.</p>
+<p>The protocol has five parts. The holder's browser picks the fewest shielded notes that reach the tier and sends their
+openings to the <strong>Verifier</strong>. The Verifier recomputes every commitment, checks that each one is in the Rings state tree
+under a root the tree account holds, derives every nullifier and checks that none is spent, checks that the sum reaches
+the tier, and signs a fixed 240-byte attestation. The <strong><code>pof</code> program</strong> rebuilds those 240 bytes on chain, checks the
+Verifier's ed25519 signature, and writes the certificate. The <strong>transparency log</strong> records every attestation the Verifier
+signs in an append-only Merkle log whose signed head is anchored on chain. The <strong>keeper</strong> watches the disclosed nullifiers
+and calls <code>revoke_spent</code> when one appears; the holder keeps the same revocation pairs, so revocation does not depend on us.</p>
+<p>Version 1 has one trusted party for privacy: the Verifier sees the amounts of the notes you disclose and the nullifier key
+of the ring they sit in, for the length of one request. It keeps neither. The program does not trust the Verifier with
+revocation: a spend is proven from the Rings program's own accounts. Phase 2 replaces the Verifier's view with a
+zero-knowledge proof.</p>
+<h2 id="what-is-private-and-what-is-not">What is private and what is not<a class="anchor" href="#what-is-private-and-what-is-not" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th></th><th>who can see it</th></tr></thead><tbody><tr><td>The subject (wallet, or the hash of an X handle, or a badge key)</td><td>everyone (an X handle is stored as a hash, but anyone can hash a handle and compare)</td></tr><tr><td>The asset and the tier</td><td>everyone</td></tr><tr><td>The slots it was issued at, expires at, was revoked at</td><td>everyone</td></tr><tr><td>How many notes back it (1 to 8)</td><td>everyone</td></tr><tr><td>The payer (the wallet itself, or the relayer for handles and badges) and the controller key</td><td>everyone</td></tr><tr><td>The amounts of the disclosed notes</td><td>the Verifier, during one request; nobody else</td></tr><tr><td>The ring the notes sit in, and its nullifier key</td><td>the Verifier, during one request; nobody else</td></tr><tr><td>Which notes back it</td><td>the Verifier (during the request) and the registered keepers (as salted nullifiers they watch); nobody else while it is live; one note becomes public if the certificate is revoked by a spend</td></tr><tr><td>The rest of the ring's balance and history</td><td>nobody (POF never sees notes you do not disclose)</td></tr><tr><td>The wallet that funded a vault ring</td><td>everyone, on chain, from the deposit itself (see <a href="/docs/privacy">Privacy guidance</a>)</td></tr></tbody></table></div>
+<p>POF is not anonymity. A certificate is as private as the subject you choose and the way you fund the ring behind it.</p>
+<h2 id="reading-order">Reading order<a class="anchor" href="#reading-order" aria-label="Link to this section">#</a></h2>
+<ol><li><a href="/docs/trust">Trust points</a>: what you are trusting, stated first.</li><li><a href="/docs/motivation">Motivation</a>: why a proof of funds, and why now.</li><li><a href="/docs/system-model">System model</a>: the parties and what each one holds.</li><li><a href="/docs/protocol">The protocol</a>: every step, with the exact bytes.</li><li><a href="/docs/threat-model">Threat model</a>: the adversaries and what stops them.</li><li><a href="/docs/revocation">Revocation</a>: how a certificate dies.</li><li><a href="/docs/transparency-log">The transparency log</a>: how anyone audits the Verifier.</li><li><a href="/docs/privacy">Privacy guidance</a>: how to keep what is private, private.</li><li><a href="/docs/fees">Fees and the $ROOT holder rule</a>.</li><li><a href="/docs/phase-2">Phase 2</a>: the zero-knowledge Verifier.</li><li><a href="/developers">Developers</a>: the API, the SDK, the CPI gate, the bots.</li><li><a href="/docs/status">Status</a>: what the status page measures.</li><li><a href="/docs/faq">FAQ</a> and <a href="/docs/glossary">Glossary</a>.</li></ol>
+<p>The normative byte layouts live in <a href="https://github.com/liakh10/pof/blob/main/CONTRACT.md" rel="noopener" target="_blank"><code>CONTRACT.md</code></a>. The facts about
+Privacy Rings that POF relies on, each checked against mainnet reads, live in
+<a href="https://github.com/liakh10/pof/blob/main/RINGS.md" rel="noopener" target="_blank"><code>RINGS.md</code></a>. Where this paper and the code disagree, the code is what
+runs, and the disagreement is a bug: please report it (<a href="https://github.com/liakh10/pof/blob/main/SECURITY.md" rel="noopener" target="_blank">Security</a>).</p>
+    <nav class="docs-next" aria-label="Pages"><span></span><a class="next" href="/docs/trust"><span>Next</span>Trust points</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#abstract">Abstract</a></li><li class="d2"><a href="#what-is-private-and-what-is-not">What is private and what is not</a></li><li class="d2"><a href="#reading-order">Reading order</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

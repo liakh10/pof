@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Changelog · Proof of Funds</title>
+<meta name="description" content="What changed in Proof of Funds, part by part.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/changelog">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Changelog · Proof of Funds">
+<meta property="og:description" content="What changed in Proof of Funds, part by part.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/changelog">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>Record</summary><ol class="docs-list"><li><a href="/changelog" aria-current="page"><span class="n">00</span>Changelog</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    
+    <h1 id="changelog">Changelog</h1>
+<p>Every notable change to Proof of Funds, by component. The format follows <a href="https://keepachangelog.com/en/1.1.0/" rel="noopener" target="_blank">Keep a Changelog</a>,
+and each component is versioned on its own with <a href="https://semver.org/" rel="noopener" target="_blank">Semantic Versioning</a>. Commit hashes point into
+<a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">liakh10/pof</a>. Nothing is deployed on mainnet yet, so every component is <strong>Unreleased</strong>;
+the first release of each will move its section under a version heading with its release slot.</p>
+<div class="table"><table><thead><tr><th>component</th><th>version</th><th>where</th></tr></thead><tbody><tr><td>program (<code>pof</code>, <code>pof_gate</code>)</td><td>0.1.0</td><td><code>program/</code></td></tr><tr><td>verifier (Verifier, log, relayer, keeper, X linker)</td><td>0.1.0</td><td><code>verifier/</code>, <code>api/attest</code>, <code>api/relay</code>, <code>api/link</code>, <code>api/keeper</code></td></tr><tr><td>client</td><td>0.1.0</td><td><code>client/</code>, <code>lab/</code></td></tr><tr><td>sdk (<code>@pof/sdk</code>)</td><td>0.1.0</td><td><code>sdk/</code></td></tr><tr><td>api (<code>/v1</code>, <code>/api/status</code>, <code>/api/spr</code>)</td><td>0.1.0</td><td><code>api/</code></td></tr><tr><td>mcp</td><td>0.1.0</td><td><code>mcp/</code></td></tr><tr><td>bots</td><td>0.1.0</td><td><code>bots/</code></td></tr><tr><td>witness and cli</td><td>0.1.0</td><td><code>witness/</code>, <code>cli/</code></td></tr><tr><td>contract</td><td>§1 to §8</td><td><code>CONTRACT.md</code>, <code>RINGS.md</code></td></tr><tr><td>embed (<code>&lt;pof-badge&gt;</code>)</td><td>0.1.0</td><td><code>embed/</code></td></tr><tr><td>zk (phase 2)</td><td>in development</td><td><code>zk/</code></td></tr></tbody></table></div>
+<h2 id="program">program<a class="anchor" href="#program" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010" aria-label="Link to this section">#</a></h3>
+<h4 id="added">Added<a class="anchor" href="#added" aria-label="Link to this section">#</a></h4>
+<ul><li><code>pof</code>: <code>init_config</code> (upgrade authority only), <code>set_roles</code>, <code>set_params</code>, <code>set_fee</code> (capped at 0.25 SOL), <code>set_asset</code>
+(a tier table, once set, only toggles), <code>set_verifier</code> with a rotation delay in slots and <code>apply_verifier</code>,
+<code>set_paused</code>, <code>certify</code> (the 240-byte attestation rebuilt on chain and checked against the Ed25519-program instruction
+before it), <code>renew</code>, <code>revoke_spent</code> (nullifier PDA, or a nullifier-tree membership path to one of the 100 on-chain
+roots), <code>revoke_by_holder</code>, <code>expire</code>, <code>anchor_log</code> (the signed log head, only growing), <code>require_certificate</code> (CPI gate),
+<code>withdraw_fees</code>, <code>close_begin</code>, <code>close_config</code>. Fee exemption for payers holding 1,000,000 $POF and for the relayer. (<code>54aa589</code>)</li><li><code>pof_gate</code>: Rooms (<code>create_room</code>, <code>set_room</code>, <code>join</code> through <code>require_certificate</code>, permissionless <code>evict</code>, <code>leave</code>,
+<code>close_room</code>, <code>release_room</code>). No fees, no admin. (<code>54aa589</code>)</li><li>IDLs in <code>program/idl/</code>, consumed by the SDK, the Verifier and the API. (<code>54aa589</code>)</li><li><code>launch.mjs</code>, <code>wind-down.mjs</code>, <code>ops.mjs</code>; the suite, wind-down, rehearsal and own-CA tests. (<code>73d71dd</code>)</li></ul>
+<h4 id="changed">Changed<a class="anchor" href="#changed" aria-label="Link to this section">#</a></h4>
+<ul><li>Config gains <code>held_delay</code> and <code>held_until</code>; IDLs refreshed. (<code>73d71dd</code>)</li></ul>
+<h4 id="security">Security<a class="anchor" href="#security" aria-label="Link to this section">#</a></h4>
+<ul><li>POF-07: remaking a certificate pays the prior payer the rent only; a donated surplus goes to the Treasury. POF-17: a
+lowered rotation delay waits out the old one. POF-22: <code>renew</code> refuses an expired certificate. (<code>73d71dd</code>)</li></ul>
+<h2 id="verifier">verifier<a class="anchor" href="#verifier" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-1">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-1" aria-label="Link to this section">#</a></h3>
+<h4 id="added-1">Added<a class="anchor" href="#added-1" aria-label="Link to this section">#</a></h4>
+<ul><li>The Verifier: CONTRACT §4 package in, §3 attestation out; commitments recomputed with the Rings SDK hasher, Merkle and
+non-inclusion paths re-hashed to on-chain roots, nullifiers derived from <code>nk</code>, minimum note age 150 slots, the sum
+compared and never returned. (<code>47bc6ce</code>, <code>9034e44</code>)</li><li>The transparency log: RFC 9162 hashing, 377-byte leaves, 80-byte signed tree heads, inclusion and consistency proofs,
+create-if-absent appends. (<code>47bc6ce</code>, <code>9034e44</code>)</li><li>The relayer (quote, exact-lamport payment, rolling 24-hour cap, balance floor), the keeper (sealed kits, spend scan,
+<code>revoke_spent</code>, <code>anchor_log</code>), the X linker (fxtwitter), rate limits, error codes. (<code>47bc6ce</code>, <code>9034e44</code>)</li><li>Deterministic bundle with a published hash (<code>verifier/dist/BUILD.json</code>); the Vercel functions over it; a key script that
+writes keys to <code>~/.config/pof</code> (mode 600) and prints public keys only. (<code>47bc6ce</code>, <code>b0edfcc</code>)</li><li>Keeper escrow: every kit sealed to each keeper registered in <code>verifier/keepers.json</code> and published at
+<code>GET /api/keeper/escrow</code>; <code>scripts/witness-keeper.mjs</code>, an independent keeper in one file. (<code>035f6a6</code>)</li><li><code>renew</code> with the holder's salts. (<code>035f6a6</code>)</li><li>The keeper writes <code>keeper/last-scan.json</code> for the status page. (<code>d84df76</code>)</li></ul>
+<h4 id="changed-1">Changed<a class="anchor" href="#changed-1" aria-label="Link to this section">#</a></h4>
+<ul><li>Default certificate validity is 216,000 slots (the program still accepts up to <code>validity_slots</code>). (<code>035f6a6</code>)</li><li>The Vercel build verifies that the bundle equals the published hash and fails the deploy otherwise. (<code>0387b66</code>)</li><li>Rate-limit counters are named by a keyed hash of the client address per window, swept by the keeper. (<code>d84df76</code>)</li></ul>
+<h4 id="security-1">Security<a class="anchor" href="#security-1" aria-label="Link to this section">#</a></h4>
+<ul><li>POF-02: the ring owner signs the disclosure message v2 (<code>ring.proof</code>), always. (<code>d84df76</code>)</li><li>POF-03, POF-09: an X code is redeemable only with the starter's secret; link ids are bound to the controller
+(<code>POF-LINK2</code>); a second start never cancels a first. (<code>d84df76</code>)</li><li>POF-04: note locks are atomic create-if-absent generations. (<code>d84df76</code>)</li><li>POF-05, POF-06: kits are kept per attestation until they can no longer land or their certificate dies. (<code>d84df76</code>)</li><li>POF-08: the relayer refuses before it uses a payment, and releases it on a failed <code>certify</code>. (<code>d84df76</code>)</li><li>POF-01: keeper escrow (above). (<code>035f6a6</code>)</li></ul>
+<h2 id="client">client<a class="anchor" href="#client" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-2">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-2" aria-label="Link to this section">#</a></h3>
+<h4 id="added-2">Added<a class="anchor" href="#added-2" aria-label="Link to this section">#</a></h4>
+<ul><li><code>pof-client</code>: the Rings SDK and Poseidon WASM in the browser (139 KB gzip certify path, hasher loaded with progress),
+vault, register, shield, sync, note choice, disclosure package, revoke kits with export and import; LocalRings for a
+local validator with Rings cloned. (<code>6189906</code>)</li><li>The lab page and the local validator recipe; withdrawals through the Helius prover. (<code>ec99afb</code>)</li><li><code>api/spr</code>: the indexer and prover proxies (method allowlists, key rotation, per-address window, size caps, key never
+echoed). (<code>084ea11</code>)</li></ul>
+<h4 id="security-2">Security<a class="anchor" href="#security-2" aria-label="Link to this section">#</a></h4>
+<ul><li>POF-02: the vault key signs the disclosure message v2. POF-03: X link with the secret kept in the tab. POF-10: the kit key
+comes from the vault seed, not <code>nk</code>; old kits are re-sealed. POF-11: vault message v2 with domain, purpose and warning,
+determinism check, random vault key with a passphrase backup otherwise. POF-12: X and badge certificates go through the
+relayer, paid from the vault; a wallet payer needs explicit consent. (<code>d9bec9f</code>)</li></ul>
+<h2 id="sdk">sdk<a class="anchor" href="#sdk" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-3">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-3" aria-label="Link to this section">#</a></h3>
+<h4 id="added-3">Added<a class="anchor" href="#added-3" aria-label="Link to this section">#</a></h4>
+<ul><li><code>@pof/sdk</code>: subjects, PDAs, IDL-driven account decoding, a chain reader, RFC 9162 log proofs, CPI accounts; no runtime
+dependencies. (<code>1955110</code>, <code>82a06d2</code>)</li><li>Local-validator integration suite. (<code>7402298</code>)</li><li>README with examples and a release tarball installable from the repository. (<code>4b00ca8</code>)</li><li>Witness cosignatures (<code>cosignMessage</code>, <code>verifyCosignature</code>). (<code>39e02d9</code>)</li></ul>
+<h4 id="changed-2">Changed<a class="anchor" href="#changed-2" aria-label="Link to this section">#</a></h4>
+<ul><li>Expiry read as the program does: live through <code>expiry_slot</code>. (<code>4b00ca8</code>)</li></ul>
+<h4 id="security-3">Security<a class="anchor" href="#security-3" aria-label="Link to this section">#</a></h4>
+<ul><li>POF-13: log heads and entries verify only against Verifier keys from Config and the <code>VerifierSet</code> history. POF-18:
+certificates matched to log leaves by the signed bytes. (<code>39e02d9</code>)</li></ul>
+<h2 id="api">api<a class="anchor" href="#api" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-4">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-4" aria-label="Link to this section">#</a></h3>
+<h4 id="added-4">Added<a class="anchor" href="#added-4" aria-label="Link to this section">#</a></h4>
+<ul><li><code>/v1</code>: certificates, rooms, stats, config, verified log head and proofs; OpenAPI 3.1. (<code>c3e6f87</code>, <code>82a06d2</code>)</li><li><code>/v1/log/consistency</code>, <code>/v1/witness</code>, <code>/v1/badge/{subject}.svg</code>. (<code>39e02d9</code>)</li><li><code>/api/status</code>: RPC, program, Rings tree root age, indexer against on-chain roots, Verifier key and bundle, relayer band,
+keeper, log head signature and consistency; uptime history in Blob; the sample cron parked. (<code>c51636c</code>)</li></ul>
+<h4 id="security-4">Security<a class="anchor" href="#security-4" aria-label="Link to this section">#</a></h4>
+<ul><li>POF-14 (status): one cacheable URL (a query string redirects), at most one run per instance every 15 s, a shared run in
+Blob reused for 30 s, at most 6 runs a minute. POF-20 (status): the Verifier origin from <code>POF_STATUS_ORIGIN</code> or Vercel's
+own URLs, never the Host header. (<code>55b8394</code>, <code>fb1e902</code>)</li><li>POF-20: service URLs no longer derived from the Host header when the environment is unset. (<code>39e02d9</code>)</li></ul>
+<h2 id="mcp">mcp<a class="anchor" href="#mcp" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-5">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-5" aria-label="Link to this section">#</a></h3>
+<h4 id="added-5">Added<a class="anchor" href="#added-5" aria-label="Link to this section">#</a></h4>
+<ul><li>MCP server with read-only tools (<code>check_proof_of_funds</code>, <code>get_certificates</code>, <code>list_certificates</code>, <code>get_room</code>,
+<code>list_rooms</code>, <code>get_stats</code>, <code>get_log_proof</code>, <code>get_log_head</code>), stdio and Streamable HTTP at <code>/mcp</code>. (<code>4d3a3e3</code>)</li></ul>
+<h4 id="security-5">Security<a class="anchor" href="#security-5" aria-label="Link to this section">#</a></h4>
+<ul><li>POF-14: batch at most 10, body at most 64 KB, per-address limit. POF-24: room names treated as untrusted. (<code>39e02d9</code>)</li></ul>
+<h2 id="bots">bots<a class="anchor" href="#bots" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-6">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-6" aria-label="Link to this section">#</a></h3>
+<h4 id="added-6">Added<a class="anchor" href="#added-6" aria-label="Link to this section">#</a></h4>
+<ul><li>Telegram gate bot and Discord role bot over Rooms, the <code>/link</code> page, the sweep (cron parked). (<code>413fbda</code>)</li></ul>
+<h4 id="security-6">Security<a class="anchor" href="#security-6" aria-label="Link to this section">#</a></h4>
+<ul><li>POF-03 (bot side): X subjects link only with a signature by the certificate's on-chain controller. POF-15: the sweep
+runs in turns with a cursor. POF-21: Discord role hierarchy respected. (<code>39e02d9</code>)</li></ul>
+<h2 id="embed">embed<a class="anchor" href="#embed" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-7">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-7" aria-label="Link to this section">#</a></h3>
+<h4 id="added-7">Added<a class="anchor" href="#added-7" aria-label="Link to this section">#</a></h4>
+<ul><li><code>&lt;pof-badge&gt;</code>: a web component that shows a subject's certificate live (REVOKED with its slot), with an iframe
+fallback. (<code>c25f503</code>)</li></ul>
+<h2 id="witness-and-cli">witness and cli<a class="anchor" href="#witness-and-cli" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-8">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-8" aria-label="Link to this section">#</a></h3>
+<h4 id="added-8">Added<a class="anchor" href="#added-8" aria-label="Link to this section">#</a></h4>
+<ul><li><code>witness/</code>: an independent log monitor that cosigns heads or records alarms (CONTRACT §8); certificate monitor; the
+project's witness cron parked. (<code>6780b93</code>, <code>39e02d9</code>)</li><li><code>cli/</code>: <code>pof check</code>, <code>watch</code>, <code>rooms</code>, <code>config</code>, <code>stats</code>, <code>log head|proof|verify</code> (keys and anchor read from chain).
+(<code>c4f9a99</code>)</li></ul>
+<h2 id="contract">contract<a class="anchor" href="#contract" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased">[Unreleased]<a class="anchor" href="#unreleased" aria-label="Link to this section">#</a></h3>
+<h4 id="added-9">Added<a class="anchor" href="#added-9" aria-label="Link to this section">#</a></h4>
+<ul><li><code>CONTRACT.md</code> §1 to §7 (<code>1e4c9d1</code>, <code>7eb3bcd</code>, <code>5e2a7ca</code>, <code>54aa589</code>, <code>457d9a3</code>); §8 log witnesses (<code>5906c78</code>).</li><li><code>RINGS.md</code>: the Privacy Rings facts POF relies on, each checked against mainnet reads (<code>1413cf0</code>, <code>f396ca5</code>, <code>084ea11</code>).</li></ul>
+<h4 id="changed-3">Changed<a class="anchor" href="#changed-3" aria-label="Link to this section">#</a></h4>
+<ul><li>§3: <code>controller</code> added, 240 bytes (<code>54aa589</code>). §4: <code>ring.proof</code> over the disclosure message v2, the X link with a secret
+and a bound controller; §7: the anchor is <code>anchor_log</code> (<code>0387b66</code>).</li></ul>
+<h2 id="docs-and-reports">docs and reports<a class="anchor" href="#docs-and-reports" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-1">[Unreleased]<a class="anchor" href="#unreleased-1" aria-label="Link to this section">#</a></h3>
+<h4 id="added-10">Added<a class="anchor" href="#added-10" aria-label="Link to this section">#</a></h4>
+<ul><li><code>/developers</code> content and the devx test report (<code>ec99afb</code>); the Rings client test report (<code>d449f65</code>).</li><li>The internal security review, round 1: 25 findings, failing proofs in <code>audit/test/</code> (<code>9407010</code>, <code>cf763b5</code>); round 2
+re-review: the High findings fixed and re-tested, POF-26 to POF-29 new (<code>78234b3</code>).</li><li>The protocol paper in <code>docs-src/</code> and the litepaper (<code>c0fd4df</code>, <code>0218cba</code>); <code>README.md</code>, <code>SECURITY.md</code>, <code>LICENSE</code>
+(Apache-2.0), this changelog.</li></ul>
+<h2 id="zk">zk<a class="anchor" href="#zk" aria-label="Link to this section">#</a></h2>
+<p>In development (<code>zk/</code>, <code>62937c7</code>): the phase 2 Groth16 circuit (circom 2, 4 notes, the Rings Poseidon), witness and
+escrow code, parity tests against the Rings SDK and mainnet leaves, a development setup, the browser prover and the
+<code>certify_zk</code> patch for <code>pof</code>, documented in <code>docs-src/zk.md</code>. Not deployed: <code>certify_zk</code> stays off until a public
+ceremony has run. It will get its own version when it ships.</p>
+    <nav class="docs-next" aria-label="Pages"><span></span></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#program">program</a></li><li class="d3"><a href="#unreleased-010">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#verifier">verifier</a></li><li class="d3"><a href="#unreleased-010-1">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#client">client</a></li><li class="d3"><a href="#unreleased-010-2">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#sdk">sdk</a></li><li class="d3"><a href="#unreleased-010-3">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#api">api</a></li><li class="d3"><a href="#unreleased-010-4">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#mcp">mcp</a></li><li class="d3"><a href="#unreleased-010-5">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#bots">bots</a></li><li class="d3"><a href="#unreleased-010-6">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#embed">embed</a></li><li class="d3"><a href="#unreleased-010-7">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#witness-and-cli">witness and cli</a></li><li class="d3"><a href="#unreleased-010-8">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#contract">contract</a></li><li class="d3"><a href="#unreleased">[Unreleased]</a></li><li class="d2"><a href="#docs-and-reports">docs and reports</a></li><li class="d3"><a href="#unreleased-1">[Unreleased]</a></li><li class="d2"><a href="#zk">zk</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

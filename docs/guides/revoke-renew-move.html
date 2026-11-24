@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revoke, renew, and moving your funds · Proof of Funds</title>
+<meta name="description" content="How a certificate ends, how to keep it alive, and the right order of steps when you want your money back.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/guides/revoke-renew-move">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Revoke, renew, and moving your funds · Proof of Funds">
+<meta property="og:description" content="How a certificate ends, how to keep it alive, and the right order of steps when you want your money back.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/guides/revoke-renew-move">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move" aria-current="page"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">How a certificate ends, how to keep it alive, and the right order of steps when you want your money back.</p>
+    <h1 id="revoke-renew-and-moving-your-funds">Revoke, renew, and moving your funds</h1>
+<h2 id="the-four-ways-a-certificate-ends">The four ways a certificate ends<a class="anchor" href="#the-four-ways-a-certificate-ends" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>what happens</th><th>who does it</th><th>what anyone sees afterwards</th></tr></thead><tbody><tr><td>You revoke it</td><td>you, with the certificate's controller key</td><td><code>revoked_by_holder</code> at that slot, nothing more</td></tr><tr><td>A note behind it is spent</td><td>a keeper, you, or anyone holding its revoke kit, once the spend has happened</td><td><code>revoked_spent</code> at that slot, and that one note's nullifier</td></tr><tr><td>It reaches its expiry slot</td><td>nobody needs to act: it reads <code>expired</code> from then on</td><td><code>expired</code>; anyone may later close the account, and its rent goes back to whoever paid it</td></tr><tr><td>You certify the same subject again later</td><td>you</td><td>a new certificate in the same place, after the old one is revoked or expired</td></tr></tbody></table></div>
+<h2 id="revoke-it-yourself">Revoke it yourself<a class="anchor" href="#revoke-it-yourself" aria-label="Link to this section">#</a></h2>
+<p>Open your certificates on the site (the page lists the kits saved in this browser, or imported from your backup file)
+and choose revoke. The certificate's <strong>controller</strong> signs:</p>
+<ul><li>a wallet certificate: Phantom asks you to approve the transaction;</li><li>a badge certificate: the badge key, kept in your kit, signs in the page;</li><li>a handle certificate: the controller key, rebuilt from your vault, signs in the page.</li></ul>
+<p>Revoking reveals no secret. It is the step to take <strong>before</strong> you move funds behind a handle or badge certificate (see
+below). Every transaction also needs an account that pays its network fee, and that account appears in the
+transaction: the page tells you which one it uses before you confirm.</p>
+<p>If you lost the kit, you can still revoke a wallet certificate (the wallet is the controller) and a handle certificate
+(the controller comes back from the vault); a badge's key lives only in the kit.</p>
+<h2 id="renew-it">Renew it<a class="anchor" href="#renew-it" aria-label="Link to this section">#</a></h2>
+<p>A certificate lasts <strong>216,000 slots</strong> by default (roughly a day). Renewing re-checks the <strong>same notes</strong> and moves the
+expiry forward; the tier can change if the notes still reach it. You need:</p>
+<ul><li>the certificate still live (a renew is refused once it has expired: certify again instead);</li><li>the kit, because a renewal reuses the certificate's secrets so the program can see it is the same set of notes;</li><li>the protocol fee again (<strong>0.01 SOL</strong> at launch, none for a payer holding 1,000,000 $POF), or the relayer's fee for a
+handle or badge.</li></ul>
+<p>Renew from the same page you certified on. The checks and the messages are the ones of
+<a href="/docs/guides/first-certificate">Get your first certificate</a>, step 6; if a note has been spent in the meantime you will see
+<strong>&quot;A note you picked was already spent.&quot;</strong>, and the certificate cannot be renewed on those notes.</p>
+<h2 id="moving-your-funds">Moving your funds<a class="anchor" href="#moving-your-funds" aria-label="Link to this section">#</a></h2>
+<p>The notes behind a certificate are its promise. Spending one ends the certificate, and <strong>how</strong> it ends matters:</p>
+<p><strong>If the certificate is for a handle or a badge, revoke it first, then move.</strong></p>
+<ol><li>Revoke it (above) and wait until the page shows the revocation confirmed.</li><li>Then withdraw or transfer out of the vault.</li></ol>
+<p>Done in this order, nothing links the handle or badge to your vault. Done the other way round, a keeper revokes the
+certificate by showing the spent note's nullifier, and that nullifier matches a transaction your vault signed: the
+handle or badge is then publicly linked to the vault, and through the vault's funding to your wallet. The page reminds
+you: <strong>&quot;To move the money without linking the certificate to the spend, revoke the certificate first.&quot;</strong></p>
+<p><strong>If the certificate is for your wallet,</strong> the order matters less: the wallet is already named. Moving the funds ends the
+certificate as soon as the spend is shown.</p>
+<p><strong>Notes that do not back any certificate</strong> can move freely; they do not affect any certificate.</p>
+<p>To move funds out, the page withdraws from the vault through the Privacy Rings prover. The vault key signs and pays the
+network fee from its own small SOL balance, and each spent note leaves 0.00070612 SOL of rent in the Rings program. You
+can withdraw to any address, or transfer privately to another Privacy Ring.</p>
+<h2 id="what-happens-if-you-move-funds-and-nobody-revokes">What happens if you move funds and nobody revokes<a class="anchor" href="#what-happens-if-you-move-funds-and-nobody-revokes" aria-label="Link to this section">#</a></h2>
+<p>The certificate stays <code>live</code> until someone shows the spend. After launch, the registered keepers do that on their next
+scan; anyone with the kit can do it at any time. If no keeper were running, the certificate would stay live until its
+expiry slot, which is why certificates are short-lived by default (<a href="/docs/trust">Trust points</a>, item 4).</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/guides/otc-deals"><span>Previous</span>Require a certificate before a deal</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-four-ways-a-certificate-ends">The four ways a certificate ends</a></li><li class="d2"><a href="#revoke-it-yourself">Revoke it yourself</a></li><li class="d2"><a href="#renew-it">Renew it</a></li><li class="d2"><a href="#moving-your-funds">Moving your funds</a></li><li class="d2"><a href="#what-happens-if-you-move-funds-and-nobody-revokes">What happens if you move funds and nobody revokes</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

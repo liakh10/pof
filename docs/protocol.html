@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The protocol · Proof of Funds</title>
+<meta name="description" content="Every step from a wallet to a live certificate, with the exact bytes the Verifier signs and the program rebuilds.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/protocol">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="The protocol · Proof of Funds">
+<meta property="og:description" content="Every step from a wallet to a live certificate, with the exact bytes the Verifier signs and the program rebuilds.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/protocol">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol" aria-current="page"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">Every step from a wallet to a live certificate, with the exact bytes the Verifier signs and the program rebuilds.</p>
+    <h1 id="the-protocol">The protocol</h1>
+<p>The normative layouts are in <a href="https://github.com/liakh10/pof/blob/main/CONTRACT.md" rel="noopener" target="_blank"><code>CONTRACT.md</code></a> (§1 subjects, §2 tiers,
+§3 the attestation, §4 the disclosure package, §5 revocation, §6 accounts and HTTP, §7 the log). This page walks through
+them in the order they are used. Byte strings in quotes are UTF-8; <code>‖</code> is concatenation; integers are little-endian unless
+marked otherwise; Poseidon is BN254 with the circom parameters, exactly the Rings SDK hasher.</p>
+<h2 id="step-0-a-vault-ring">Step 0. A vault ring<a class="anchor" href="#step-0-a-vault-ring" aria-label="Link to this section">#</a></h2>
+<p>The client asks the wallet to sign one plain-text message:</p>
+<div class="code"><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>Proof of Funds: create my POF vault key
+domain: proof-of-funds
+wallet: &lt;wallet address&gt;
+purpose: this signature IS the spending key of a separate Privacy Ring (the POF vault).
+Never sign this message on any other site: whoever has this signature can move the money in the vault.
+version: pof/vault/v2</code></pre></div>
+<p>The vault's Ed25519 seed is <code>sha256(&quot;pof/vault/v2&quot; ‖ signature)</code>: <strong>the signature is the vault's spending key</strong>, which is
+why the message says so. The first time, the client asks for the signature twice and compares: a wallet that signs
+deterministically rebuilds the same vault on any device. A wallet that does not (some MPC and smart wallets) gets a random
+vault key instead, kept on the device, and the client requires a passphrase-protected backup file before the first shield.
+From the seed the Rings SDK derives the vault's nullifier key <code>nk</code> (31 bytes) and its viewing key; the kit sealing key and
+the X controller seed are derived from the seed, never from <code>nk</code>, because the Verifier sees <code>nk</code>.</p>
+<p>The client can also use the wallet's own ring (the Rings derivation signature, RINGS.md §6), but then the Verifier sees the
+main ring's <code>nk</code>; the vault is the default.</p>
+<p>The vault is registered once in the Rings User Registry (record PDA <code>[&quot;zolana/registry/v0&quot;, owner]</code>, 100 bytes, rent
+0.00115824 SOL). The wallet pays; the vault key co-signs. The record publishes the vault's nullifier public key
+<code>npk = Poseidon(nk)</code> and its viewing public key.</p>
+<p>Funds enter the vault with a proofless Rings deposit from the wallet. <strong>The deposit is public</strong>: the depositing wallet, the
+amount, and the vault as recipient are in the transaction. What happens after the deposit is private.</p>
+<h2 id="step-1-notes-and-their-age">Step 1. Notes and their age<a class="anchor" href="#step-1-notes-and-their-age" aria-label="Link to this section">#</a></h2>
+<p>The client syncs the vault's notes through the indexer and decrypts them. For a chosen asset and tier it picks the
+<strong>fewest notes</strong> whose amounts reach the tier minimum, using only notes whose creating transaction is at least
+<strong>150 slots</strong> old (the Verifier refuses younger ones with <code>NOTE_TOO_NEW</code> and says how many slots to wait). At most 8 notes,
+all in tree 0.</p>
+<p>For each note, the commitment is (RINGS.md §2):</p>
+<div class="code"><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>ownerHash  = Poseidon( hashBytes(0x53 ‖ ownerKey), Poseidon(nk) )
+commitment = Poseidon( 3, treeId, hashBytes(mint), amount,
+                       dataHash or 0,
+                       Poseidon( ringDataHash or 0, ringProgramId ? hashBytes(ringProgramId) : 0 ),
+                       Poseidon( ownerHash, blinding ) )
+nullifier  = Poseidon( commitment, blinding, nk )</code></pre></div>
+<h2 id="step-2-the-disclosure-message-and-the-subject-proof">Step 2. The disclosure message and the subject proof<a class="anchor" href="#step-2-the-disclosure-message-and-the-subject-proof" aria-label="Link to this section">#</a></h2>
+<p>Every package carries one statement, these UTF-8 lines joined with <code>\n</code> (CONTRACT §4):</p>
+<div class="code"><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>Proof of Funds: disclosure v2
+program: &lt;pof program id&gt;
+subject: &lt;wallet|x|badge&gt; &lt;value; a handle lowercase, without @&gt;
+ring: &lt;ring owner key&gt;
+controller: &lt;the controller key&gt;
+asset: &lt;SOL|USDC&gt; tier: &lt;tier&gt;
+payer: &lt;payer&gt;
+slot: &lt;a recent slot&gt;</code></pre></div>
+<ul><li><strong>The ring owner always signs it</strong> (<code>ring.proof</code>). For the vault the client signs with the vault key in the page, with no
+wallet prompt. Openings and <code>nk</code> alone certify nobody: lending a certificate means handing over the key that spends the
+funds.</li><li><strong>Wallet (kind 0) and badge (kind 2):</strong> the subject key signs the same bytes (<code>subject.proof</code>). A wallet that is itself
+the ring owner signs once. A badge key is made fresh in the page; its secret is kept, sealed, in the kit.</li><li>The slot must be within 1,500 slots of the Verifier's read.</li></ul>
+<p><strong>X handle (kind 1).</strong> The client first derives the certificate's <strong>controller</strong> key for the handle from the vault seed,
+so it can be rebuilt on any device. Then:</p>
+<ol><li><code>POST /api/link/start {handle, controller}</code> returns a one-time code <code>pof-xxxxxxxx</code> to post, and a <strong>secret</strong> the
+browser keeps (the posted code is public; the secret is not). The code lives 30 minutes; only hashes are stored. A
+second start never cancels a first.</li><li>The holder posts the code from the handle.</li><li><code>POST /api/link/check {handle, post, secret, controller}</code>: the linker requires the secret, reads the post through
+fxtwitter, checks the author is the handle, the post contains the code and is not older than it, and returns a
+<strong>link id</strong> <code>&lt;handle&gt;.&lt;controller&gt;.&lt;expiry&gt;.&lt;signature&gt;</code>: the Verifier's own ed25519 signature over
+<code>&quot;POF-LINK2&quot; ‖ program id ‖ handle ‖ 0x00 ‖ controller ‖ expiry (u64)</code>, valid one hour. After 5 wrong tries the code is
+burnt.</li></ol>
+<p>The link id is the subject proof, and it certifies only with the controller it names. No handle state is kept on our side.</p>
+<h2 id="step-3-the-disclosure-package">Step 3. The disclosure package<a class="anchor" href="#step-3-the-disclosure-package" aria-label="Link to this section">#</a></h2>
+<p><code>POST /api/attest</code> with (CONTRACT §4):</p>
+<div class="code" data-lang="json"><span class="code-lang">json</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-json">{
+  &quot;v&quot;: 1,
+  &quot;subject&quot;: { &quot;kind&quot;: 0, &quot;value&quot;: &quot;&lt;wallet | handle | badge key&gt;&quot;, &quot;proof&quot;: &quot;&lt;signature | link id&gt;&quot;, &quot;slot&quot;: &quot;&lt;slot&gt;&quot; },
+  &quot;asset&quot;: 0, &quot;tier&quot;: 3,
+  &quot;ring&quot;: { &quot;owner&quot;: &quot;&lt;vault owner key&gt;&quot;, &quot;nk&quot;: &quot;&lt;hex 31&gt;&quot;, &quot;proof&quot;: &quot;&lt;ring owner's signature over the disclosure message&gt;&quot; },
+  &quot;notes&quot;: [ { &quot;tree&quot;: &quot;777pvSGe…&quot;, &quot;leafIndex&quot;: &quot;…&quot;, &quot;asset&quot;: &quot;&lt;mint&gt;&quot;, &quot;amount&quot;: &quot;…&quot;, &quot;blinding&quot;: &quot;&lt;hex 32&gt;&quot;,
+               &quot;sig&quot;: &quot;&lt;transaction that created the note&gt;&quot; } ],
+  &quot;payer&quot;: &quot;&lt;wallet, or the relayer&gt;&quot;, &quot;relay&quot;: false,
+  &quot;controller&quot;: &quot;&lt;kind 1 only&gt;&quot;
+}</code></pre></div>
+<p>The body is at most 16,384 bytes. Requests are rate-limited per client (6 a minute, 30 per 10-minute window).</p>
+<h2 id="step-4-what-the-verifier-checks">Step 4. What the Verifier checks<a class="anchor" href="#step-4-what-the-verifier-checks" aria-label="Link to this section">#</a></h2>
+<p>In this order, each failure with its own code (<code>verifier/src/verify.ts</code>):</p>
+<ol><li>Version 1; a known asset and tier; 1 to 8 notes; for kind 1 a controller that is not the default key, for kinds 0 and 2
+no controller other than the subject key. With <code>relay: true</code>, the payer must be the relayer.</li><li>The signatures: the ring owner's over the disclosure message, always (<code>BAD_RING_PROOF</code>); the subject key's over the same bytes for kinds
+0 and 2, with a fresh slot (<code>BAD_SUBJECT_PROOF</code>, <code>SUBJECT_PROOF_STALE</code>); for kind 1 a link id this Verifier issued,
+unexpired, for this handle and bound to this package's controller (<code>LINK_EXPIRED</code>, <code>LINK_OTHER_CONTROLLER</code>,
+<code>LINK_UNBOUND</code>).</li><li>The ring: a User Registry record exists for <code>ring.owner</code> (<code>NO_RING</code>) and <code>Poseidon(nk)</code> equals its <code>npk</code>
+(<code>NULLIFIER_KEY_MISMATCH</code>).</li><li>The tree: one read of the tree account gives the current state root, its slot (the u64 at offset 120), the 500-root
+history and the 100 nullifier roots. The root must be no older than the program accepts (<code>ROOT_TOO_OLD</code>: 9,000 slots).</li><li>Each note: the mint matches the asset (<code>WRONG_ASSET</code>), all notes in one tree (<code>MIXED_TREES</code>), no duplicates, and the
+commitment is recomputed with the SDK's own hasher.</li><li>Membership: the indexer's 32-level Merkle path for each commitment is re-hashed here with Poseidon; it must reach a
+root that is in the tree account's on-chain history, at the stated leaf index (<code>NOT_IN_TREE</code>).</li><li>Unspent: each nullifier is derived here from <code>nk</code>, so no note can be certified under a nullifier it will never
+publish. A nullifier is spent if its PDA <code>[&quot;nullifier&quot;, tree, nf]</code> exists under the Rings program; otherwise the
+indexer's 40-level non-inclusion path is re-hashed and must reach one of the on-chain nullifier roots
+(<code>NOTE_SPENT</code>, <code>NULLIFIER_UNPROVEN</code>).</li><li>Age: each note's creating transaction (from the indexer) created that commitment at that leaf, at least 150 slots ago
+(<code>NOTE_TOO_NEW</code>).</li><li>The sum of the amounts reaches the tier minimum (<code>BELOW_TIER</code>). The sum is compared, never returned.</li><li>One note, one certificate: a keyed index <code>HMAC(seal key, nullifier)</code>, taken with an atomic create-if-absent, refuses
+a note already behind another live certificate for a different subject or asset (<code>NOTE_IN_USE</code>).</li></ol>
+<h2 id="step-5-salts-hashes-and-the-240-bytes">Step 5. Salts, hashes and the 240 bytes<a class="anchor" href="#step-5-salts-hashes-and-the-240-bytes" aria-label="Link to this section">#</a></h2>
+<p>For each note the Verifier draws a 32-byte random <code>salt</code> and computes
+<code>h = sha256(&quot;pof:null:&quot; ‖ salt ‖ nullifier)</code>. The hashes are sorted ascending; <code>nullset_hash = sha256(h_1 ‖ … ‖ h_n)</code>.
+Then it signs, with ed25519, exactly these bytes (CONTRACT §3):</p>
+<div class="table"><table><thead><tr><th>offset</th><th>size</th><th>field</th></tr></thead><tbody><tr><td>0</td><td>4</td><td><code>&quot;POF1&quot;</code></td></tr><tr><td>4</td><td>32</td><td>the <code>pof</code> program id</td></tr><tr><td>36</td><td>1</td><td>subject kind</td></tr><tr><td>37</td><td>32</td><td>subject hash: <code>sha256(&quot;pof:wallet:&quot; ‖ base58)</code>, <code>sha256(&quot;pof:x:&quot; ‖ lowercase handle)</code>, <code>sha256(&quot;pof:badge:&quot; ‖ base58)</code></td></tr><tr><td>69</td><td>1</td><td>asset (0 SOL, 1 USDC)</td></tr><tr><td>70</td><td>1</td><td>tier (1 to 5)</td></tr><tr><td>71</td><td>32</td><td>the Rings state root of tree 0 at the Verifier's read (the head; every note's path reaches a root in the tree's on-chain history up to it)</td></tr><tr><td>103</td><td>8</td><td>that root's slot (u64)</td></tr><tr><td>111</td><td>1</td><td>note count</td></tr><tr><td>112</td><td>32</td><td><code>nullset_hash</code></td></tr><tr><td>144</td><td>8</td><td>issued slot (the slot the Verifier read)</td></tr><tr><td>152</td><td>8</td><td>expiry slot (issued + 216,000 by default; the program accepts at most <code>validity_slots</code>, 6,480,000)</td></tr><tr><td>160</td><td>32</td><td>payer</td></tr><tr><td>192</td><td>32</td><td>controller</td></tr><tr><td>224</td><td>16</td><td>random nonce</td></tr></tbody></table></div>
+<p>Then it appends a 377-byte leaf to the transparency log (§7: <code>0x01 ‖ attestation ‖ signature ‖ verifier key ‖
+bundle hash ‖ logged slot</code>), hands the keeper the sealed pairs <code>(h, salt, nullifier)</code>, zeroes <code>nk</code>, and answers:</p>
+<div class="code"><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>{ attestation (hex 240 B), signature, verifierKey, salts[], nullifiers[], hashes[] (sorted), logIndex,
+  subjectHash, controller, issuedSlot, expirySlot, bundleHash, certificate: { seeds } }</code></pre></div>
+<p>The salts and nullifiers are the holder's <strong>revoke kit</strong>. The client stores the kit locally, with the openings sealed under a
+key derived from the vault, and can export it as a file.</p>
+<h2 id="step-6-submitting-certify">Step 6. Submitting <code>certify</code><a class="anchor" href="#step-6-submitting-certify" aria-label="Link to this section">#</a></h2>
+<p>The program refuses an attestation older than <strong>300 slots</strong> (<code>max_attest_age</code>), so submission follows at once.</p>
+<ul><li><strong>Wallet subject.</strong> The wallet sends one transaction: an Ed25519-program instruction carrying the Verifier's signature,
+key and the 240-byte message, immediately followed by <code>certify(attestation, log_index)</code>. The wallet is the payer.</li><li><strong>X handle or badge.</strong> The holder asks <code>GET /api/relay/quote</code> for the exact lamports (the fee, the certificate rent, a
+network fee, and a few unique lamports that tag the payment), pays that amount to the relayer from any wallet or as a
+Ring withdrawal, then calls <code>POST /api/relay/certify</code> with the attestation, its hashes, the log index and the quote. The
+relayer checks its rolling 24-hour spend cap and balance floor before it uses a payment, finds the matching unused
+payment, and submits the same two instructions as payer; if <code>certify</code> fails, the payment is released for another try.
+The client pays the relayer by default as a withdrawal from the vault, so no wallet appears in the certificate, its
+event or its log entry.</li></ul>
+<h2 id="step-7-what-the-program-checks">Step 7. What the program checks<a class="anchor" href="#step-7-what-the-program-checks" aria-label="Link to this section">#</a></h2>
+<p><code>certify</code> rebuilds the 240 bytes from its arguments, its accounts and its own program id, and requires that the
+instruction right before it is an Ed25519-program instruction with exactly one signature, whose key is the <strong>active</strong>
+Verifier key in Config and whose message equals the rebuilt bytes. It also checks, by itself:</p>
+<ul><li>kinds 0 and 2: the subject hash is the §1 hash of the controller; kind 1: the controller is not the default key;</li><li>the asset is enabled and the tier exists in its table; 1 to 8 salted hashes, strictly ascending;</li><li><code>issued_slot ≤ now</code>, <code>now − issued_slot ≤ 300</code>; <code>root_slot ≤ issued_slot</code>, <code>issued_slot − root_slot ≤ 9,000</code>;
+<code>issued_slot &lt; expiry_slot ≤ issued_slot + 6,480,000</code>, <code>expiry_slot &gt; now</code>;</li><li>not paused, not winding down;</li><li>an existing certificate account is replaced only if it is no longer live and the new attestation is newer; its rent goes
+back to its previous payer.</li></ul>
+<p>It takes the fee (<a href="/docs/fees">Fees</a>), writes the certificate at <code>[&quot;cert&quot;, subject_hash, [asset]]</code>, updates the Treasury counters
+and emits <code>Certified</code>.</p>
+<h2 id="step-8-renew">Step 8. Renew<a class="anchor" href="#step-8-renew" aria-label="Link to this section">#</a></h2>
+<p><code>renew</code> takes a fresh attestation over the <strong>same notes</strong> (the same salted hashes), the same subject, asset and
+controller, with a newer issued slot. The holder sends the package again with the certificate's salts from the kit
+(<code>salts</code>, one per note), so the Verifier re-checks everything in Step 4 and produces the same salted hashes. The program
+updates the root, the slots and the tier, and charges the fee again.</p>
+<h2 id="step-9-reading-and-gating">Step 9. Reading and gating<a class="anchor" href="#step-9-reading-and-gating" aria-label="Link to this section">#</a></h2>
+<p>Anyone reads the certificate account. A certificate is <strong>live</strong> when its status byte is live and the current slot is at
+most its expiry slot. Other programs call <code>require_certificate(subject_hash, asset, min_tier)</code>, which fails unless the
+certificate is live, unexpired, of that asset and at least that tier, and returns <code>{ subject_kind, tier, expiry_slot,
+controller }</code>. Rooms (<code>pof_gate</code>) use exactly that. See <a href="/developers">Developers</a>.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/system-model"><span>Previous</span>System model</a><a class="next" href="/docs/threat-model"><span>Next</span>Threat model</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#step-0-a-vault-ring">Step 0. A vault ring</a></li><li class="d2"><a href="#step-1-notes-and-their-age">Step 1. Notes and their age</a></li><li class="d2"><a href="#step-2-the-disclosure-message-and-the-subject-proof">Step 2. The disclosure message and the subject proof</a></li><li class="d2"><a href="#step-3-the-disclosure-package">Step 3. The disclosure package</a></li><li class="d2"><a href="#step-4-what-the-verifier-checks">Step 4. What the Verifier checks</a></li><li class="d2"><a href="#step-5-salts-hashes-and-the-240-bytes">Step 5. Salts, hashes and the 240 bytes</a></li><li class="d2"><a href="#step-6-submitting-certify">Step 6. Submitting certify</a></li><li class="d2"><a href="#step-7-what-the-program-checks">Step 7. What the program checks</a></li><li class="d2"><a href="#step-8-renew">Step 8. Renew</a></li><li class="d2"><a href="#step-9-reading-and-gating">Step 9. Reading and gating</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

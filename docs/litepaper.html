@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proof of Funds, the litepaper · Proof of Funds</title>
+<meta name="description" content="The protocol paper in two pages.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/litepaper">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Proof of Funds, the litepaper · Proof of Funds">
+<meta property="og:description" content="The protocol paper in two pages.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/litepaper">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper" aria-current="page"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">The protocol paper in two pages.</p>
+    <h1 id="proof-of-funds">Proof of Funds</h1>
+<p><strong>A live, public certificate that a subject holds at least a tier of SOL or USDC in a Helius Privacy Ring. It never shows
+the amount, and it is revoked on chain when the notes behind it are spent.</strong></p>
+<h2 id="the-problem">The problem<a class="anchor" href="#the-problem" aria-label="Link to this section">#</a></h2>
+<p>On a public chain, the way to prove you can pay is to show the wallet, and with it the whole history. Finance solved the
+same problem long ago with a <em>proof of funds</em> letter: a trusted party states that a client holds at least a sum, without
+handing over the statement. Since Helius Privacy Rings went live, balances inside a ring are encrypted. That makes a proof of
+funds both possible and needed: the balance can no longer be shown by pointing at it.</p>
+<h2 id="the-certificate">The certificate<a class="anchor" href="#the-certificate" aria-label="Link to this section">#</a></h2>
+<p>A certificate is a program account <code>[&quot;cert&quot;, subject_hash, [asset]]</code>. Its subject is a Solana wallet, an X handle (stored as
+a hash) or a fresh badge key. It records the asset, the tier (SOL: 1 to 10,000; USDC: 100 to 1,000,000, in powers of ten),
+the slots it was issued and expires at, and the salted hashes of the nullifiers of the 1 to 8 notes behind it. It never
+records an amount. Anyone can read it; other programs gate on it with one CPI, <code>require_certificate(subject_hash, asset,
+min_tier)</code>; on-chain Rooms and Telegram and Discord bots gate communities on it.</p>
+<h2 id="how-it-is-issued">How it is issued<a class="anchor" href="#how-it-is-issued" aria-label="Link to this section">#</a></h2>
+<ol><li>The holder's browser derives a <strong>vault ring</strong> from one wallet signature, registers it and shields funds into it.</li><li>It picks the fewest notes, each at least 150 slots old, that reach the tier, and sends their openings, the vault's
+nullifier key and a disclosure statement signed by the vault key (and by the subject key for a wallet or badge) to
+the <strong>Verifier</strong>.</li><li>The Verifier recomputes each commitment with the Rings hasher, re-hashes the indexer's Merkle path to a root the tree
+account holds on chain, derives each nullifier and proves it unspent (no nullifier PDA, and a non-inclusion path to an
+on-chain nullifier root), checks the sum reaches the tier and that no note backs another live certificate. It then
+signs 240 bytes: domain, program id, subject, asset, tier, the tree root and its slot, the note count, the hash of the
+sorted salted nullifier hashes, issue and expiry slots, payer, controller, nonce.</li><li>It appends the attestation to a public <strong>transparency log</strong> (RFC 9162 Merkle hashing, signed tree heads anchored on
+chain with <code>anchor_log</code>, checked by witnesses anyone can run) and returns the salts and nullifiers to the holder as a revoke kit.</li><li><code>certify</code> rebuilds the 240 bytes on chain and checks them against an Ed25519-program instruction by the active
+Verifier key, within 300 slots of issue. For an X handle or a badge, a <strong>relayer</strong> submits it, so the holder's wallet
+signs nothing public.</li></ol>
+<h2 id="how-it-dies">How it dies<a class="anchor" href="#how-it-dies" aria-label="Link to this section">#</a></h2>
+<p>Every Rings spend creates a nullifier PDA. Whoever holds a disclosed note's salt and nullifier (the keeper, the holder)
+calls <code>revoke_spent</code>: the program recomputes the salted hash and checks the spend from the Rings accounts alone, either the
+PDA or a membership path in the nullifier tree to an on-chain root. The certificate is revoked at that slot and the pair
+becomes public. The controller can revoke at any time without revealing anything; anyone can close a certificate after
+its expiry slot.</p>
+<h2 id="what-you-trust">What you trust<a class="anchor" href="#what-you-trust" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>The Verifier sees the disclosed amounts and the vault's nullifier key</strong> for one request, and can link subject, vault
+and funding wallet. The code keeps none of it; every signature is in the public log with the hash of the code that
+made it. A false attestation is detectable, not impossible.</li><li><strong>Revocation on spend needs the salts.</strong> Only the holder and the registered keepers (each sent its own sealed copy)
+have them, so it depends on a keeper running. Certificates are issued for 216,000 slots by default and renewed on the
+same notes, which bounds the damage; the status page shows the keeper's last run.</li><li><strong>The admin</strong> can pause, rotate the Verifier key after a delay counted in slots, set the fee under a hard cap, and, as
+upgrade authority, upgrade the program.</li><li><strong>Helius</strong>: the Rings programs, the tree, and the indexer (its paths are re-checked against on-chain roots; note
+creation slots are taken from it). Rings is new and its SDK is alpha.</li><li><strong>X and fxtwitter</strong> for the handle check.</li><li><strong>Control is not ownership</strong>: borrowed funds certify, until they move.</li><li><strong>Not anonymity</strong>: deposits are public, so timing and amounts can pair a vault with a certificate.</li></ul>
+<h2 id="fees">Fees<a class="anchor" href="#fees" aria-label="Link to this section">#</a></h2>
+<p>A fee per certify and renew (0.01 SOL at launch, capped at 0.25 SOL by the program) to the Treasury; the certificate's rent
+is returned at expiry. A payer holding 1,000,000 $POF in its canonical token account pays no fee. The Treasury's counters
+are public; its surplus goes to the dev key in Config.</p>
+<h2 id="phase-2">Phase 2<a class="anchor" href="#phase-2" aria-label="Link to this section">#</a></h2>
+<p>A Groth16 circuit over the same Poseidon proves membership, non-spending, the tier and an escrow of each nullifier to a
+revocation key, so the program checks the statement itself and nobody sees an amount or a nullifier key. In development in
+<code>zk/</code>, not deployed.</p>
+<h2 id="read-further">Read further<a class="anchor" href="#read-further" aria-label="Link to this section">#</a></h2>
+<p>The full paper (<code>/docs</code>), <code>CONTRACT.md</code> (every byte), <code>RINGS.md</code> (the Rings facts, checked on mainnet), <code>reports/</code> (tests
+and the internal security review), and the source at github.com/liakh10/pof.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/glossary"><span>Previous</span>Glossary</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-problem">The problem</a></li><li class="d2"><a href="#the-certificate">The certificate</a></li><li class="d2"><a href="#how-it-is-issued">How it is issued</a></li><li class="d2"><a href="#how-it-dies">How it dies</a></li><li class="d2"><a href="#what-you-trust">What you trust</a></li><li class="d2"><a href="#fees">Fees</a></li><li class="d2"><a href="#phase-2">Phase 2</a></li><li class="d2"><a href="#read-further">Read further</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

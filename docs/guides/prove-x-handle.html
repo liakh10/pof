@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prove an X handle · Proof of Funds</title>
+<meta name="description" content="Link a handle you control to a certificate with one public post, and what that does and does not reveal.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/guides/prove-x-handle">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Prove an X handle · Proof of Funds">
+<meta property="og:description" content="Link a handle you control to a certificate with one public post, and what that does and does not reveal.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/guides/prove-x-handle">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle" aria-current="page"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">Link a handle you control to a certificate with one public post, and what that does and does not reveal.</p>
+    <h1 id="prove-an-x-handle">Prove an X handle</h1>
+<p>A certificate for an X handle says &quot;@handle holds at least this tier&quot;. To get one, you show once that you control the
+handle, by posting a short code from it. This guide is step 5 of
+<a href="/docs/guides/first-certificate">Get your first certificate</a> when you pick <strong>An X handle</strong> as the subject.</p>
+<h2 id="before-you-start">Before you start<a class="anchor" href="#before-you-start" aria-label="Link to this section">#</a></h2>
+<ul><li>The account must be <strong>public</strong> while you link it: the check reads the post through a public reader.</li><li>Have your vault ready (steps 1 to 4 of the first guide). The handle's certificate gets its own key, the
+<strong>controller</strong>, which the page rebuilds from your vault. It is the key that can later revoke the certificate and join
+Rooms with it.</li><li>Use the same browser tab from start to finish: the page keeps a private secret for this link in the tab.</li></ul>
+<h2 id="step-1-ask-for-a-code">Step 1. Ask for a code<a class="anchor" href="#step-1-ask-for-a-code" aria-label="Link to this section">#</a></h2>
+<p>Type the handle without the <code>@</code> (1 to 15 letters, digits or underscores; otherwise <strong>&quot;That is not an X handle.&quot;</strong>).
+The page asks the server for a one-time code and gets back two things:</p>
+<ul><li>the <strong>code</strong>, <code>pof-</code> followed by 8 letters and digits, which you will post: it is public from that moment;</li><li>a <strong>secret</strong>, which stays in your tab. Only the holder of the secret can turn the code into a link, so someone who
+reads your post first cannot use it.</li></ul>
+<p>The code lives <strong>30 minutes</strong>. Asking again does not cancel the first one.</p>
+<h2 id="step-2-post-it">Step 2. Post it<a class="anchor" href="#step-2-post-it" aria-label="Link to this section">#</a></h2>
+<p>Post this text from the handle, exactly as the page shows it:</p>
+<div class="code"><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>Linking @yourhandle to Proof of Funds: pof-xxxxxxxx</code></pre></div>
+<p>A reply works too, as long as it comes from the handle and contains the code.</p>
+<h2 id="step-3-check">Step 3. Check<a class="anchor" href="#step-3-check" aria-label="Link to this section">#</a></h2>
+<p>Paste the link to the post (<code>x.com/yourhandle/status/…</code>) and press check. The server reads the post and checks that the
+author is the handle, that the post contains your code, and that it is not older than the code. Then it returns a
+<strong>link</strong>: the Verifier's signature over the handle, your controller key and an expiry one hour ahead.</p>
+<p>You can delete the post now. The link does not depend on it.</p>
+<p>What you may see:</p>
+<div class="table"><table><thead><tr><th>message</th><th>what to do</th></tr></thead><tbody><tr><td>that post could not be read: is it public, and is the account public?</td><td>make the account public for a moment, or wait for the post to appear, then check again</td></tr><tr><td>that post is not from @yourhandle</td><td>post from the handle itself, not from another account</td></tr><tr><td>the post does not contain the current code</td><td>copy the code from the page again; an older code does not count</td></tr><tr><td>that post is older than the code</td><td>make a new post after asking for the code</td></tr><tr><td>too many wrong tries for this code: start again</td><td>after 5 failed checks the code is burnt; ask for a new one</td></tr><tr><td><strong>&quot;X did not answer the handle check.&quot;</strong></td><td>the public reader is down for a moment; try again</td></tr><tr><td><strong>&quot;The X link expired.&quot;</strong></td><td>the link lasts one hour; post a fresh code and link again</td></tr></tbody></table></div>
+<h2 id="step-4-certify">Step 4. Certify<a class="anchor" href="#step-4-certify" aria-label="Link to this section">#</a></h2>
+<p>Continue with step 6 of the first guide. An X certificate is always submitted by the relayer and paid from your vault,
+so no wallet appears in it.</p>
+<h2 id="what-this-reveals">What this reveals<a class="anchor" href="#what-this-reveals" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>On chain</strong>, the certificate stores only <code>sha256(&quot;pof:x:&quot; ‖ handle)</code>. Anyone can hash a handle and compare, so the
+certificate is public for that handle, but the chain does not hold the name itself.</li><li><strong>Your post</strong> is public for as long as you leave it up, and archives may keep it.</li><li><strong>The Verifier</strong> learns the handle, your vault and its funding. See <a href="/docs/trust">Trust points</a>, item 1.</li><li><strong>The handle check trusts X</strong>: if the account is taken over, whoever controls it can link it. See
+<a href="/docs/trust">Trust points</a>, item 5.</li><li>Nothing on chain ties the handle to your wallet, except what <a href="/docs/privacy">Privacy guidance</a> lists: timing, deposit
+amounts and payments next to the certificate, and a revocation by spend. To move the funds, revoke first.</li></ul>
+<h2 id="using-the-handle-with-the-bots">Using the handle with the bots<a class="anchor" href="#using-the-handle-with-the-bots" aria-label="Link to this section">#</a></h2>
+<p>The Telegram and Discord bots accept a handle certificate too. When the link page asks you to prove the handle, it asks
+for a signature by the certificate's <strong>controller</strong> key, which the site rebuilds from your vault. See
+<a href="/docs/guides/gate-a-community">Gate a community</a>.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/guides/first-certificate"><span>Previous</span>Get your first certificate with Phantom</a><a class="next" href="/docs/guides/verify-a-proof"><span>Next</span>Verify someone's proof</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#before-you-start">Before you start</a></li><li class="d2"><a href="#step-1-ask-for-a-code">Step 1. Ask for a code</a></li><li class="d2"><a href="#step-2-post-it">Step 2. Post it</a></li><li class="d2"><a href="#step-3-check">Step 3. Check</a></li><li class="d2"><a href="#step-4-certify">Step 4. Certify</a></li><li class="d2"><a href="#what-this-reveals">What this reveals</a></li><li class="d2"><a href="#using-the-handle-with-the-bots">Using the handle with the bots</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

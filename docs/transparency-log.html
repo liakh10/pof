@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The transparency log · Proof of Funds</title>
+<meta name="description" content="An append-only Merkle log of every attestation the Verifier signs, anchored on chain, and how anyone audits it.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/transparency-log">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="The transparency log · Proof of Funds">
+<meta property="og:description" content="An append-only Merkle log of every attestation the Verifier signs, anchored on chain, and how anyone audits it.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/transparency-log">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log" aria-current="page"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">An append-only Merkle log of every attestation the Verifier signs, anchored on chain, and how anyone audits it.</p>
+    <h1 id="the-transparency-log">The transparency log</h1>
+<p>The Verifier is trusted to check funds honestly. The log does not make that trust unnecessary; it makes every signature
+the Verifier produces <strong>public, ordered and permanent</strong>, so a false attestation cannot be quietly withdrawn and a
+signature made outside the log stands out.</p>
+<h2 id="what-is-in-it">What is in it<a class="anchor" href="#what-is-in-it" aria-label="Link to this section">#</a></h2>
+<p>One entry per attestation the Verifier signs, appended before the answer leaves the Verifier, whether or not the holder
+later submits it. A leaf is exactly 377 bytes (CONTRACT §7):</p>
+<div class="table"><table><thead><tr><th>offset</th><th>size</th><th>field</th></tr></thead><tbody><tr><td>0</td><td>1</td><td>version <code>0x01</code></td></tr><tr><td>1</td><td>240</td><td>the attestation bytes (<a href="/docs/protocol">The protocol</a>, Step 5)</td></tr><tr><td>241</td><td>64</td><td>the Verifier's ed25519 signature over them</td></tr><tr><td>305</td><td>32</td><td>the Verifier key that signed</td></tr><tr><td>337</td><td>32</td><td>the bundle hash: sha256 of the Verifier code that produced it</td></tr><tr><td>369</td><td>8</td><td>the slot the Verifier read when it appended the entry</td></tr></tbody></table></div>
+<p>No amounts, no openings, no nullifiers, no salts. The attestation carries the salted <code>nullset_hash</code>, which cannot be tested
+against a nullifier without the salts.</p>
+<h2 id="how-it-is-built">How it is built<a class="anchor" href="#how-it-is-built" aria-label="Link to this section">#</a></h2>
+<ul><li>Hashing is RFC 9162 (Certificate Transparency v2): <code>leaf_hash = sha256(0x00 ‖ leaf)</code>,
+<code>node = sha256(0x01 ‖ left ‖ right)</code>, the tree over n leaves splits at the largest power of two below n, and the empty
+tree's root is <code>sha256(&quot;&quot;)</code>.</li><li>Entries are stored at sequential indexes, each written with create-if-absent, so two concurrent appends never take the
+same index and the log has no gaps. Nothing is rewritten or deleted.</li><li><strong>Signed tree head.</strong> The Verifier signs, with its attestation key, the 80 bytes
+<code>&quot;POF-STH1&quot; ‖ program id ‖ tree size (u64) ‖ root hash</code>.</li><li><strong>On-chain anchor.</strong> The keeper submits the current signed head to the program's <code>anchor_log</code> instruction (an
+Ed25519-program instruction by the active Verifier key, then <code>anchor_log(size, head)</code>). The program accepts a head only
+if it is larger than the last one, and stores size, root and slot in the Treasury. Anchoring runs with the keeper,
+which is off before launch.</li></ul>
+<h2 id="reading-it">Reading it<a class="anchor" href="#reading-it" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>request</th><th>answer</th></tr></thead><tbody><tr><td><code>GET /api/attest/log?head</code></td><td><code>{ treeSize, rootHash, slot, signature, verifierKey }</code></td></tr><tr><td><code>GET /api/attest/log?entry=i</code></td><td><code>{ index, leaf, leafHash, attestation, signature, verifierKey, bundleHash, loggedSlot }</code></td></tr><tr><td><code>GET /api/attest/log?proof=i&amp;size=n</code></td><td>an RFC 9162 inclusion path of entry i in the tree of size n</td></tr><tr><td><code>GET /api/attest/log?consistency=m&amp;size=n</code></td><td>an RFC 9162 consistency proof from size m to size n</td></tr><tr><td><code>GET /api/attest/log?from=i&amp;to=j</code></td><td>up to 256 entries</td></tr></tbody></table></div>
+<p><code>/v1/log/head</code> and <code>/v1/log/proof/:id</code> return the same data with the checks already run; run them yourself anyway.</p>
+<h2 id="how-anyone-audits-it">How anyone audits it<a class="anchor" href="#how-anyone-audits-it" aria-label="Link to this section">#</a></h2>
+<p>Everything below uses public data and <code>@pof/sdk</code> (<a href="/developers">Developers</a>, &quot;Verify the transparency log yourself&quot;, has the
+code).</p>
+<ol><li><strong>Take the Verifier key from the chain, not from the log.</strong> Read <code>Config</code> for the active key (and any pending key and
+its slot), and the <code>VerifierSet</code> events for the keys it had before. An answer that names its own key proves nothing by
+itself; <code>@pof/sdk</code>'s log checks require the trusted keys as an argument for this reason.</li><li><strong>Check the head.</strong> Verify the signed tree head with that key.</li><li><strong>Check it extends the anchor.</strong> Read the Treasury's anchored <code>{ treeSize, rootHash, slot }</code> and verify a consistency
+proof from the anchored size to the current size. The head you were shown is then the same history the chain fixed.</li><li><strong>Check it extends what you saw before.</strong> Keep the last head you verified and check consistency from it every time. A
+log that forks or rewrites fails this check; the <a href="/docs/status">status page</a> runs it at every sample.</li><li><strong>Match certificates to entries.</strong> For each <code>Certified</code> event (or each certificate account), fetch the entry at its
+<code>log_index</code>, check the inclusion proof against a verified head, parse the 240 bytes and compare them with the
+certificate: subject kind and hash, asset, tier, tree root and its slot, note count, <code>nullset_hash</code>, issued and expiry
+slots, payer, controller, nonce, and the Verifier key. The <code>log_index</code> on a certificate is what the submitter stated;
+it is not part of the signed bytes, so if it does not match, search the log for the attestation itself.</li><li><strong>Raise the alarm on a certificate with no entry.</strong> A certificate whose attestation is in no log entry means the
+Verifier key signed outside the log. That is the one event a monitor must never see.</li><li><strong>Check the code that signed.</strong> Every entry names the bundle hash of the Verifier that produced it. Rebuild the bundle
+from the repository (<code>cd verifier &amp;&amp; npm ci &amp;&amp; npm run build:check</code>: same Node major, pinned lockfile and esbuild,
+no timestamps or absolute paths) and compare the hash with <code>verifier/dist/BUILD.json</code> and with the entries.</li></ol>
+<h2 id="witnesses">Witnesses<a class="anchor" href="#witnesses" aria-label="Link to this section">#</a></h2>
+<p>A witness runs steps 1 to 4 continuously and publishes what it saw (CONTRACT §8). <code>node witness/run.js</code> runs one, with
+its own key (<code>node witness/keygen.js</code> writes it to <code>~/.config/pof/witness.json</code> and prints only the public key). At each
+step it fetches the signed head, requires the key to be one Config lists now or listed before, requires a consistency proof
+from the last head it verified, and requires agreement with the head anchored in the Treasury. Only then does it
+<strong>cosign</strong> the head: ed25519 over <code>&quot;POF-WIT1&quot; ‖ program id ‖ tree size ‖ root hash ‖ timestamp</code> (88 bytes). On any
+failure it records an alarm with both signed heads as evidence and cosigns nothing: <code>log_unreachable</code>, <code>unknown_key</code>,
+<code>bad_signature</code>, <code>log_shrank</code>, <code>equivocation</code>, <code>inconsistent</code>, <code>anchor_mismatch</code>.</p>
+<p>The project runs one witness (<code>GET /v1/witness</code> serves its document; before launch its cron is parked). One witness run by
+the operator adds little against the operator; its value is that anyone can run another with the same code, and two
+witnesses that cosigned different heads of the same size are proof of a split view.</p>
+<h2 id="what-the-log-proves-and-what-it-does-not">What the log proves and what it does not<a class="anchor" href="#what-the-log-proves-and-what-it-does-not" aria-label="Link to this section">#</a></h2>
+<p>It proves that an attestation was signed by the key the program accepted, that it is in an ordered history that never
+shrinks, and which build signed it. It does not prove the Verifier checked the notes honestly: that remains trust point 1
+until <a href="/docs/phase-2">Phase 2</a> replaces the Verifier's view with a proof the program checks itself.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/revocation"><span>Previous</span>Revocation</a><a class="next" href="/docs/privacy"><span>Next</span>Privacy guidance</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-is-in-it">What is in it</a></li><li class="d2"><a href="#how-it-is-built">How it is built</a></li><li class="d2"><a href="#reading-it">Reading it</a></li><li class="d2"><a href="#how-anyone-audits-it">How anyone audits it</a></li><li class="d2"><a href="#witnesses">Witnesses</a></li><li class="d2"><a href="#what-the-log-proves-and-what-it-does-not">What the log proves and what it does not</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

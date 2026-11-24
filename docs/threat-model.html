@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Threat model · Proof of Funds</title>
+<meta name="description" content="What the Verifier learns and keeps, every adversary we designed against, what stops each one, what is left, and what phase 2 removes.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/threat-model">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Threat model · Proof of Funds">
+<meta property="og:description" content="What the Verifier learns and keeps, every adversary we designed against, what stops each one, what is left, and what phase 2 removes.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/threat-model">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model" aria-current="page"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">What the Verifier learns and keeps, every adversary we designed against, what stops each one, what is left, and what phase 2 removes.</p>
+    <h1 id="threat-model">Threat model</h1>
+<p>This page covers the off-chain half of POF: the Verifier, its transparency log, the relayer, the keeper and the X-handle
+linker (<code>verifier/</code>, <code>api/attest</code>, <code>api/relay</code>, <code>api/keeper</code>, <code>api/link</code>). The program's own checks are in
+<a href="/docs/protocol">Protocol</a> and <a href="/docs/revocation">Revocation</a>; the trust points they rest on are in <a href="/docs/trust">Trust points</a>. Every claim
+below names the code that enforces it and the test that proves it (<code>reports/verifier.md</code>).</p>
+<h2 id="what-a-certificate-claims">What a certificate claims<a class="anchor" href="#what-a-certificate-claims" aria-label="Link to this section">#</a></h2>
+<p>At <code>issued_slot</code>, the Verifier saw one to eight notes in the Helius Privacy Rings state tree, owned by a ring whose owner
+signed this exact request, all unspent, each older than the minimum age, summing to at least the tier; and it bound that
+statement to one subject, one controller key and one payer. Afterwards, the certificate is live until one of those notes
+is spent (anyone with the salt can then prove it on chain), its controller revokes it, or it expires.</p>
+<p>It does <strong>not</strong> claim the money is the subject's own (only that whoever asked controls the ring), the total balance of
+the ring, or how long the money was held before the note was made.</p>
+<h2 id="what-the-verifier-learns">What the Verifier learns<a class="anchor" href="#what-the-verifier-learns" aria-label="Link to this section">#</a></h2>
+<p>For one request, over TLS:</p>
+<div class="table"><table><thead><tr><th>item</th><th>why it is needed</th></tr></thead><tbody><tr><td>each disclosed note's <strong>amount</strong>, blinding, asset, leaf index and creating transaction</td><td>to recompute the commitment and prove it is in the tree</td></tr><tr><td>the ring owner's public key and its signature</td><td>to prove the ring's owner asked for this certificate (audit POF-02)</td></tr><tr><td>the ring's <strong>nullifier key <code>nk</code></strong></td><td>to derive each note's nullifier itself; a nullifier the holder merely claimed could be one that never appears, and the certificate would never die</td></tr><tr><td>the subject, its signature or X link id, the controller and its signature, the payer</td><td>to bind the statement</td></tr><tr><td>the client's IP address (HTTP)</td><td>rate limits</td></tr></tbody></table></div>
+<p>From these the operator can link the subject to the vault ring, and the vault to the public deposit that funded it.
+<code>nk</code> lets its holder see <strong>when</strong> each deposit into that ring is later spent and read the ring's merge outputs; it cannot
+spend, and it cannot read transfer notes (RINGS.md §5). This is why the client certifies from a separate vault ring.</p>
+<h2 id="what-the-verifier-keeps">What the Verifier keeps<a class="anchor" href="#what-the-verifier-keeps" aria-label="Link to this section">#</a></h2>
+<p>Nothing it is shown about money. <code>nk</code> lives in memory for the request: its key bytes are zeroed when the request ends
+(<code>verify.ts</code>, <code>finally</code>) and the request body is dropped with it (JavaScript gives no stronger guarantee over strings).
+The process writes only these, to a private Vercel Blob store:</p>
+<div class="table"><table><thead><tr><th>prefix</th><th>content</th><th>at rest</th></tr></thead><tbody><tr><td><code>log/e/&lt;i&gt;</code></td><td>the 377-byte §7 leaf: the §3 bytes, the signature, the key, the bundle hash, the slot</td><td>public by design (the log)</td></tr><tr><td><code>keeper/kits/&lt;subject&gt;-&lt;asset&gt;/&lt;attestation hash&gt;</code></td><td>per disclosed note: the salted hash, the salt, the nullifier</td><td>AES-256-GCM, key <code>POF_SEAL_KEY</code>, the blob name as associated data</td></tr><tr><td><code>escrow/&lt;subject&gt;-&lt;asset&gt;/&lt;attestation hash&gt;.json</code></td><td>the same kit, sealed to each registered keeper's X25519 key</td><td>X25519 + HKDF + AES-256-GCM per keeper</td></tr><tr><td><code>notes/&lt;HMAC(nf)&gt;/&lt;gen&gt;</code></td><td>which subject and asset a note currently backs, and until which slot</td><td>the name is a keyed hash of the nullifier; no amount</td></tr><tr><td><code>link/&lt;h(handle)&gt;/&lt;h(secret)&gt;</code></td><td>the hash of a pending X code, its time, tries and controller</td><td>hashes only, 30 minutes</td></tr><tr><td><code>relay/paid/&lt;payment signature&gt;</code>, <code>relay/spend.json</code></td><td>which payment paid which attestation; the relayer's spend in the last 24 hours</td><td></td></tr><tr><td><code>limits/&lt;route&gt;/&lt;window&gt;/&lt;HMAC&gt;</code></td><td>a request count</td><td>the client is <code>HMAC(window key, ip)</code>, the window key derived from the seal key and rotated every 10 minutes; old windows are deleted by the keeper's sweep; no raw IP is written</td></tr><tr><td><code>keeper/last-scan.json</code>, <code>keeper/cursor</code>, <code>log/anchored</code></td><td>the keeper's last pass</td><td></td></tr></tbody></table></div>
+<p>No amount, no opening, no <code>nk</code>, no blinding is written anywhere, and no request body is logged. An internal error logs a
+reference id and a stack with RPC keys scrubbed.</p>
+<h2 id="adversaries-and-what-stops-them">Adversaries and what stops them<a class="anchor" href="#adversaries-and-what-stops-them" aria-label="Link to this section">#</a></h2>
+<h3 id="a-holder-who-wants-a-certificate-the-money-does-not-support">A holder who wants a certificate the money does not support<a class="anchor" href="#a-holder-who-wants-a-certificate-the-money-does-not-support" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>attack</th><th>what stops it</th><th>where</th></tr></thead><tbody><tr><td>claim an amount the note does not hold</td><td>the commitment is recomputed from the opening with the SDK's hasher; a wrong amount is a different commitment, which is not in the tree</td><td><code>verify.ts</code> NOT_IN_TREE; tests &quot;rejections&quot;</td></tr><tr><td>point at a commitment that is not in the tree, or one under a forged root</td><td>the indexer's path is re-hashed with the SDK's Poseidon; the root must be one of the 500 in the tree account</td><td><code>verify.ts</code>, <code>rings.ts decodeTreeAccount</code></td></tr><tr><td>certify spent notes</td><td>the nullifier is derived from <code>nk</code> here; its PDA must be absent, and the indexer's non-inclusion path must reach an on-chain nullifier root</td><td><code>rings.ts spent</code>, <code>checkNonInclusion</code></td></tr><tr><td>give a fake nullifier so the certificate never dies</td><td>the holder never gives nullifiers; <code>Poseidon(nk)</code> must equal the <code>npk</code> in the owner's registry record</td><td>NULLIFIER_KEY_MISMATCH</td></tr><tr><td>certify someone else's ring (a public deposit's opening is public data)</td><td>the ring owner signs the disclosure message; without that key nothing is signed</td><td>BAD_RING_PROOF (POF-02)</td></tr><tr><td>back many subjects with one note</td><td>a keyed index of nullifiers; a lock is an atomic create of the next generation, so two parallel requests cannot both take it</td><td><code>locks.ts</code> NOTE_IN_USE (POF-04)</td></tr><tr><td>shield and certify in the same minute, so the certificate dates the shield</td><td>a minimum note age (150 slots by default) from the creating transaction's slot</td><td>NOTE_TOO_NEW</td></tr><tr><td>borrow, certify, return (&quot;rent a whale&quot;)</td><td>not preventable from openings. The return is a spend, the spend revokes the certificate on chain, and the card reads live status</td><td>keeper, program <code>revoke_spent</code></td></tr><tr><td>spend between attestation and certify</td><td>the program refuses an attestation older than <code>max_attest_age</code> (300 slots); the keeper still watches the kit and revokes once it lands</td><td><code>keeper.ts</code></td></tr><tr><td>replay an old attestation</td><td><code>issued_slot</code> age, a random nonce, and certify over a live certificate is refused unless newer</td><td>program</td></tr><tr><td>land a second attestation of the same subject after revoking the first, so nobody watches it</td><td>the keeper keeps every kit per attestation until it can no longer land or its certificate dies, never because a sibling is live</td><td><code>keeper.ts</code> (POF-05)</td></tr></tbody></table></div>
+<h3 id="a-third-party">A third party<a class="anchor" href="#a-third-party" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>attack</th><th>what stops it</th><th>where</th></tr></thead><tbody><tr><td>redeem the X code someone posted (it is public)</td><td>check needs the secret that <code>start</code> returned only to the starter's browser</td><td>NO_SECRET (POF-03)</td></tr><tr><td>use a leaked link id to certify the handle with their own money</td><td>a link id is bound to one controller, and the controller signs the disclosure message</td><td>LINK_OTHER_CONTROLLER, BAD_CONTROLLER_PROOF (POF-03, POF-26)</td></tr><tr><td>cancel a victim's pending code by starting again, or by wrong tries</td><td>each start is its own record, tries count per record</td><td>POF-09</td></tr><tr><td>drain the relayer</td><td>it serves only paid, signed attestations for X and badge subjects; a rolling 24-hour cap and a balance floor; a payment is used once and given back only when the certify surely did not land</td><td><code>relayer.ts</code> (POF-08, POF-28)</td></tr><tr><td>flood the Verifier</td><td>a per-instance token bucket per client and route, a store-backed cap per 10 minutes per client, a 16 KB body cap; the expensive checks run after the cheap ones</td><td><code>limits.ts</code>, <code>app.ts</code></td></tr><tr><td>read someone's holdings from the log or the escrow</td><td>the log holds the §3 bytes (subject hash, tier, salted nullset); the escrow holds sealed envelopes</td><td>§7, <code>escrow.ts</code></td></tr><tr><td>test whether a known nullifier backs a certificate</td><td>the certificate stores <code>sha256(&quot;pof:null:&quot; ‖ salt ‖ nf)</code> with a 32-byte random salt; the lock index is an HMAC</td><td>CONTRACT §5</td></tr></tbody></table></div>
+<h3 id="a-source-that-lies">A source that lies<a class="anchor" href="#a-source-that-lies" aria-label="Link to this section">#</a></h3>
+<ul><li><strong>The Helius indexer.</strong> It cannot invent membership or non-membership: both paths are re-hashed here and must end at
+roots the tree account holds on chain. It is trusted for two things: the slot of a note's creating transaction (the
+minimum age) and liveness (if it refuses to answer, nothing is signed).</li><li><strong>The RPC node.</strong> The tree account, the registry record and the nullifier PDAs are read from it. A lying node could hide a
+nullifier PDA. Mitigation: <code>SOLANA_RPC</code> takes several nodes; the non-inclusion check is a second, independent source for
+the same fact.</li><li><strong>X and fxtwitter.</strong> The handle check believes the post's author and text. A compromised X account can be linked by
+whoever controls it, which is what the certificate says.</li></ul>
+<h3 id="the-operator-or-someone-who-takes-its-keys">The operator, or someone who takes its keys<a class="anchor" href="#the-operator-or-someone-who-takes-its-keys" aria-label="Link to this section">#</a></h3>
+<ul><li><strong>Records what it sees.</strong> Not detectable from outside. The code is open, the bundle is reproducible and its hash is in
+every log entry and on <code>/status</code>, so a changed binary is visible; a dishonest operator running the published code and
+also copying memory is not. This is the first trust point, and phase 2 removes it.</li><li><strong>Signs a false attestation.</strong> Possible with the key. Every signature the Verifier makes goes into the append-only log
+with the bundle hash, and the log head is anchored on chain by <code>anchor_log</code>; a false attestation is permanent and
+attributable. Witnesses cosign heads (CONTRACT §8), so a forked log is caught.</li><li><strong>Steals the Verifier key.</strong> Rotation is <code>set_verifier</code> with a delay in slots; every attestation names the key that
+signed it. The key never leaves <code>~/.config/pof</code> (600) and the Vercel env, and is never printed.</li><li><strong>Takes the seal key.</strong> It opens the keeper's kits: salts and nullifiers of live certificates, which let it revoke them
+early (harmless to holders' money) and link a spend to a certificate. No amounts.</li><li><strong>Stops the keeper.</strong> Revocation then waits for someone else holding a kit: the holder (the client keeps its own), any
+registered keeper reading the escrow (<code>scripts/witness-keeper.mjs</code>), and in the worst case expiry, which is one day at
+launch (POF-01). <code>revoke_spent</code> is permissionless; it needs only the salt and the nullifier.</li></ul>
+<h2 id="what-is-left">What is left<a class="anchor" href="#what-is-left" aria-label="Link to this section">#</a></h2>
+<ul><li>The Verifier sees the amounts of the disclosed notes and the ring's <code>nk</code>, and can link subject, vault and funding wallet.</li><li>The minimum age relies on the indexer's slot for the creating transaction.</li><li>A certificate shows control of a ring at a slot, not ownership. Borrowed money certifies until it moves.</li><li>If every keeper and the holder are offline, a spent certificate stays live until it expires (at most <code>validity_slots</code>).</li><li>If Helius ever closes nullifier PDAs before a keeper acts, revocation needs the nullifier-tree membership path, which
+the program accepts and the keeper builds from the indexer (<code>rings.ts nullifierMembership</code>).</li></ul>
+<h2 id="what-phase-2-removes">What phase 2 removes<a class="anchor" href="#what-phase-2-removes" aria-label="Link to this section">#</a></h2>
+<p>A zero-knowledge range proof (see <a href="/docs/phase-2">Phase 2</a>) proves, in the browser, that some notes in the tree, owned by the
+prover's ring and unspent at a root, sum to at least the tier, and outputs only the salted nullifier hashes. The program
+verifies it. Then:</p>
+<ul><li>nobody sees an amount, an opening or <code>nk</code>; the Verifier's view, the first trust point, is gone;</li><li>the Verifier's key, and with it the false-attestation and key-theft cases, are gone: the program checks the proof;</li><li>the linkage of subject, vault and funding wallet by the operator is gone;</li><li>what stays: the indexer and RPC for state reads, X for handles, the keepers for timely revocation, and expiry as the
+bound.</li></ul>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/protocol"><span>Previous</span>The protocol</a><a class="next" href="/docs/revocation"><span>Next</span>Revocation</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-a-certificate-claims">What a certificate claims</a></li><li class="d2"><a href="#what-the-verifier-learns">What the Verifier learns</a></li><li class="d2"><a href="#what-the-verifier-keeps">What the Verifier keeps</a></li><li class="d2"><a href="#adversaries-and-what-stops-them">Adversaries and what stops them</a></li><li class="d3"><a href="#a-holder-who-wants-a-certificate-the-money-does-not-support">A holder who wants a certificate the money does not support</a></li><li class="d3"><a href="#a-third-party">A third party</a></li><li class="d3"><a href="#a-source-that-lies">A source that lies</a></li><li class="d3"><a href="#the-operator-or-someone-who-takes-its-keys">The operator, or someone who takes its keys</a></li><li class="d2"><a href="#what-is-left">What is left</a></li><li class="d2"><a href="#what-phase-2-removes">What phase 2 removes</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

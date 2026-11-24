@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Test reports · Proof of Funds</title>
+<meta name="description" content="Every part of Proof of Funds publishes what it tested, how, and what failed: the program, the Verifier, the client, the API and SDK, and the internal security review.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/reports">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Test reports · Proof of Funds">
+<meta property="og:description" content="Every part of Proof of Funds publishes what it tested, how, and what failed: the program, the Verifier, the client, the API and SDK, and the internal security review.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/reports">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+
+</head>
+<body class="page-index" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<section class="band"><div class="grid"><p class="label col-12">Record</p><h1 class="h1 col-8">Test reports</h1><p class="lead col-7">Each part publishes what it tested, the commands that run the tests, and what is still open. Findings stay in the reports after they are fixed.</p></div></section>
+<section class="band"><ol class="index-list"><li><a href="/reports/rings"><span class="n">01</span><span class="t">Test report: the Privacy Rings client (browser client, lab, proxies)</span><span class="s">Scope: client/ (the browser client and its SDK bundle), client/server/spr-proxy.js and api/spr/[method].js (the Rings
+indexer and prover proxies), lab/ (the harness and the local validator with Privacy Rings cloned from mainnet), and the
+facts in RINGS.md. Nod</span></a></li><li><a href="/reports/devx"><span class="n">02</span><span class="t">Test report: developer surfaces (API, SDK, MCP, bots)</span><span class="s">Scope: sdk/ (@pof/sdk 0.1.0), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js.
+Every suite below runs from a clean checkout with the commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0
+programs built from program/ at the ti</span></a></li><li><a href="/reports/audit"><span class="n">03</span><span class="t">Proof of Funds: internal security review</span><span class="s">Status: round 2 (2026-11-25). The four High findings of round 1 are fixed and re-tested. New findings from round 2 are in §4b. This report is updated as fixes land; every row of the findings table carries its status.
+Reviewer: the POF audit agent. It did not w</span></a></li><li><a href="/reports/zk"><span class="n">04</span><span class="t">Test report: phase 2, the zero-knowledge proof of funds (zk/)</span><span class="s">Development setup only. Every number and every proof below comes from a trusted setup made on one machine
+(zk/setup/TRANSCRIPT.md). Whoever ran it could forge proofs for that key. It is fit for local tests and devnet, never for
+mainnet certificates; the public</span></a></li></ol></section>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

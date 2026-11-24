@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Verify someone's proof · Proof of Funds</title>
+<meta name="description" content="Check any wallet, handle or badge live, on the site, through the API, from a terminal, or with an embedded badge.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/guides/verify-a-proof">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Verify someone's proof · Proof of Funds">
+<meta property="og:description" content="Check any wallet, handle or badge live, on the site, through the API, from a terminal, or with an embedded badge.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/guides/verify-a-proof">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof" aria-current="page"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">Check any wallet, handle or badge live, on the site, through the API, from a terminal, or with an embedded badge.</p>
+    <h1 id="verify-someones-proof">Verify someone's proof</h1>
+<p>A certificate is an account on Solana. Checking it means reading that account at the current slot. A screenshot, a
+card image or a forwarded message proves nothing: always check live.</p>
+<h2 id="what-you-are-looking-at">What you are looking at<a class="anchor" href="#what-you-are-looking-at" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>field</th><th>meaning</th></tr></thead><tbody><tr><td>subject</td><td>the wallet, <code>@handle</code> or badge key the certificate is about</td></tr><tr><td>asset and tier</td><td>for example &quot;≥ 1,000 SOL&quot;. A floor, never an amount</td></tr><tr><td>status</td><td><code>live</code>, <code>revoked_spent</code>, <code>revoked_by_holder</code> or <code>expired</code>, at the slot shown</td></tr><tr><td>certified slot, expiry slot</td><td>when it was made, and the slot after which it reads <code>expired</code></td></tr><tr><td>revoked slot</td><td>when it died, if it did</td></tr></tbody></table></div>
+<p><strong>Live</strong> means: the Verifier checked the notes when it signed, and no spend of them has been shown since. A spend is
+shown by whoever holds the certificate's revoke kit, normally a keeper, so there can be a short gap between a spend and
+the revocation (<a href="/docs/trust">Trust points</a>, item 4). For a large deal, ask for a certificate issued or renewed recently.</p>
+<p><strong>Who are you talking to?</strong> A certificate is public: anyone can point at someone else's. If it matters, ask the person
+to prove they control it (<a href="/docs/guides/otc-deals">Require a certificate before a deal</a>).</p>
+<h2 id="on-the-site">On the site<a class="anchor" href="#on-the-site" aria-label="Link to this section">#</a></h2>
+<p>Open <code>/verify</code> and type the subject: <code>@handle</code>, a wallet address, <code>badge:&lt;key&gt;</code>. The page reads the chain and shows
+every certificate the subject has (one per asset), with the status at the current slot. Add an asset and a minimum tier
+to get a plain yes or no.</p>
+<h2 id="through-the-api">Through the API<a class="anchor" href="#through-the-api" aria-label="Link to this section">#</a></h2>
+<p>No key, no account, open to any origin:</p>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">curl -s &quot;https://&lt;site&gt;/v1/certificates/@anon?asset=SOL&amp;minTier=4&quot;</code></pre></div>
+<p>The answer lists the certificates and, when you give <code>asset</code> and <code>minTier</code>, a <code>check</code>:</p>
+<div class="code" data-lang="json"><span class="code-lang">json</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-json">&quot;check&quot;: { &quot;asset&quot;: &quot;SOL&quot;, &quot;minTier&quot;: 4, &quot;minTierLabel&quot;: &quot;≥ 1,000 SOL&quot;, &quot;ok&quot;: true, &quot;reason&quot;: &quot;ok&quot; }</code></pre></div>
+<p><code>reason</code> is one of <code>ok</code>, <code>no_certificate</code>, <code>below_tier</code>, <code>revoked_spent</code>, <code>revoked_by_holder</code>, <code>expired</code>. A subject with
+no certificate is still a normal answer with an empty list. Every answer carries the <code>slot</code> it was read at. The full
+schema is at <code>/v1/openapi.json</code>; <a href="/developers">Developers</a> has every endpoint.</p>
+<h2 id="from-a-terminal-without-trusting-us">From a terminal, without trusting us<a class="anchor" href="#from-a-terminal-without-trusting-us" aria-label="Link to this section">#</a></h2>
+<p>The <code>pof</code> command reads the chain through <strong>your own</strong> RPC:</p>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">node cli/pof.js check @anon --asset SOL --min-tier 4 --rpc https://your-rpc</code></pre></div>
+<p>It exits with 0 when the subject passes, 1 when it does not, 2 when a service cannot be reached, so a script can use it
+directly. Add <code>--verify-log</code> to also check the certificate's entry in the transparency log against the Verifier keys
+the program lists. <code>pof watch @anon</code> prints every status change as it happens.</p>
+<h2 id="on-your-own-page-the-badge">On your own page: the badge<a class="anchor" href="#on-your-own-page-the-badge" aria-label="Link to this section">#</a></h2>
+<p>Embed a live badge that reads the chain on its own and refreshes:</p>
+<div class="code" data-lang="html"><span class="code-lang">html</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-html">&lt;script type=&quot;module&quot; src=&quot;https://&lt;site&gt;/embed/pof-badge.js&quot;&gt;&lt;/script&gt;
+&lt;pof-badge subject=&quot;@anon&quot; asset=&quot;SOL&quot; min-tier=&quot;4&quot;&gt;&lt;/pof-badge&gt;</code></pre></div>
+<p>It shows the subject, the tier and the status, turns to <strong>REVOKED</strong> with the slot when the certificate dies, and links to
+<code>/verify</code>. There is also a plain image at <code>/v1/badge/&lt;subject&gt;.svg</code> for places that cannot run scripts. Both show the
+status at the moment they were loaded; the script version refreshes every 30 seconds by default.</p>
+<h2 id="checking-the-verifier-too">Checking the Verifier too<a class="anchor" href="#checking-the-verifier-too" aria-label="Link to this section">#</a></h2>
+<p>The certificate tells you the Verifier signed. To check that signature is in the public log and that the log was not
+rewritten, see <a href="/docs/transparency-log">The transparency log</a>, &quot;How anyone audits it&quot;, or run <code>node cli/pof.js log verify</code>.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/guides/prove-x-handle"><span>Previous</span>Prove an X handle</a><a class="next" href="/docs/guides/gate-a-community"><span>Next</span>Gate a Telegram group or a Discord role</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-you-are-looking-at">What you are looking at</a></li><li class="d2"><a href="#on-the-site">On the site</a></li><li class="d2"><a href="#through-the-api">Through the API</a></li><li class="d2"><a href="#from-a-terminal-without-trusting-us">From a terminal, without trusting us</a></li><li class="d2"><a href="#on-your-own-page-the-badge">On your own page: the badge</a></li><li class="d2"><a href="#checking-the-verifier-too">Checking the Verifier too</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

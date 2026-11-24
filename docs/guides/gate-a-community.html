@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gate a Telegram group or a Discord role · Proof of Funds</title>
+<meta name="description" content="For community admins: let in only people with a live certificate of a tier, and let them out when it dies.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/guides/gate-a-community">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Gate a Telegram group or a Discord role · Proof of Funds">
+<meta property="og:description" content="For community admins: let in only people with a live certificate of a tier, and let them out when it dies.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/guides/gate-a-community">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community" aria-current="page"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">For community admins: let in only people with a live certificate of a tier, and let them out when it dies.</p>
+    <h1 id="gate-a-telegram-group-or-a-discord-role">Gate a Telegram group or a Discord role</h1>
+<p>You run a community and want it open only to people who hold at least a tier, say &quot;≥ 100 SOL&quot;, right now. Proof of
+Funds gives you three pieces that work together:</p>
+<ul><li>a <strong>Room</strong>: an on-chain rule, &quot;asset SOL, at least tier 3&quot;, owned by you;</li><li>the <strong>Telegram bot</strong>, which approves join requests for a group bound to that Room;</li><li>the <strong>Discord bot</strong>, which gives a role to members whose certificate meets the Room, and takes it away when it stops.</li></ul>
+<p>Nobody sends you a wallet address or a balance. A member links a subject (a wallet, an <code>@handle</code> or a badge) that holds
+a certificate, and the bot reads the chain.</p>
+<h2 id="step-1-make-a-room">Step 1. Make a Room<a class="anchor" href="#step-1-make-a-room" aria-label="Link to this section">#</a></h2>
+<p>On the <code>/rooms</code> page, connect your wallet and create a Room: pick the asset, the minimum tier and a short name. Your
+wallet pays the Room account's rent; there is no fee and no admin other than you. You can change the tier, the name or
+close it to new members later. Copy the <strong>Room address</strong>: the bots need it.</p>
+<p>(Developers can create Rooms directly with the <code>pof_gate</code> instruction <code>create_room</code>; see <a href="/developers">Developers</a>.)</p>
+<p>A Room is also an on-chain membership list: certificate holders can <code>join</code> it themselves, and anyone can <code>evict</code> a
+member whose certificate is no longer good enough. The bots do not need that: they read the Room's asset and tier and
+check each member's certificate.</p>
+<h2 id="step-2a-telegram">Step 2a. Telegram<a class="anchor" href="#step-2a-telegram" aria-label="Link to this section">#</a></h2>
+<ol><li>Add the Proof of Funds bot (its handle is on the site) to your group and make it an <strong>admin</strong> with the permission to
+<strong>invite users via link</strong>. It needs nothing else.</li><li>In the group, send <code>/pof_bind &lt;Room address&gt;</code>. The bot answers <code>Bound to Room …</code> with the tier.</li><li>In the group settings, create an <strong>invite link with &quot;Request admin approval&quot; turned on</strong>, and share that link. People
+who open it send a join request instead of entering directly.</li><li>Optional: <code>/pof_evict on</code> makes the bot remove members whose certificate is revoked or expires (they can request
+again). <code>/pof_status</code> shows the binding; <code>/pof_unbind</code> stops the bot acting in the group. Only group admins can use
+these commands.</li></ol>
+<p>What a member sees: after the join request, the bot sends them a private message with a <strong>Link my certificate</strong> button.
+They open it, prove they control their subject (below), and if the certificate is live and meets the Room the request is
+approved at once. If not, the bot tells them why, for example <code>The certificate reads ≥ 10 SOL; this room needs ≥ 100 SOL.</code>
+or <code>The certificate expired at slot … Renew it to enter.</code></p>
+<h2 id="step-2b-discord">Step 2b. Discord<a class="anchor" href="#step-2b-discord" aria-label="Link to this section">#</a></h2>
+<ol><li>Open the bot's invite link (on the site). It asks only for <strong>Manage Roles</strong>. Pick your server and authorize.</li><li>In <strong>Server Settings → Roles</strong>, create the role you want to give (for example <code>Verified ≥ 100 SOL</code>), and drag the
+bot's own role <strong>above</strong> it: Discord lets a bot hand out only roles below its own.</li><li>In any channel, run <code>/pof-setup room:&lt;Room address&gt; role:@Verified ≥ 100 SOL</code>. You need Manage Roles yourself, and
+the bot refuses a role above your own highest role.</li><li>Tell members to run <code>/pof-verify</code>. The first time, they get a personal <strong>Link my certificate</strong> button; after linking,
+a live certificate that meets the Room gets the role. <code>/pof-status</code> shows what they linked; <code>/pof-unlink</code> removes it.</li></ol>
+<h2 id="how-members-prove-their-subject">How members prove their subject<a class="anchor" href="#how-members-prove-their-subject" aria-label="Link to this section">#</a></h2>
+<p>The link page asks for one signature, by the key that controls the subject:</p>
+<div class="table"><table><thead><tr><th>subject</th><th>what the member signs with</th></tr></thead><tbody><tr><td>wallet</td><td>that wallet</td></tr><tr><td>badge</td><td>the badge key, which the site takes from the member's saved kit</td></tr><tr><td><code>@handle</code></td><td>the certificate's controller key, which the site rebuilds from the member's vault</td></tr></tbody></table></div>
+<p>One subject links to one Telegram account and one Discord account at a time. Linking it again moves it, so one
+certificate cannot let a whole group in.</p>
+<h2 id="when-certificates-die">When certificates die<a class="anchor" href="#when-certificates-die" aria-label="Link to this section">#</a></h2>
+<p>A member's certificate ends when its funds move, when its holder revokes it, or when it expires (216,000 slots by
+default unless renewed). After launch the bots re-check gated members on a regular sweep:</p>
+<ul><li>Telegram removes them when <code>/pof_evict on</code> is set;</li><li>Discord removes the role.</li></ul>
+<p>Before launch that sweep is off: the bots gate new requests, and removal waits for it. Between a spend and its revocation
+there can be a short gap (<a href="/docs/trust">Trust points</a>, item 4).</p>
+<h2 id="what-you-as-the-admin-learn">What you, as the admin, learn<a class="anchor" href="#what-you-as-the-admin-learn" aria-label="Link to this section">#</a></h2>
+<p>The bots see which subject each Telegram or Discord account linked. You see, through the bot's messages and the chain,
+the subject's tier and status. Nobody learns an amount. If your members would rather not tie their Telegram or Discord
+account to their wallet, suggest a badge or a handle certificate.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/guides/verify-a-proof"><span>Previous</span>Verify someone's proof</a><a class="next" href="/docs/guides/otc-deals"><span>Next</span>Require a certificate before a deal</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#step-1-make-a-room">Step 1. Make a Room</a></li><li class="d2"><a href="#step-2a-telegram">Step 2a. Telegram</a></li><li class="d2"><a href="#step-2b-discord">Step 2b. Discord</a></li><li class="d2"><a href="#how-members-prove-their-subject">How members prove their subject</a></li><li class="d2"><a href="#when-certificates-die">When certificates die</a></li><li class="d2"><a href="#what-you-as-the-admin-learn">What you, as the admin, learn</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

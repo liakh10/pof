@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Status · Proof of Funds</title>
+<meta name="description" content="What the status page measures, how each state is decided, and how the uptime history is kept.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/status">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Status · Proof of Funds">
+<meta property="og:description" content="What the status page measures, how each state is decided, and how the uptime history is kept.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/status">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status" aria-current="page"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">What the status page measures, how each state is decided, and how the uptime history is kept.</p>
+    <h1 id="status">Status</h1>
+<p><code>GET /api/status</code> runs every check below at the moment it is asked (cached at the edge for about 20 seconds) and returns
+their states, their measurements and the stored uptime history. Every check reads public state only: the Solana RPC, the
+Rings tree account, the Helius Rings indexer, the Verifier's own public endpoints, and the <code>pof</code> program's Config and
+Treasury. Nothing on this page signs, and nothing on it can leak a key: RPC and indexer addresses are never shown, and the
+relayer appears as a balance band, not a number.</p>
+<p>Each check is in one of five states:</p>
+<div class="table"><table><thead><tr><th>state</th><th>meaning</th></tr></thead><tbody><tr><td>ok</td><td>working as designed</td></tr><tr><td>degraded</td><td>working, with a margin running out or a part slow</td></tr><tr><td>down</td><td>the function it guards would refuse right now</td></tr><tr><td>off</td><td>deliberately off (before launch)</td></tr><tr><td>unknown</td><td>not configured on this deployment, or nothing to compare with yet</td></tr></tbody></table></div>
+<p>The overall state is the worst of ok, degraded and down; off and unknown do not lower it.</p>
+<p>All windows are counted in <strong>slots</strong>, read from the chain.</p>
+<p><code>/api/status</code> takes no parameters: a request with a query string is redirected to the plain URL, so every visitor shares
+the one cached answer. Behind the edge cache, each server instance runs the checks at most once every 15 seconds, a run
+stored in Blob in the last 30 seconds is reused by every instance, and at most 6 runs start in any one-minute window;
+past that the last stored run is served, marked <code>stale: true</code>. Nobody can make the page read the chain or the indexer on
+demand. The Verifier and the log are
+reached at the address set in <code>POF_STATUS_ORIGIN</code>, or else the production domain Vercel sets for the project, or else the
+deployment's own URL; never at the address a request claims in its Host header.</p>
+<h2 id="the-checks">The checks<a class="anchor" href="#the-checks" aria-label="Link to this section">#</a></h2>
+<h3 id="solana-rpc-rpc">Solana RPC (<code>rpc</code>)<a class="anchor" href="#solana-rpc-rpc" aria-label="Link to this section">#</a></h3>
+<p>Asks every configured RPC node for its slot at <code>confirmed</code>. <strong>Degraded</strong> if a node does not answer, if the fastest answer
+takes more than 1,500 ms, or if one node is more than 150 slots behind another. <strong>Down</strong> if no node answers. Shows the
+number of nodes, how many answered, the fastest time, the highest slot and the spread.</p>
+<h3 id="the-pof-program-program">The <code>pof</code> program (<code>program</code>)<a class="anchor" href="#the-pof-program-program" aria-label="Link to this section">#</a></h3>
+<p>Reads <code>Config</code>. <strong>Unknown</strong> if the program has no Config on this network (not deployed yet). <strong>Down</strong> if certify and renew
+are paused (<code>set_paused</code>), or the program is winding down. Shows the active Verifier key, the fee, <code>max_root_lag</code>,
+<code>max_attest_age</code>, <code>validity_slots</code>, and a pending Verifier key rotation with the slots left until it takes over.</p>
+<h3 id="rings-tree-root-ringstree">Rings tree root (<code>rings_tree</code>)<a class="anchor" href="#rings-tree-root-ringstree" aria-label="Link to this section">#</a></h3>
+<p>Reads the Rings tree account (<code>777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor</code>): the current state root, the slot it was
+last updated (offset 120), the number of leaves and the root history. The program refuses an attestation whose root is
+more than <code>max_root_lag</code> slots older than its issue slot (9,000 at launch). The tree only updates when someone transacts
+on Rings, so a quiet pool can stop certification by itself. <strong>Degraded</strong> when the root is older than half of
+<code>max_root_lag</code>; <strong>down</strong> when it is older than <code>max_root_lag</code>: certification waits for the next Rings transaction.</p>
+<h3 id="rings-indexer-as-the-verifier-sees-it-ringsindexer">Rings indexer, as the Verifier sees it (<code>rings_indexer</code>)<a class="anchor" href="#rings-indexer-as-the-verifier-sees-it-ringsindexer" aria-label="Link to this section">#</a></h3>
+<p>The Verifier accepts &quot;this nullifier is unspent&quot; from the indexer only when the indexer's non-inclusion path reaches a
+nullifier root that the tree account itself holds. This check makes the same call for a fixed probe value and compares:
+the indexer's slot with the chain's (the lag), and the indexer's nullifier root with the 100 roots in the tree account.
+<strong>Degraded</strong> if the indexer is more than 150 slots behind, or its root is not in the on-chain history yet while it is
+less than 1,500 slots behind. <strong>Down</strong> if it is more than 1,500 slots behind, does not answer, or its root is not in the
+history and it is far behind. Unknown when no Helius key is configured.</p>
+<h3 id="verifier-verifier">Verifier (<code>verifier</code>)<a class="anchor" href="#verifier-verifier" aria-label="Link to this section">#</a></h3>
+<p>Calls <code>GET /api/attest</code>, the Verifier's public facts. <strong>Down</strong> if it does not answer, or if its key is not the key the
+program accepts now (its attestations would be refused). <strong>Degraded</strong> if the bundle hash it reports is not the published
+build in <code>verifier/dist/BUILD.json</code>. Shows the response time, the key, the version, the running bundle hash and the
+published one. To check the published hash yourself, rebuild it (<a href="/docs/transparency-log">The transparency log</a>, step 7).</p>
+<h3 id="relayer-balance-relayer">Relayer balance (<code>relayer</code>)<a class="anchor" href="#relayer-balance-relayer" aria-label="Link to this section">#</a></h3>
+<p>Reads the relayer's SOL balance (its address is in Config) and shows only the band:</p>
+<div class="table"><table><thead><tr><th>band</th><th>balance</th><th>state</th></tr></thead><tbody><tr><td>empty</td><td>below 0.05 SOL (the relayer's floor)</td><td>down: relayed certificates wait; holders can still certify from their own wallet</td></tr><tr><td>low</td><td>0.05 to 0.5 SOL</td><td>degraded</td></tr><tr><td>ok</td><td>0.5 to 2 SOL</td><td>ok</td></tr><tr><td>ample</td><td>2 SOL or more</td><td>ok</td></tr></tbody></table></div>
+<h3 id="keeper-keeper">Keeper (<code>keeper</code>)<a class="anchor" href="#keeper-keeper" aria-label="Link to this section">#</a></h3>
+<p><strong>Off</strong> before launch: nobody watches the disclosed nullifiers yet, and revocation on spend depends on holders. After
+launch it reads the keeper's last run (its slot and counts: kits watched, live, revoked, errors). <strong>Degraded</strong> if the last
+run is more than 3,000 slots old or had errors; <strong>down</strong> if it is more than 6,000 slots old. The keeper runs about every
+1,500 slots; its last run is also the upper bound of how long a spent certificate can stay live before it is revoked
+(<a href="/docs/revocation">Revocation</a>).</p>
+<h3 id="transparency-log-log">Transparency log (<code>log</code>)<a class="anchor" href="#transparency-log-log" aria-label="Link to this section">#</a></h3>
+<p>Fetches the signed tree head and verifies its signature, with the Verifier's key. Then it checks that the log extends
+every head seen before:</p>
+<ul><li>the head <strong>anchored on chain</strong> in the Treasury (by <code>anchor_log</code>): a consistency proof from the anchored size to the
+current size must verify;</li><li>the head the <strong>previous sample</strong> stored: the same proof from that size.
+<strong>Down</strong> if the signature fails, if the head is signed by another key than the Verifier's, if the log is shorter than
+an anchored or earlier head, or if a consistency proof fails: each of these means the log changed its history.
+<strong>Degraded</strong>, after launch, when entries have waited more than 9,000 slots for an anchor. Shows the size, the root, the
+anchored size and slot, and how many entries are not anchored yet.</li></ul>
+<h2 id="history">History<a class="anchor" href="#history" aria-label="Link to this section">#</a></h2>
+<p>After launch a cron calls <code>GET /api/status/sample</code> (with the cron secret) every few minutes. Each sample runs all checks
+and stores, in Vercel Blob:</p>
+<ul><li>the sample itself (the states and a few numbers: root age, indexer lag, RPC and Verifier times, log size, anchored
+size, relayer band), in one file per UTC date;</li><li>a per-day summary: for each check, how many samples were ok, degraded and down; 90 days are kept;</li><li>the log head, so the next sample can prove the log only grew.</li></ul>
+<p><code>GET /api/status/history</code> returns the summary as uptime per day and per check, where uptime is the share of samples that
+were not down (off and unknown are not counted). Before launch the cron is parked, so the history is empty and the page
+shows the live checks only. Data older than 2 hours is shown &quot;as of&quot; its date.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/zk"><span>Previous</span>Zero-knowledge circuit</a><a class="next" href="/docs/faq"><span>Next</span>FAQ</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-checks">The checks</a></li><li class="d3"><a href="#solana-rpc-rpc">Solana RPC (rpc)</a></li><li class="d3"><a href="#the-pof-program-program">The pof program (program)</a></li><li class="d3"><a href="#rings-tree-root-ringstree">Rings tree root (rings_tree)</a></li><li class="d3"><a href="#rings-indexer-as-the-verifier-sees-it-ringsindexer">Rings indexer, as the Verifier sees it (rings_indexer)</a></li><li class="d3"><a href="#verifier-verifier">Verifier (verifier)</a></li><li class="d3"><a href="#relayer-balance-relayer">Relayer balance (relayer)</a></li><li class="d3"><a href="#keeper-keeper">Keeper (keeper)</a></li><li class="d3"><a href="#transparency-log-log">Transparency log (log)</a></li><li class="d2"><a href="#history">History</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

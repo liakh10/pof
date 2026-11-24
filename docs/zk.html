@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zero-knowledge circuit · Proof of Funds</title>
+<meta name="description" content="The phase 2 circuit, its public inputs, the setup, the browser prover and certify_zk, with measured numbers and the known limits.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/zk">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Zero-knowledge circuit · Proof of Funds">
+<meta property="og:description" content="The phase 2 circuit, its public inputs, the setup, the browser prover and certify_zk, with measured numbers and the known limits.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/zk">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk" aria-current="page"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">The phase 2 circuit, its public inputs, the setup, the browser prover and certify_zk, with measured numbers and the known limits.</p>
+    <h1 id="the-zero-knowledge-circuit-phase-2">The zero-knowledge circuit (phase 2)</h1>
+<p>Phase 1 trusts the Verifier with the openings of the disclosed notes and with the vault's nullifier key <code>nk</code>
+(<a href="/docs/trust">Trust points</a>, item 1). Phase 2 replaces that request with a Groth16 proof made in the holder's browser and
+checked by the <code>pof</code> program itself. The program learns that the subject holds at least the tier in one asset, and nothing
+else: no amount, no <code>nk</code>, no owner key, no leaf, no nullifier.</p>
+<p><strong>Status: in development, not deployed.</strong> The circuit, a development setup, the browser prover and the on-chain
+instruction <code>certify_zk</code> are built and tested (numbers below). The setup is a <strong>development setup</strong> made on one machine.
+<code>certify_zk</code> stays switched off on mainnet until the public ceremony described at the end has run.</p>
+<h2 id="the-statement">The statement<a class="anchor" href="#the-statement" aria-label="Link to this section">#</a></h2>
+<p>For public values <code>(state_root, null_root, asset, min_amount, ctx, K, R, tag_1..4, ct_1..4)</code> the prover knows a ring
+(<code>ownerId</code>, <code>nk</code>), an ephemeral scalar <code>r</code>, and 1 to 4 notes <code>(amount, blinding, dataHash, ringTerm, leafIndex, paths)</code> such
+that, for every used note slot:</p>
+<ol><li><code>commitment = Poseidon(3, 0, asset, amount, dataHash, ringTerm, Poseidon(Poseidon(ownerId, Poseidon(nk)), blinding))</code>,
+the Rings note commitment (<a href="https://github.com/liakh10/pof/blob/main/RINGS.md" rel="noopener" target="_blank">RINGS.md</a> §2);</li><li>the commitment is the leaf at <code>leafIndex</code> of the Rings state tree (height 32) under <code>state_root</code>;</li><li><code>nullifier = Poseidon(commitment, blinding, nk)</code> (RINGS §3);</li><li>the nullifier is <strong>absent</strong> from the Rings indexed nullifier tree (height 40) under <code>null_root</code>: a leaf
+<code>Poseidon(low, next)</code> of that tree has <code>low &lt; nullifier &lt; next</code> as integers;</li><li><code>tag = Poseidon(&quot;pof:zk:tag:v1&quot;, nullifier)</code>;</li><li><code>ct = nullifier + Poseidon(&quot;pof:zk:esc:v1&quot;, S.x, S.y, slot)</code> where <code>R = r·B8</code> and <code>S = r·K</code> on Baby Jubjub;</li></ol>
+<p>and, over all notes: <code>amount &lt; 2^64</code> each, <code>Σ amount ≥ min_amount</code>, used slots come first, unused slots have <code>tag = ct = 0</code>.</p>
+<p>Every hash is Poseidon over BN254 with the circom parameters. That is the Rings hasher itself (the SDK uses
+light-poseidon): the tests check circomlib against the Helius SDK value for value, and recompute real mainnet deposit
+leaves with the circuit's commitment formula (<code>zk/test/parity.test.mjs</code>).</p>
+<h2 id="public-inputs-and-who-sets-them">Public inputs, and who sets them<a class="anchor" href="#public-inputs-and-who-sets-them" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>#</th><th>input</th><th>set by</th></tr></thead><tbody><tr><td>0</td><td><code>state_root</code></td><td>the transaction; the program requires it to be in the Rings tree account's 500-root state history</td></tr><tr><td>1</td><td><code>null_root</code></td><td>the transaction; the program requires it to be in the tree's 100-root nullifier history</td></tr><tr><td>2</td><td><code>asset</code></td><td>the program: <code>Poseidon(mint[0..31], mint[31])</code> of the asset's mint in <code>Config</code> (Rings <code>hashBytes</code>)</td></tr><tr><td>3</td><td><code>min_amount</code></td><td>the program: the tier's minimum from <code>Config</code></td></tr><tr><td>4</td><td><code>ctx</code></td><td>the program: <code>sha256(&quot;pof:zk:ctx:v1&quot; ‖ program ‖ kind ‖ subject_hash ‖ asset ‖ tier ‖ controller ‖ payer ‖ nonce)</code>, top 3 bits cleared</td></tr><tr><td>5, 6</td><td><code>K</code></td><td>the program: the revocation key in <code>ZkConfig</code></td></tr><tr><td>7, 8</td><td><code>R</code></td><td>the transaction (stored in each note lock)</td></tr><tr><td>9 to 12</td><td><code>tag_i</code></td><td>the transaction (stored on the certificate)</td></tr><tr><td>13 to 16</td><td><code>ct_i</code></td><td>the transaction (stored in each note lock)</td></tr></tbody></table></div>
+<p>Because the program computes <code>asset</code>, <code>min_amount</code>, <code>ctx</code> and <code>K</code> itself, a proof cannot be moved to another subject,
+controller, payer, tier, asset or nonce: any change gives other public inputs and the pairing check fails. Inputs must be
+canonical field elements (below r); a non-canonical encoding of the same value is refused, so the byte strings the program
+stores are unique.</p>
+<h2 id="why-the-escrow">Why the escrow<a class="anchor" href="#why-the-escrow" aria-label="Link to this section">#</a></h2>
+<p>A nullifier spent recently sits in the Rings nullifier queue (a PDA) before a forester folds it into the nullifier tree, in
+batches of 4,999. The proof can show absence from the tree, not from the queue, without revealing the nullifier. So the
+proof also encrypts each nullifier to the revocation key <code>K</code>, and the circuit forces the encryption to be correct. The
+keeper holds <code>k</code> (with <code>K = k·B8</code>); it reads <code>R</code> and <code>ct</code> from the note lock, recovers each nullifier, checks it against the
+tag, and calls <code>revoke_spent</code> the moment the nullifier PDA appears, including right after certify for a note that was already
+in the queue. The keeper learns nullifiers, which only matter at the moment of a spend, and never an amount or <code>nk</code>.</p>
+<h2 id="one-note-one-live-certificate">One note, one live certificate<a class="anchor" href="#one-note-one-live-certificate" aria-label="Link to this section">#</a></h2>
+<p>Tags are deterministic per note. <code>certify_zk</code> creates a <code>NoteLock</code> PDA <code>[&quot;znote&quot;, tag]</code> per note, so the same note cannot back
+two live certificates. <code>release_note_lock</code> (anyone) closes a lock once its certificate is revoked, expired, closed or no
+longer carries the tag, and returns the rent to whoever paid it.</p>
+<h2 id="revocation">Revocation<a class="anchor" href="#revocation" aria-label="Link to this section">#</a></h2>
+<p>A zk certificate records the <code>ZkConfig</code> address as its <code>verifier</code>. <code>revoke_spent</code> then checks
+<code>Poseidon(&quot;pof:zk:tag:v1&quot;, nullifier) == tag</code> (no salt) and the same chain proofs as phase 1: the nullifier PDA exists, or a
+membership path in the nullifier tree. The nullifier becomes public at that point, as in phase 1.</p>
+<h2 id="numbers-development-build">Numbers (development build)<a class="anchor" href="#numbers-development-build" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>constraints</td><td>88,474 (circom 2.2.2 <code>--O2</code>), 17 public inputs, Powers of Tau 2^17</td></tr><tr><td>per note</td><td>~21.5k: state path 32 × Poseidon(2), nullifier path 40 × Poseidon(2), the commitment, three 254-bit range checks</td></tr><tr><td>escrow</td><td>~3.5k (one fixed-base and one variable-base Baby Jubjub multiplication)</td></tr><tr><td>circuit wasm</td><td>see <a href="https://github.com/liakh10/pof/blob/main/reports/zk.md" rel="noopener" target="_blank">the zk report</a></td></tr><tr><td>proving key</td><td>see the report</td></tr><tr><td>proving time</td><td>see the report (browser and Node)</td></tr><tr><td><code>certify_zk</code></td><td>see the report (compute units, transaction size)</td></tr></tbody></table></div>
+<h2 id="the-development-setup">The development setup<a class="anchor" href="#the-development-setup" aria-label="Link to this section">#</a></h2>
+<p><code>zk/scripts/ceremony.sh</code> runs a local Powers of Tau (BN254, 2^17) with two random contributions and a public beacon, then a
+Groth16 phase 2 with two random contributions and a beacon. The beacon is the sha256 of a finalized Solana mainnet blockhash,
+named in the transcript. Every step is verified with snarkjs; <code>zk/setup/TRANSCRIPT.md</code> lists every contribution hash, and
+the hashes of the r1cs, the phase 1 output, the proving key and the verifying key. The program embeds the verifying key
+(<code>zk/onchain/src/vk.rs</code>, generated) and records its sha256 in <code>ZkConfig.vk_hash</code>.</p>
+<p><strong>Why it is not enough for mainnet.</strong> One machine made every contribution. Whoever ran it could have kept the secrets and
+could forge proofs for this key. That is acceptable for local tests and devnet, and not for real certificates.</p>
+<h2 id="the-public-ceremony-before-mainnet">The public ceremony (before mainnet)<a class="anchor" href="#the-public-ceremony-before-mainnet" aria-label="Link to this section">#</a></h2>
+<ol><li>Phase 1 from the Perpetual Powers of Tau (a public ceremony with many independent contributors), at 2^17 or above.</li><li>Phase 2 opened to outside contributors: each downloads the latest <code>zkey</code>, contributes with their own entropy, and publishes
+their contribution hash; the coordinator only sequences. At least one honest contributor makes the key sound.</li><li>A final beacon from a future Solana blockhash fixed in advance.</li><li>The final key's hash is published, <code>vk.rs</code> is regenerated from it, the program is rebuilt and its build hash published,
+and only then does the admin call <code>set_zk(true, K)</code>.</li></ol>
+<h2 id="known-limits">Known limits<a class="anchor" href="#known-limits" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Subjects.</strong> <code>certify_zk</code> takes wallet and badge subjects (their key signs the transaction). X handles still need the
+linker's proof, which this version does not carry into the circuit.</li><li><strong>Up to 4 notes.</strong> A holder with more small notes merges them in Rings first, or certifies a lower tier.</li><li><strong>The keeper sees nullifiers.</strong> It cannot see amounts or <code>nk</code>, but it can link a certificate to a later spend, as the
+holder of the salts can in phase 1. A threshold of keepers is the upgrade path.</li><li><strong>Root age.</strong> The program accepts any state root in the 500-root history (about eight hours at today's traffic), and the
+certificate records the tree's last update slot, not the root's own slot.</li><li><strong>Minimum note age.</strong> Phase 1 checks each note's creating transaction is older than 150 slots. The proof does not; the
+client should prove against an older root, which gives the same guarantee.</li><li><strong>The proving key is large</strong> (tens of MB) and is downloaded once per device; the circuit runs in a Web Worker.</li><li><strong>Groth16 needs a trusted setup per circuit.</strong> Any change to the circuit needs a new phase 2.</li></ul>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/phase-2"><span>Previous</span>Phase 2</a><a class="next" href="/docs/status"><span>Next</span>Status</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-statement">The statement</a></li><li class="d2"><a href="#public-inputs-and-who-sets-them">Public inputs, and who sets them</a></li><li class="d2"><a href="#why-the-escrow">Why the escrow</a></li><li class="d2"><a href="#one-note-one-live-certificate">One note, one live certificate</a></li><li class="d2"><a href="#revocation">Revocation</a></li><li class="d2"><a href="#numbers-development-build">Numbers (development build)</a></li><li class="d2"><a href="#the-development-setup">The development setup</a></li><li class="d2"><a href="#the-public-ceremony-before-mainnet">The public ceremony (before mainnet)</a></li><li class="d2"><a href="#known-limits">Known limits</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

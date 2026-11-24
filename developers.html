@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Developers · Proof of Funds</title>
+<meta name="description" content="The read API, the SDK, the require_certificate CPI, pof_gate Rooms, the MCP server and the bots.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/developers">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Developers · Proof of Funds">
+<meta property="og:description" content="The read API, the SDK, the require_certificate CPI, pof_gate Rooms, the MCP server and the bots.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/developers">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="developers">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs">Docs</a><a href="/developers" aria-current="page">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>Developers</summary><ol class="docs-list"><li><a href="/developers" aria-current="page"><span class="n">20</span>Developers</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    
+    <h1 id="developers">Developers</h1>
+<p>Proof of Funds certificates say that a subject (a Solana wallet, an X handle, or a fresh badge key) holds <strong>at least</strong> a
+tier of SOL or USDC in a Helius Privacy Ring. They never carry an amount, and they revoke on chain the moment a disclosed
+note is spent. This page is for people who build on them: read a certificate, gate an instruction, gate a community,
+or let an agent ask.</p>
+<p>Everything here reads public state. The chain is the source of truth; the API, the MCP server and the bots are
+conveniences on top of it, and every one of them can be replaced by a direct read with the SDK.</p>
+<p><code>https://proofoffunds.vercel.app</code> below is this site's address.</p>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td><code>pof</code> program</td><td><code>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code></td></tr><tr><td><code>pof_gate</code> program</td><td><code>gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</code></td></tr><tr><td>IDLs</td><td><code>program/idl/pof.json</code>, <code>program/idl/pof_gate.json</code> in the repository</td></tr><tr><td>HTTP API</td><td><code>https://proofoffunds.vercel.app/v1</code>, OpenAPI 3.1 at <code>https://proofoffunds.vercel.app/v1/openapi.json</code></td></tr><tr><td>MCP</td><td><code>https://proofoffunds.vercel.app/mcp</code> (Streamable HTTP), or <code>node mcp/stdio.js</code></td></tr><tr><td>CLI</td><td><code>node cli/pof.js</code> from the repository (<code>pof check</code>, <code>pof watch</code>, <code>pof log verify</code>)</td></tr><tr><td>Embed</td><td><code>&lt;pof-badge&gt;</code> from <code>https://proofoffunds.vercel.app/embed/pof-badge.js</code>, <code>https://proofoffunds.vercel.app/embed/frame.html</code>, <code>https://proofoffunds.vercel.app/v1/badge/{subject}.svg</code></td></tr><tr><td>Witness</td><td><code>node witness/run.js</code>; the project's own at <code>https://proofoffunds.vercel.app/v1/witness</code></td></tr><tr><td>SDK</td><td><code>@pof/sdk</code>, from <code>https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz</code></td></tr><tr><td>Source</td><td><code>https://github.com/liakh10/pof</code></td></tr></tbody></table></div>
+<h2 id="what-a-certificate-is">What a certificate is<a class="anchor" href="#what-a-certificate-is" aria-label="Link to this section">#</a></h2>
+<p>One account per subject and asset, at the PDA <code>[&quot;cert&quot;, subject_hash, [asset]]</code> of the <code>pof</code> program.</p>
+<div class="table"><table><thead><tr><th>field</th><th>meaning</th></tr></thead><tbody><tr><td><code>subject_kind</code>, <code>subject_hash</code></td><td>who: 0 wallet, 1 X handle, 2 badge, and <code>sha256(&quot;pof:&lt;kind&gt;:&quot; ‖ value)</code> (the value is never stored)</td></tr><tr><td><code>asset</code>, <code>tier</code></td><td>0 SOL or 1 USDC, tier 1 to 5 (table below)</td></tr><tr><td><code>status</code></td><td>0 live, 1 revoked because a disclosed note was spent, 2 revoked by its holder</td></tr><tr><td><code>certified_slot</code>, <code>issued_slot</code>, <code>expiry_slot</code>, <code>revoked_slot</code></td><td>when. Live means <code>status == 0</code> and <code>slot &lt;= expiry_slot</code></td></tr><tr><td><code>controller</code></td><td>the key that can revoke it and join rooms with it: the wallet itself, the badge key itself, or a key the holder's client keeps for an X handle</td></tr><tr><td><code>null_hashes</code>, <code>nullset_hash</code></td><td>salted hashes of the disclosed notes' nullifiers. Anyone holding a salt can call <code>revoke_spent</code> once that note is spent</td></tr><tr><td><code>verifier</code>, <code>log_index</code></td><td>the Verifier key that signed, and the attestation's entry in the transparency log</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>asset</th><th>id</th><th>tier 1</th><th>tier 2</th><th>tier 3</th><th>tier 4</th><th>tier 5</th></tr></thead><tbody><tr><td>SOL</td><td>0</td><td>≥ 1</td><td>≥ 10</td><td>≥ 100</td><td>≥ 1,000</td><td>≥ 10,000</td></tr><tr><td>USDC</td><td>1</td><td>≥ 100</td><td>≥ 1,000</td><td>≥ 10,000</td><td>≥ 100,000</td><td>≥ 1,000,000</td></tr></tbody></table></div>
+<p>The tables live in the program's <code>Config</code> (base units) and can only be extended, never re-meant: a tier issued today
+keeps its meaning. <code>GET /v1/config</code> shows them.</p>
+<p><strong>Read it as a minimum.</strong> &quot;Tier 4 SOL&quot; means &quot;at least 1,000 SOL in the disclosed notes at the issue slot, and none of them
+spent since&quot;. It does not say how much more, and it does not say anything about other wallets of the same person.</p>
+<h2 id="http-api">HTTP API<a class="anchor" href="#http-api" aria-label="Link to this section">#</a></h2>
+<p>Read-only JSON, CORS open (<code>*</code>), cached at the edge for 5 to 30 seconds. No key. Errors are
+<code>{ &quot;error&quot;: { &quot;code&quot;, &quot;message&quot; } }</code> with 400 (your input), 404 (nothing there), 502 (the RPC or the log did not answer;
+retry), 503 (not configured).</p>
+<div class="table"><table><thead><tr><th>endpoint</th><th>what</th></tr></thead><tbody><tr><td><code>GET /v1/certificates/{subject}</code></td><td>every certificate of one subject; <code>?asset=SOL&amp;minTier=4</code> adds a yes/no <code>check</code></td></tr><tr><td><code>GET /v1/certificates?asset=&amp;tier=&amp;minTier=&amp;status=&amp;kind=&amp;limit=&amp;cursor=</code></td><td>list, newest first, paged</td></tr><tr><td><code>GET /v1/rooms</code> · <code>GET /v1/rooms/{room}</code></td><td>pof_gate rooms; one room with its members and whether each still passes</td></tr><tr><td><code>GET /v1/stats</code></td><td>live, revoked, expired, renewed; certified sums (tier minimums, never amounts); log size</td></tr><tr><td><code>GET /v1/config</code></td><td>active verifier key, fee, validity, tier tables</td></tr><tr><td><code>GET /v1/log/head</code></td><td>the signed tree head of the transparency log, its signature check, and the head anchored on chain</td></tr><tr><td><code>GET /v1/log/proof/{id}</code></td><td>one log entry with its inclusion proof against the current head, verified; <code>?certificate=&lt;address&gt;</code> also checks the leaf holds that certificate's signed bytes</td></tr><tr><td><code>GET /v1/log/consistency?first=&amp;second=</code></td><td>an RFC 9162 consistency proof between two sizes, verified against the signed head</td></tr><tr><td><code>GET /v1/witness</code></td><td>the log witness's cosigned heads, their anchors on chain, and any alarms</td></tr><tr><td><code>GET /v1/badge/{subject}.svg</code></td><td>a status badge for <code>&lt;img&gt;</code>: live, revoked with its slot, expired, below tier, none</td></tr></tbody></table></div>
+<p><code>{subject}</code> is what a person types: <code>@handle</code>, <code>x:handle</code>, <code>wallet:&lt;base58&gt;</code>, <code>badge:&lt;base58&gt;</code>, a bare base58 key (tried
+as a wallet and as a badge), or a 64-hex subject hash. No certificate is a <code>200</code> with an empty list, so a gate can read
+one shape.</p>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">curl -s &quot;https://proofoffunds.vercel.app/v1/certificates/@anon?asset=SOL&amp;minTier=4&quot;</code></pre></div>
+<div class="code" data-lang="json"><span class="code-lang">json</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-json">{
+  &quot;query&quot;: &quot;@anon&quot;,
+  &quot;slot&quot;: 389120455,
+  &quot;subjects&quot;: [{ &quot;kind&quot;: &quot;x&quot;, &quot;value&quot;: &quot;anon&quot;, &quot;subjectHash&quot;: &quot;cedd88c7…739520&quot; }],
+  &quot;live&quot;: true,
+  &quot;certificates&quot;: [{
+    &quot;address&quot;: &quot;95Yo…R1ve&quot;, &quot;subject&quot;: &quot;anon&quot;, &quot;kind&quot;: &quot;x&quot;, &quot;subjectHash&quot;: &quot;cedd88c7…739520&quot;,
+    &quot;asset&quot;: &quot;SOL&quot;, &quot;assetId&quot;: 0, &quot;tier&quot;: 5, &quot;tierLabel&quot;: &quot;≥ 10,000 SOL&quot;,
+    &quot;status&quot;: &quot;live&quot;, &quot;statusOnChain&quot;: &quot;live&quot;, &quot;live&quot;: true,
+    &quot;certifiedSlot&quot;: 389101207, &quot;issuedSlot&quot;: 389101207, &quot;expirySlot&quot;: 395581207, &quot;revokedSlot&quot;: null,
+    &quot;logIndex&quot;: 41, &quot;noteCount&quot;: 2, &quot;payer&quot;: &quot;Rly…&quot;, &quot;controller&quot;: &quot;Ctl…&quot;, &quot;verifierKey&quot;: &quot;Vfr…&quot;,
+    &quot;renewals&quot;: 0, &quot;revealed&quot;: null
+  }],
+  &quot;check&quot;: { &quot;asset&quot;: &quot;SOL&quot;, &quot;minTier&quot;: 4, &quot;minTierLabel&quot;: &quot;≥ 1,000 SOL&quot;, &quot;ok&quot;: true, &quot;reason&quot;: &quot;ok&quot; }
+}</code></pre></div>
+<p><code>check.reason</code> is one of <code>ok</code>, <code>no_certificate</code>, <code>below_tier</code>, <code>revoked_spent</code>, <code>revoked_by_holder</code>, <code>expired</code>.
+<code>status</code> is the status at <code>slot</code>: a certificate whose expiry slot has passed reads <code>expired</code> even before anyone calls
+<code>expire</code> (which closes the account and returns its rent). <code>subject</code> is <code>null</code> in lists, because the chain only holds the
+hash.</p>
+<p>The full schema, with every field, is the OpenAPI file. Import it into any client generator.</p>
+<h2 id="sdk">SDK<a class="anchor" href="#sdk" aria-label="Link to this section">#</a></h2>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz</code></pre></div>
+<p>TypeScript, ESM with types, <strong>no runtime dependencies</strong> (WebCrypto for SHA-256 and Ed25519, its own base58, PDAs and
+Borsh). Node 20+ or a modern browser. It reads the chain through any RPC you give it, so your gate does not depend on us.</p>
+<div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">import { PofClient } from &quot;@pof/sdk&quot;;
+
+const pof = new PofClient({ rpc: process.env.SOLANA_RPC! });
+
+const r = await pof.checkProofOfFunds({ subject: &quot;@anon&quot;, asset: &quot;SOL&quot;, minTier: 4 });
+if (!r.ok) throw new Error(`no: ${r.reason}`);       // as of r.slot</code></pre></div>
+<div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">await pof.lookup(&quot;wallet:7Xf…&quot;);                       // all certificates of a subject
+await pof.listCertificates({ asset: &quot;USDC&quot;, minTier: 3, status: &quot;live&quot; });
+await pof.getRoomWithMembers(roomAddress);             // members and whether each still passes
+await pof.getConfig();                                 // active verifier, fee, tiers
+await pof.getTreasury();                               // public counters and the log head anchored on chain</code></pre></div>
+<p>Account layouts come from the program's IDL, in one module, so a field the program adds is a regenerated file, not a
+code change. <code>@pof/sdk/testing</code> exports <code>MemoryRpc</code>, an in-memory chain to unit-test your own gate with live, revoked and
+expired certificates.</p>
+<h2 id="gate-an-instruction-requirecertificate">Gate an instruction: <code>require_certificate</code><a class="anchor" href="#gate-an-instruction-requirecertificate" aria-label="Link to this section">#</a></h2>
+<p>Any program can ask <code>pof</code> before it does something:</p>
+<div class="code"><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>pof::require_certificate(subject_hash: [u8; 32], asset: u8, min_tier: u8)
+accounts: [certificate]   (the PDA [&quot;cert&quot;, subject_hash, [asset]])
+returns:  CertView { subject_kind: u8, tier: u8, expiry_slot: u64, controller: Pubkey }
+fails:    NotLive · CertificateExpired · TierTooLow · AssetMismatch · BadCertificate</code></pre></div>
+<p>It checks the account's owner and PDA, the status, the expiry against the current slot, the asset and the tier. It does
+<strong>not</strong> know who is calling: compare <code>controller</code> with your signer, or anyone could use anyone's certificate.</p>
+<div class="code" data-lang="toml"><span class="code-lang">toml</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-toml">pof = { git = &quot;https://github.com/liakh10/pof&quot;, features = [&quot;cpi&quot;] }   # Anchor 1.2</code></pre></div>
+<div class="code" data-lang="rust"><span class="code-lang">rust</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-rust">#[derive(Accounts)]
+pub struct Enter&lt;'info&gt; {
+    pub user: Signer&lt;'info&gt;,
+    /// CHECK: pof checks it in the CPI
+    pub certificate: UncheckedAccount&lt;'info&gt;,
+    pub pof_program: Program&lt;'info, pof::program::Pof&gt;,
+}
+
+pub fn enter(ctx: Context&lt;Enter&gt;, subject_hash: [u8; 32]) -&gt; Result&lt;()&gt; {
+    let a = &amp;ctx.accounts;
+    let view = pof::cpi::require_certificate(
+        CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info() }),
+        subject_hash, 0 /* SOL */, 3 /* ≥ 100 SOL */,
+    )?.get();
+    require_keys_eq!(view.controller, a.user.key());
+    Ok(())
+}</code></pre></div>
+<p>To skip the CPI, <code>pof::read_certificate(&amp;info, &amp;subject_hash, asset)</code> and <code>pof::gate(&amp;cert, asset, min_tier, slot)</code> apply
+the same rule inside your program.</p>
+<p>The SDK builds the client side:</p>
+<div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">import { requireCertificateAccounts, walletSubject } from &quot;@pof/sdk&quot;;
+const { subjectHash, certificate } = await requireCertificateAccounts({ subject: walletSubject(user), asset: &quot;SOL&quot;, minTier: 3 });</code></pre></div>
+<p><strong>Hold the gate, not the moment.</strong> A certificate checked at join time can be revoked an hour later. If your program keeps
+a membership, let anyone re-check it, the way <code>pof_gate</code> does with <code>evict</code>.</p>
+<h2 id="rooms-pofgate">Rooms: <code>pof_gate</code><a class="anchor" href="#rooms-pofgate" aria-label="Link to this section">#</a></h2>
+<p><code>pof_gate</code> is a small, real program built on <code>require_certificate</code>, and the reference for using it.</p>
+<ul><li><code>create_room(id, asset, min_tier, name)</code> makes a Room at <code>[&quot;room&quot;, creator, id u64 LE]</code>.</li><li><code>join(subject_hash)</code>: the certificate's controller signs, the CPI decides, and a Member is written at
+<code>[&quot;member&quot;, room, subject_hash]</code>.</li><li><code>evict</code>: <strong>anyone</strong> can remove a member whose certificate is revoked, expired, below the room's tier, or now has another
+controller. The member's rent goes back to whoever paid it.</li><li><code>leave</code>, <code>set_room</code> (tier, open, name), <code>close_room</code>.</li></ul>
+<div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">import { joinRoomInstruction, toWeb3Instruction, walletSubject } from &quot;@pof/sdk&quot;;
+const room = await pof.getRoom(roomAddress);
+const ix = await joinRoomInstruction({ room: roomAddress, asset: room.asset, subject: walletSubject(me), payer: me, controller: me });
+tx.add(toWeb3Instruction(ix, web3));</code></pre></div>
+<p>The Telegram and Discord bots read Rooms, so one Room can gate an on-chain action, a chat and a role at once.</p>
+<h2 id="for-agents-the-mcp-server">For agents: the MCP server<a class="anchor" href="#for-agents-the-mcp-server" aria-label="Link to this section">#</a></h2>
+<p>Ask in plain language: &quot;does @anon hold 1,000 SOL?&quot;. Eight read-only tools:</p>
+<div class="table"><table><thead><tr><th>tool</th><th>what</th></tr></thead><tbody><tr><td><code>check_proof_of_funds</code></td><td>yes or no, with the reason; takes <code>min_tier</code> or <code>min_amount</code> (mapped to the smallest tier that proves it)</td></tr><tr><td><code>get_certificates</code></td><td>every certificate of a subject</td></tr><tr><td><code>list_certificates</code></td><td>certificates across subjects, filtered</td></tr><tr><td><code>get_room</code> · <code>list_rooms</code></td><td>pof_gate rooms and their members</td></tr><tr><td><code>get_stats</code></td><td>the counters</td></tr><tr><td><code>get_log_proof</code> · <code>get_log_head</code></td><td>a log entry with its verified proof; the signed head</td></tr></tbody></table></div>
+<p>Hosted, nothing to install:</p>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">claude mcp add --transport http proof-of-funds https://proofoffunds.vercel.app/mcp</code></pre></div>
+<p>Or local over stdio, reading the chain through your own RPC (no server of ours involved):</p>
+<div class="code" data-lang="json"><span class="code-lang">json</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-json">{
+  &quot;mcpServers&quot;: {
+    &quot;proof-of-funds&quot;: {
+      &quot;command&quot;: &quot;node&quot;,
+      &quot;args&quot;: [&quot;/path/to/pof/mcp/stdio.js&quot;],
+      &quot;env&quot;: { &quot;SOLANA_RPC&quot;: &quot;https://your-rpc&quot; }
+    }
+  }
+}</code></pre></div>
+<p><code>POF_API=https://proofoffunds.vercel.app/v1</code> instead of <code>SOLANA_RPC</code> makes the local server read the API. The hosted endpoint is stateless
+Streamable HTTP (POST, JSON answers), supports protocol versions 2024-11-05 to 2025-11-25, and has no sessions or keys.
+It takes batches of up to 10 messages and bodies up to 64 KB, and limits each caller's rate (HTTP 429 with
+<code>retry-after</code>). Every answer says the slot it was read at. Room names are chosen by room creators, so tool answers quote
+them and label them as untrusted text.</p>
+<h2 id="for-communities-the-bots">For communities: the bots<a class="anchor" href="#for-communities-the-bots" aria-label="Link to this section">#</a></h2>
+<p><strong>Telegram gate bot.</strong> Add the bot to a group as an admin with &quot;Invite users&quot;, then send <code>/pof_bind &lt;room address&gt;</code>.
+Make an invite link with &quot;Request admin approval&quot;. When someone asks to join, the bot approves them if the wallet, handle
+or badge they linked holds a live certificate meeting the Room; otherwise it says why. First-time requesters get a
+private link to prove control of their subject: a signature by the wallet or the badge key, or for an X handle, by the
+key that controls the handle's certificate on chain. Their pending request is approved the moment the link completes. <code>/pof_evict on</code> also removes members whose certificate
+is revoked or expires (they can ask again after renewing).</p>
+<p><strong>Discord role bot.</strong> Invite it with Manage Roles, put its role above the one it grants, and run
+<code>/pof-setup room:&lt;address&gt; role:@role</code> (the role must sit below your own highest role). Members run <code>/pof-verify</code>. The role is granted while the certificate passes and
+removed when it stops (on <code>/pof-verify</code> and by a periodic re-check).</p>
+<p>One subject links to one account per platform: linking it from a second account moves it, so a certificate cannot be
+passed around a group. Links are signed by the holder; the bots never see keys or amounts.</p>
+<h2 id="verify-the-transparency-log-yourself">Verify the transparency log yourself<a class="anchor" href="#verify-the-transparency-log-yourself" aria-label="Link to this section">#</a></h2>
+<p>Every attestation the Verifier signs is appended to a public Merkle log (RFC 9162 hashing). A leaf is 377 bytes:
+<code>0x01 ‖ the 240 attestation bytes ‖ signature ‖ verifier key ‖ bundle hash ‖ logged slot</code>. It holds no amounts, no
+openings, no nullifiers and no salts. The Verifier signs each tree head (<code>&quot;POF-STH1&quot; ‖ program id ‖ size ‖ root</code>), and
+heads are anchored on chain in the Treasury by <code>anchor_log</code>.</p>
+<div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">import { verifyLogEntry, verifyConsistency } from &quot;@pof/sdk&quot;;
+
+const base = &quot;https://proofoffunds.vercel.app/api/attest/log&quot;;
+const head  = await (await fetch(`${base}?head`)).json();
+const entry = await (await fetch(`${base}?entry=${cert.logIndex}`)).json();
+const proof = await (await fetch(`${base}?proof=${cert.logIndex}&amp;size=${head.treeSize}`)).json();
+const v = await verifyLogEntry({ leaf: entry.leaf, index: cert.logIndex, proof, head, programId: &quot;pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT&quot; });
+// v.ok, v.checks = { leafParses, attestationSigned, included, headSigned, programMatches }</code></pre></div>
+<p>Then tie the head to the chain: <code>(await pof.getTreasury()).log</code> is the last anchored <code>{ treeSize, rootHash, slot }</code>, and
+<code>GET https://proofoffunds.vercel.app/api/attest/log?consistency=&lt;anchored size&gt;&amp;size=&lt;head size&gt;</code> with <code>verifyConsistency</code> proves the current
+head extends it. <code>GET /v1/log/head</code> does these checks for you and reports them; you should still be able to run them
+without us, and you can.</p>
+<p><strong>Trust the keys from the chain, not from the log.</strong> A head or a leaf names the key that signed it, and that proves
+nothing on its own: anyone can sign a log with their own key. <code>pof.verifierKeys({ history: true })</code> returns the keys the
+program's Config lists now and every key a <code>VerifierSet</code> event ever named. <code>verifyLogEntry</code> and <code>auditLog</code> take them as
+<code>trustedKeys</code>, and fail without them; the API reports <code>keyTrusted</code> separately.</p>
+<p><strong>Match a certificate by its bytes, not by its index.</strong> <code>log_index</code> on a certificate is whatever the submitter passed to
+<code>certify</code>. <code>matchCertificateLeaf(cert, leaf)</code> compares the signed fields (subject, asset, tier, nullset hash, nonce, payer,
+controller, slots, verifier key), and <code>/v1/log/proof/{id}?certificate=&lt;address&gt;</code> does the same.</p>
+<h2 id="witnesses-anyone-can-watch-the-log">Witnesses: anyone can watch the log<a class="anchor" href="#witnesses-anyone-can-watch-the-log" aria-label="Link to this section">#</a></h2>
+<p>A witness is what Certificate Transparency calls a monitor. It polls the signed head and cosigns it only when the head:
+is signed by a key the program lists; extends the last head it saw (a consistency proof; a smaller size, or the same
+size with another root, is an alarm with both signed heads kept as evidence); and agrees with the head anchored on chain.
+With <code>--monitor</code> it also checks that every certificate on chain is backed by the log entry it names.</p>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">node witness/keygen.js                     # ~/.config/pof/witness.json, mode 600; prints only the public key
+node witness/run.js --origin https://proofoffunds.vercel.app --rpc https://your-rpc --out witness.json --loop 60 --monitor</code></pre></div>
+<p>Cosignatures are ed25519 over <code>&quot;POF-WIT1&quot; ‖ program_id ‖ tree_size ‖ root_hash ‖ timestamp</code> (88 bytes, CONTRACT §8);
+<code>verifyCosignature</code> in the SDK checks them. Publish your <code>witness.json</code> anywhere: the more independent witnesses, the
+harder it is to show two people two different logs.</p>
+<h2 id="the-command-line">The command line<a class="anchor" href="#the-command-line" aria-label="Link to this section">#</a></h2>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">node cli/pof.js check @anon --asset SOL --min-tier 4 --rpc https://your-rpc        # exit 0 yes, 1 no (with the reason)
+node cli/pof.js check wallet:7Xf… --verify-log --origin https://proofoffunds.vercel.app --rpc …         # also ties it to its signed log entry
+node cli/pof.js watch @anon --interval 10 --rpc …                                   # one line per change: tier, REVOKED, closed
+node cli/pof.js rooms &lt;room address&gt; --rpc …
+node cli/pof.js log verify --origin https://proofoffunds.vercel.app --rpc …                              # download, recompute, check the anchor</code></pre></div>
+<p>Every command takes <code>--json</code>. The CLI reads the chain through your RPC and the log through the site; it never asks our
+API what to believe.</p>
+<h2 id="show-a-certificate-on-any-page">Show a certificate on any page<a class="anchor" href="#show-a-certificate-on-any-page" aria-label="Link to this section">#</a></h2>
+<div class="code" data-lang="html"><span class="code-lang">html</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-html">&lt;script type=&quot;module&quot; src=&quot;https://proofoffunds.vercel.app/embed/pof-badge.js&quot;&gt;&lt;/script&gt;
+&lt;pof-badge subject=&quot;@anon&quot; asset=&quot;SOL&quot; min-tier=&quot;4&quot;&gt;&lt;/pof-badge&gt;</code></pre></div>
+<p>The badge reads <code>/v1</code>, refreshes every 30 seconds (<code>refresh=&quot;0&quot;</code> turns it off), and flips to <code>REVOKED · slot …</code> when the
+money moves. It fires a <code>pof-status</code> event on every change. Style it with CSS custom properties (<code>--pof-bg</code>, <code>--pof-fg</code>,
+<code>--pof-muted</code>, <code>--pof-border</code>, <code>--pof-live</code>, <code>--pof-revoked</code>, <code>--pof-font</code>, <code>--pof-mono</code>, <code>--pof-radius</code>, <code>--pof-pad</code>) or
+<code>::part(card|label|subject|tier|status|slot)</code>. Where scripts are not allowed:</p>
+<div class="code" data-lang="html"><span class="code-lang">html</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-html">&lt;iframe src=&quot;https://proofoffunds.vercel.app/embed/frame.html?subject=@anon&amp;asset=SOL&amp;min-tier=4&amp;theme=dark&quot; width=&quot;420&quot; height=&quot;56&quot; style=&quot;border:0&quot; title=&quot;Proof of Funds&quot;&gt;&lt;/iframe&gt;
+&lt;img src=&quot;https://proofoffunds.vercel.app/v1/badge/@anon.svg?asset=SOL&amp;minTier=4&quot; alt=&quot;Proof of Funds status&quot;&gt;</code></pre></div>
+<h2 id="examples">Examples<a class="anchor" href="#examples" aria-label="Link to this section">#</a></h2>
+<ul><li><code>examples/otc-desk/</code>: an Anchor program that takes orders only from a trader with a live certificate of at least
+100 SOL (one <code>require_certificate</code> CPI plus a controller check), and lets anyone close an order once its certificate is
+revoked. Its test runs on a local validator: <code>zsh examples/otc-desk/test/run.sh</code>.</li><li><code>examples/gated-page/</code>: a static page that opens for a wallet with a live certificate, using <code>@pof/sdk</code> from a CDN
+and nothing else, and the same check for a server.</li><li><code>examples/mcp/</code>: config snippets for Claude Desktop (local or hosted) and Claude Code.</li></ul>
+<h2 id="limits-and-honesty">Limits and honesty<a class="anchor" href="#limits-and-honesty" aria-label="Link to this section">#</a></h2>
+<ul><li>Live means live <strong>as of a slot</strong>. Every answer carries it. For anything that matters, read at <code>confirmed</code> or later.</li><li>A certificate is about the notes disclosed to the Verifier, at the issue slot. The Verifier saw those notes' amounts
+and kept none of them; see the security notes in /docs for what it learns and what it cannot do.</li><li>Expired certificates are closed by anyone calling <code>expire</code>. Until then they read <code>expired</code>, never <code>live</code>.</li><li><code>listCertificates</code> and <code>GET /v1/certificates</code> use <code>getProgramAccounts</code>. Public RPCs may refuse it; the per-subject
+lookup does not need it.</li></ul>
+    <nav class="docs-next" aria-label="Pages"><span></span></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-a-certificate-is">What a certificate is</a></li><li class="d2"><a href="#http-api">HTTP API</a></li><li class="d2"><a href="#sdk">SDK</a></li><li class="d2"><a href="#gate-an-instruction-requirecertificate">Gate an instruction: require_certificate</a></li><li class="d2"><a href="#rooms-pofgate">Rooms: pof_gate</a></li><li class="d2"><a href="#for-agents-the-mcp-server">For agents: the MCP server</a></li><li class="d2"><a href="#for-communities-the-bots">For communities: the bots</a></li><li class="d2"><a href="#verify-the-transparency-log-yourself">Verify the transparency log yourself</a></li><li class="d2"><a href="#witnesses-anyone-can-watch-the-log">Witnesses: anyone can watch the log</a></li><li class="d2"><a href="#the-command-line">The command line</a></li><li class="d2"><a href="#show-a-certificate-on-any-page">Show a certificate on any page</a></li><li class="d2"><a href="#examples">Examples</a></li><li class="d2"><a href="#limits-and-honesty">Limits and honesty</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

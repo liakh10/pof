@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Test report: the Privacy Rings client (browser client, lab, proxies) · Proof of Funds</title>
+<meta name="description" content="Scope: client/ (the browser client and its SDK bundle), client/server/spr-proxy.js and api/spr/[method].js (the Rings
+indexer and prover proxies), lab/ (the harness and the local validator with Privacy Rings cloned from mainnet), and the
+facts in RINGS.md. Nod">
+<link rel="canonical" href="https://proofoffunds.vercel.app/reports/rings">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Test report: the Privacy Rings client (browser client, lab, proxies) · Proof of Funds">
+<meta property="og:description" content="Scope: client/ (the browser client and its SDK bundle), client/server/spr-proxy.js and api/spr/[method].js (the Rings
+indexer and prover proxies), lab/ (the harness and the local validator with Privacy Rings cloned from mainnet), and the
+facts in RINGS.md. Nod">
+<meta property="og:url" content="https://proofoffunds.vercel.app/reports/rings">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>Test reports</summary><ol class="docs-list"><li><a href="/reports/rings" aria-current="page"><span class="n">01</span>Test report: the Privacy Rings client (browser client, lab, proxies)</a></li><li><a href="/reports/devx"><span class="n">02</span>Test report: developer surfaces (API, SDK, MCP, bots)</a></li><li><a href="/reports/audit"><span class="n">03</span>Proof of Funds: internal security review</a></li><li><a href="/reports/zk"><span class="n">04</span>Test report: phase 2, the zero-knowledge proof of funds (zk/)</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    
+    <h1 id="test-report-the-privacy-rings-client-browser-client-lab-proxies">Test report: the Privacy Rings client (browser client, lab, proxies)</h1>
+<p>Scope: <code>client/</code> (the browser client and its SDK bundle), <code>client/server/spr-proxy.js</code> and <code>api/spr/[method].js</code> (the Rings
+indexer and prover proxies), <code>lab/</code> (the harness and the local validator with Privacy Rings cloned from mainnet), and the
+facts in <code>RINGS.md</code>. Node 20, solana-cli 4.1.2 (Agave), Chrome 158 headless, <code>@heliuslabs/spr</code> 0.9.0-alpha.
+No mainnet transaction was sent for any of this. Mainnet was read only: accounts, tree roots, indexer reads.</p>
+<h2 id="summary">Summary<a class="anchor" href="#summary" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>suite</th><th>command</th><th>checks</th><th>result</th></tr></thead><tbody><tr><td>Core against mainnet data</td><td><code>cd client &amp;&amp; node --test test/core.test.mjs</code></td><td>7</td><td>pass</td></tr><tr><td>Error sentences</td><td><code>node --test test/errors.test.mjs</code></td><td>2</td><td>pass</td></tr><tr><td>Proxies, stubbed upstream</td><td><code>node --test test/proxy.test.mjs</code></td><td>6</td><td>pass</td></tr><tr><td>Whole flow on a local Rings clone, real Verifier</td><td><code>node --test test/local-e2e.mjs</code></td><td>1 run, 43 assertions</td><td>pass</td></tr><tr><td>Proxies live (devnet + mainnet, read-only)</td><td><code>node test/proxy-live.mjs</code></td><td>5</td><td>pass</td></tr><tr><td>The lab in headless Chrome</td><td><code>node lab/test/lab-e2e.mjs</code></td><td>12</td><td>pass</td></tr><tr><td>Prover attestation inside Chrome</td><td><code>node lab/test/prover-browser.mjs</code></td><td>2 networks</td><td>pass</td></tr><tr><td>Real spend on devnet</td><td><code>node test/devnet-e2e.mjs</code></td><td>7</td><td><strong>waiting for devnet SOL</strong> (owner step)</td></tr><tr><td>Mainnet facts behind RINGS.md</td><td><code>client/tools/facts/*.mjs</code></td><td>11 reads</td><td>done, 2026-11-25</td></tr></tbody></table></div>
+<h2 id="what-is-proven-and-where">What is proven, and where<a class="anchor" href="#what-is-proven-and-where" aria-label="Link to this section">#</a></h2>
+<p><strong>From public mainnet data</strong> (<code>test/vectors.json</code>, made by <code>tools/facts/vectors.mjs</code>):</p>
+<ul><li><strong>The note commitment formula.</strong> Four real SOL deposits, rebuilt from their public instruction data only (owner hash,
+amount, leaf index, <code>depositBlinding(tree, leafIndex)</code>), give exactly the leaf hashes the Helius indexer holds.</li><li><strong>Merkle paths.</strong> A 32-level state-tree path re-hashes to its root, and that root is in the tree account's on-chain
+500-root history.</li><li><strong>Spent nullifiers.</strong> A spent nullifier's PDA <code>[&quot;nullifier&quot;, tree, nf]</code> exists (owner <code>ring1…</code>, 11 bytes, first byte 8).
+None of the 55,348 such PDAs had been closed.</li><li><strong>The membership fallback.</strong> After a batch, the indexed-tree membership path (leaf <code>Poseidon(nf, next)</code>, 40 levels)
+reproduces a nullifier root held on chain.</li><li><strong>The cloned tree.</strong> The cloned tree's frontier (offset 128) with its next index reproduces its root.</li></ul>
+<p><strong>On a local validator with the Rings programs and tree 0 cloned</strong> (<code>lab/rings-local</code>), against the real Verifier
+(<code>verifier/dist</code>) reading the chain through <code>LocalRings</code>:</p>
+<ul><li><strong>The flow.</strong> Make the vault (one signature; the wallet is asked twice the first time to check it signs
+deterministically) → register it in the User Registry clone → shield 2 SOL and 3 SOL from the wallet.</li><li><strong>The rebuilt tree.</strong> <code>LocalRings</code> rebuilds both new leaves on top of the cloned frontier and checks the rebuilt root
+against the tree account before answering. Every path re-hashes to it.</li><li><strong>Note choice.</strong> Tier 1 takes the single 2 SOL note (fewest notes, then the least excess). Tier 2 (10 SOL) is
+correctly unreachable with 5 SOL.</li><li><strong>The attestation.</strong> The §4 package goes to <code>Verifier.attest</code>, which returns a 240-byte <code>POF1</code> attestation. Its
+<code>tree_root</code> equals the local tree root, its controller is the wallet, and its nullifier equals the one the client
+derived on its own.</li><li><strong>Refusals:</strong>
+<ul><li>a wrong nullifier key (<code>NULLIFIER_KEY_MISMATCH</code>);</li><li>a tier the notes do not reach (<code>BELOW_TIER</code>);</li><li>a forged ring proof (<code>BAD_RING_PROOF</code>, audit POF-02);</li><li>an X or badge certificate paid from the wallet without consent (<code>PAYER_LINKS_WALLET</code>, POF-12).</li></ul></li><li><strong>An X subject (POF-03)</strong>, with the real Linker and a stubbed fxtwitter: <code>linkStart</code> keeps the secret in the client. A
+stranger holding the public post and a guessed secret gets <code>NO_CODE</code>. <code>linkCheck</code> returns a link id bound to the
+vault's controller for the handle. The same link id with another controller is refused; with its own controller the
+Verifier attests, and the attestation's controller is that key.</li><li><strong><code>attest()</code> over HTTP.</strong> It saves a revoke kit: the salt and nullifier in clear, the openings and the badge secret
+sealed. A key built from <code>nk</code> does <strong>not</strong> open the kit (POF-10); the vault-seed key does. The badge kit's controller
+signs as the badge, and a second vault derivation gives the same vault.</li></ul>
+<p><strong>In headless Chrome</strong> (the lab page, <code>lab/serve.mjs</code>):</p>
+<ul><li><strong>The hasher.</strong> The Poseidon WASM is fetched next to the bundle (no CDN), with progress, compiled, and ready in about
+0.1 to 0.4 s on localhost (SIMD build).</li><li><strong>The page flow.</strong> The dev wallet, the vault, registration, two shields, sync (5.5 SOL), the pick, and certification
+of a wallet subject (240-byte attestation) all work from the page.</li><li><strong>The badge subject.</strong> It is refused by default without a relayer (POF-12). With &quot;pay from the wallet&quot; ticked, it is
+attested.</li><li><strong>Kits and keys.</strong> The kits are listed. The Rings derivation message (Solana off-chain message v0, <code>TSPP/derive/v1</code>)
+signs and derives. No page errors.</li><li><strong>The prover through the proxy.</strong> The SDK attests the Helius Nitro prover enclave through <code>/api/spr-prover</code>, including
+the signed TEE policy fetch the page makes itself: devnet 0.9 s, mainnet 0.5 s.</li></ul>
+<p><strong>Proxies:</strong></p>
+<ul><li><strong>Allowlists.</strong>
+<ul><li>Indexer: only its seven read methods pass.</li><li>Prover: only <code>/attestation</code>, <code>/health</code>, <code>/proving-keys</code> and <code>/prove/&lt;key&gt;[/status|/indexed]</code> pass.</li><li>Path tricks get 404: <code>../etc</code>, <code>prove/../x</code>, extra segments.</li></ul></li><li><strong>The key.</strong>
+<ul><li>It is added upstream only and scrubbed from every answer; the live check confirms the page never receives it.</li><li>A 429 rotates to the next key.</li><li>With no key configured, the answer is a clear 503 (<code>NO_KEY</code>).</li></ul></li><li><strong>Limits.</strong> A per-address window answers 429 with <code>retry-after</code>. Bodies are capped at 256 KB (indexer) and 4 MB (prover).</li><li><strong>Prover traffic.</strong> The <code>Spr-Tee*</code> headers pass both ways, the body passes byte for byte, cookies are dropped both ways.</li><li><strong>Live, read-only.</strong> On devnet and mainnet the SDK's own clients attest the prover and read a 40-level nullifier-tree
+path through the proxies.</li></ul>
+<h2 id="size-budget-gzip-what-a-first-visit-downloads">Size budget (gzip, what a first visit downloads)<a class="anchor" href="#size-budget-gzip-what-a-first-visit-downloads" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>file</th><th>gzip</th><th>budget</th><th>loads</th></tr></thead><tbody><tr><td><code>dist/spr.js</code> + shared chunk</td><td>138 KB</td><td>200 KB</td><td>the certify path</td></tr><tr><td><code>dist/hasher-simd.wasm</code></td><td>420 KB</td><td>440 KB</td><td>once, with progress (<code>hasher.wasm</code> 560 KB without WASM SIMD)</td></tr><tr><td><code>dist/web3.js</code></td><td>82 KB</td><td>110 KB</td><td>wallet transactions</td></tr><tr><td><code>dist/spr-spend.js</code></td><td>202 KB</td><td>260 KB</td><td>only for a withdrawal (the attested prover client)</td></tr></tbody></table></div>
+<p><code>npm run build</code> fails when a file passes its budget.</p>
+<h2 id="not-proven-yet">Not proven yet<a class="anchor" href="#not-proven-yet" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>A real spend on devnet.</strong> Register, shield 1.2 SOL, sync through the indexer, attest, withdraw 0.3 SOL through the
+prover, then see the spent note's PDA and a refusal from the Verifier. The script is written; it waits for 2 devnet SOL
+on the lab key (<code>_x/pof/OWNER-STEPS.md</code>, rings 2). The automated airdrops refused it (rate limit).</li><li><strong>Phantom.</strong>
+<ul><li>Whether Phantom signs the Rings derivation message (binary, off-chain header <code>0xff &quot;solana offchain&quot;</code>): owner step
+rings 1, a signature with no transaction. If it refuses, the vault path still works (plain-text signature).</li><li>Whether Phantom signs the vault message the same way twice: checked by the client itself on first use.</li></ul></li><li><strong>Withdrawal from a real browser wallet.</strong> The vault key signs it inside the page; the code path was exercised in Node
+only.</li><li>The audit fixes POF-02 (ring proof) and POF-03 (link secret) were re-run against the Verifier as committed (0387b66).</li></ul>
+<h2 id="trust-points-this-part-carries-for-docs">Trust points this part carries (for /docs)<a class="anchor" href="#trust-points-this-part-carries-for-docs" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>The nullifier key <code>nk</code>.</strong> The Verifier needs it to compute nullifiers (RINGS §5). It cannot spend and cannot decrypt
+transfers. It can see when that ring's deposits are spent and read the amounts of its merge outputs. The client
+therefore certifies from a separate vault ring and never sends anything else derived from the vault seed.</li><li><strong>The vault key and the vault message.</strong> The vault key comes from a wallet signature over a fixed message that says
+what it is. A page that obtains that signature can move the vault. When the wallet does not sign deterministically,
+the vault key is random and must be backed up with a passphrase before any shield.</li><li><strong>Linkability.</strong>
+<ul><li>The vault isolates <code>nk</code>, not identity: a shield from the wallet is a public deposit naming the vault.</li><li>X and badge certificates go through the relayer so the wallet is not the payer.</li><li>A revocation after a spend reveals the vault's spend.</li></ul></li></ul>
+    <nav class="docs-next" aria-label="Pages"><span></span><a class="next" href="/reports/devx"><span>Next</span>Test report: developer surfaces (API, SDK, MCP, bots)</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#summary">Summary</a></li><li class="d2"><a href="#what-is-proven-and-where">What is proven, and where</a></li><li class="d2"><a href="#size-budget-gzip-what-a-first-visit-downloads">Size budget (gzip, what a first visit downloads)</a></li><li class="d2"><a href="#not-proven-yet">Not proven yet</a></li><li class="d2"><a href="#trust-points-this-part-carries-for-docs">Trust points this part carries (for /docs)</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

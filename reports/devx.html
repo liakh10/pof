@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Test report: developer surfaces (API, SDK, MCP, bots) · Proof of Funds</title>
+<meta name="description" content="Scope: sdk/ (@pof/sdk 0.1.0), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js.
+Every suite below runs from a clean checkout with the commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0
+programs built from program/ at the ti">
+<link rel="canonical" href="https://proofoffunds.vercel.app/reports/devx">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Test report: developer surfaces (API, SDK, MCP, bots) · Proof of Funds">
+<meta property="og:description" content="Scope: sdk/ (@pof/sdk 0.1.0), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js.
+Every suite below runs from a clean checkout with the commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0
+programs built from program/ at the ti">
+<meta property="og:url" content="https://proofoffunds.vercel.app/reports/devx">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>Test reports</summary><ol class="docs-list"><li><a href="/reports/rings"><span class="n">01</span>Test report: the Privacy Rings client (browser client, lab, proxies)</a></li><li><a href="/reports/devx" aria-current="page"><span class="n">02</span>Test report: developer surfaces (API, SDK, MCP, bots)</a></li><li><a href="/reports/audit"><span class="n">03</span>Proof of Funds: internal security review</a></li><li><a href="/reports/zk"><span class="n">04</span>Test report: phase 2, the zero-knowledge proof of funds (zk/)</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    
+    <h1 id="test-report-developer-surfaces-api-sdk-mcp-bots">Test report: developer surfaces (API, SDK, MCP, bots)</h1>
+<p>Scope: <code>sdk/</code> (<code>@pof/sdk</code> 0.1.0), <code>api/v1/</code> and <code>api/openapi.json</code>, <code>mcp/</code> and <code>api/mcp.js</code>, <code>bots/</code> and <code>api/bots.js</code>.
+Every suite below runs from a clean checkout with the commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0
+programs built from <code>program/</code> at the time of the run.</p>
+<h2 id="summary">Summary<a class="anchor" href="#summary" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>suite</th><th>command</th><th>tests</th><th>result</th></tr></thead><tbody><tr><td>SDK unit</td><td><code>cd sdk &amp;&amp; npm test</code></td><td>16</td><td>pass</td></tr><tr><td>SDK on a local validator</td><td><code>cd sdk &amp;&amp; npm run test:local</code></td><td>7</td><td>pass</td></tr><tr><td>HTTP API</td><td><code>cd api/v1 &amp;&amp; node --test _test/</code></td><td>12</td><td>pass</td></tr><tr><td>MCP, official client</td><td><code>cd mcp &amp;&amp; npm ci &amp;&amp; npm test</code></td><td>3</td><td>pass</td></tr><tr><td>Bots against mocks</td><td><code>cd bots &amp;&amp; node --test test/</code></td><td>9</td><td>pass</td></tr><tr><td>Release tarball</td><td>fresh project, <code>npm install &lt;repo tarball URL&gt;</code>, <code>tsc --strict</code> (NodeNext), run</td><td>1</td><td>pass</td></tr></tbody></table></div>
+<h2 id="sdk-unit-16">SDK unit (16)<a class="anchor" href="#sdk-unit-16" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Base58 and PDAs against @solana/web3.js</strong> (an independent implementation): 200 random keys round-trip and encode
+identically; 40 random <code>[&quot;cert&quot;, hash, [asset]]</code> PDAs give the same address and bump as <code>findProgramAddressSync</code>;
+every generated keypair is on the curve and every PDA is off it.</li><li><strong>Subject hashes</strong> (CONTRACT §1) against <code>node:crypto</code> SHA-256: wallet, badge, X handle (case and <code>@</code> folded); a web3.js
+<code>PublicKey</code> is accepted; handles longer than 15 characters or with other symbols are refused.</li><li><strong>Subject parsing</strong>: <code>@h</code>, <code>x:h</code>, <code>wallet:</code>, <code>badge:</code>, a bare key (tried as wallet and as badge), a 64-hex hash; empty
+and garbage input refused.</li><li><strong>Tiers</strong> (CONTRACT §2): labels, asset parsing, unknown tiers refused. On the local validator the SDK's tier table is
+compared with the program's <code>Config</code> for all 10 asset-tier pairs (base units).</li><li><strong>Account layouts</strong> from the program's IDL: Certificate encode then decode, memcmp offsets of <code>asset</code> and <code>tier</code>, a wrong
+discriminator and a short buffer refused, liveness at the expiry slot exactly as the program's <code>Certificate::is_live</code>
+(live at <code>expiry_slot</code>, expired at <code>expiry_slot + 1</code>).</li><li><strong>Attestation bytes</strong> (CONTRACT §3, 240 bytes): built and parsed back field for field, offsets of <code>tier</code>, <code>root_slot</code>,
+<code>expiry_slot</code>, <code>controller</code> and <code>nonce</code> checked against the table.</li><li><strong>Transparency log</strong> (CONTRACT §7), against a reference RFC 9162 implementation written separately in the test:
+roots of every tree size 1 to 33 match; inclusion proofs for <strong>every index of every size 1 to 33</strong> verify, and fail
+with a wrong leaf, a tampered path node or a shortened path; consistency proofs for <strong>every pair of sizes up to 20</strong>
+verify and fail with a wrong old root. Signed tree heads (80 bytes) verify with a real Ed25519 key and fail with a
+changed size; a 377-byte leaf parses; <code>verifyLogEntry</code> passes end to end and fails with the wrong index, a forged
+attestation byte, or a head key outside the trusted set.</li><li><strong>Client on an in-memory chain</strong>: lookups by wallet, handle, badge, bare key and hash; every <code>checkProofOfFunds</code> reason
+(<code>ok</code>, <code>below_tier</code>, <code>expired</code>, <code>revoked_spent</code>, <code>no_certificate</code>); list filters by asset, tier, minimum tier, status
+and kind; stats; an account owned by another program at a certificate address is ignored; rooms with members and
+their live status; Config (verifier rotation applies at its slot) and Treasury counters.</li><li><strong>CPI accounts</strong>: <code>require_certificate</code> accounts and data, out-of-range tier refused; <code>pof_gate.join</code> member PDA
+checked against web3.js; conversion to a web3.js <code>TransactionInstruction</code>.</li></ul>
+<h2 id="sdk-on-a-local-validator-7">SDK on a local validator (7)<a class="anchor" href="#sdk-on-a-local-validator-7" aria-label="Link to this section">#</a></h2>
+<p>A fresh <code>solana-test-validator</code> with <code>pof.so</code> and <code>pof_gate.so</code> loaded as upgradeable programs (a throwaway upgrade
+authority), devx's own ports, 16 ticks per slot. <code>init_config</code> and <code>certify</code> are sent with the program's own IDL builder;
+everything a developer touches goes through the SDK and devx code. The validator is stopped and its ledger deleted after
+the run.</p>
+<ol><li>Program ids, Config and Treasury PDAs, active verifier, relayer, fee and all tier minimums read correctly.</li><li>Three real <code>certify</code> transactions (an Ed25519-signed 240-byte attestation each: a wallet subject paid by its holder, an
+X-handle subject paid by the relayer, a tier 1 wallet) read back through <code>lookup</code>, <code>checkProofOfFunds</code>,
+<code>listCertificates</code> (asset, tier and kind filters on a real <code>getProgramAccounts</code>) and <code>stats</code> (the Treasury's live count
+and live tier-minimum sum).</li><li><code>require_certificate</code> with the SDK's accounts and data: accepted at the certificate's tier, with the <code>CertView</code> return
+data decoded (kind, tier, controller); refused with <code>TierTooLow</code> one tier above.</li><li><code>pof_gate</code>: a room created; the wallet holder and the X-handle certificate's controller join with
+<code>joinRoomInstruction</code>; the tier 1 holder is refused with <code>TierTooLow</code>; the room reads back with its name, tier and two
+live members.</li><li><code>revoke_by_holder</code>: the SDK reads <code>revoked_by_holder</code> with the revoke slot; <code>checkProofOfFunds</code> gives that reason; the
+room shows the member as not live; a third party <code>evict</code>s it; the Treasury counts the revocation.</li><li><code>anchor_log</code>: the head computed by the SDK over the three log leaves is signed by the Verifier key and anchored; the
+Treasury holds the same size and root; every leaf's inclusion proof verifies against it.</li><li>The <code>/v1</code> router, the MCP <code>check_proof_of_funds</code> tool and the bots' gate decision all read the same chain and agree
+(<code>@localwhale</code> passes tier 5; the revoked wallet reads <code>revoked_by_holder</code>; stats and config match).</li></ol>
+<p>Not covered here: <code>revoke_spent</code> (it needs the cloned Privacy Rings program and a real nullifier PDA; the program and
+verifier suites cover it) and <code>renew</code>/<code>expire</code>.</p>
+<h2 id="http-api-12">HTTP API (12)<a class="anchor" href="#http-api-12" aria-label="Link to this section">#</a></h2>
+<p>Router tests and the real Vercel entry behind a Node HTTP server, with the chain served by a JSON-RPC mock built from the
+in-memory accounts and the log served in the Verifier's exact shape:</p>
+<ul><li>every endpoint answers with the documented shape; CORS <code>*</code> and preflight <code>204</code>; <code>405</code> for writes; cache headers per
+endpoint (<code>s-maxage</code> 5 to 300, <code>no-store</code> on upstream errors);</li><li>the gate <code>check</code> for each reason; an unknown subject is <code>200</code> with an empty list;</li><li>a clear <code>400</code> for a bad subject, an unknown asset, <code>minTier</code> without <code>asset</code>, a tier out of range, an unknown status or
+kind, a room that is not an address; <code>404</code> for unknown routes, rooms and log entries; <code>503</code> without an RPC; <code>502</code> when
+the RPC fails;</li><li>paging (<code>limit</code>, <code>cursor</code>, <code>nextCursor</code>);</li><li><code>/v1/log/proof/{id}</code> verifies all entries, and a <strong>tampered proof from the log is reported as <code>verified: false</code></strong> with
+<code>checks.included: false</code>, never passed through;</li><li>the OpenAPI file is served and lists every route.</li></ul>
+<h2 id="mcp-3">MCP (3)<a class="anchor" href="#mcp-3" aria-label="Link to this section">#</a></h2>
+<p>The official client (<code>@modelcontextprotocol/sdk</code> 1.32.2) connects over <strong>stdio</strong> (spawning <code>node mcp/stdio.js</code> against
+the JSON-RPC mock) and over <strong>Streamable HTTP</strong> (the hosted handler behind a Node server). On both: initialize, server
+info and instructions, <code>tools/list</code> (8 tools, read-only annotations), calls of every tool with yes and no answers
+(including <code>min_amount</code> mapped to a tier and the &quot;funds moved&quot; reason), tool errors returned as <code>isError</code> results, an
+unknown tool rejected, ping. Over raw HTTP: <code>GET</code> is 405, notifications are 202, CORS preflight, protocol version
+negotiation (2024-11-05 echoed, unknown versions answered with 2025-11-25), batches, a parse error is 400.</p>
+<h2 id="bots-against-mocks-9">Bots against mocks (9)<a class="anchor" href="#bots-against-mocks-9" aria-label="Link to this section">#</a></h2>
+<p>Recorded Telegram Bot API and Discord REST calls, Discord interactions signed with a real Ed25519 key, wallet link
+signatures from real Ed25519 keys, the in-memory chain.</p>
+<ul><li>Link tokens: expiry, platform and user binding, tampering refused; a short secret refused.</li><li>Telegram: the webhook secret is enforced; only admins bind a group; an unlinked requester is held and sent a personal
+link, then <strong>approved in the same call that completes the link</strong>; a linked small holder is declined with the reason; a
+linked whale is approved at once; unbound groups are left alone; <code>/start</code>, <code>/status</code>, <code>/unlink</code>.</li><li>Linking: a signature by another key, an unreadable signature, and a signature made for another user are refused; a
+subject linked from a second account moves; X handles through the Verifier's link id (good, unknown, wrong handle).</li><li>Discord: bad signatures are 401; PING answers PONG; setup needs Manage Roles and a real Room; <code>/pof-verify</code> offers a
+personal link, the link grants the role; after a revocation the sweep removes the role, and <strong>a second sweep does
+nothing</strong>; <code>/pof-verify</code> then says the funds moved; <code>/pof-unlink</code>.</li><li>Telegram sweep removes a revoked member (ban then unban, so they can ask again) only where <code>/pof_evict on</code> is set.</li><li>Paused sweep and unconfigured bots answer clearly.</li></ul>
+<p>Not covered: the live Telegram and Discord platforms (their tokens are the owner's to create; the setup scripts print
+each step's result) and Vercel Blob itself (the bots use the same private-store calls as the Verifier).</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/reports/rings"><span>Previous</span>Test report: the Privacy Rings client (browser client, lab, proxies)</a><a class="next" href="/reports/audit"><span>Next</span>Proof of Funds: internal security review</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#summary">Summary</a></li><li class="d2"><a href="#sdk-unit-16">SDK unit (16)</a></li><li class="d2"><a href="#sdk-on-a-local-validator-7">SDK on a local validator (7)</a></li><li class="d2"><a href="#http-api-12">HTTP API (12)</a></li><li class="d2"><a href="#mcp-3">MCP (3)</a></li><li class="d2"><a href="#bots-against-mocks-9">Bots against mocks (9)</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

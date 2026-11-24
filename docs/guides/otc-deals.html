@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Require a certificate before a deal · Proof of Funds</title>
+<meta name="description" content="For OTC desks and counterparties: what to ask for, how to check it, how to tie it to the person you deal with, and how to enforce it on chain.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/guides/otc-deals">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Require a certificate before a deal · Proof of Funds">
+<meta property="og:description" content="For OTC desks and counterparties: what to ask for, how to check it, how to tie it to the person you deal with, and how to enforce it on chain.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/guides/otc-deals">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals" aria-current="page"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">For OTC desks and counterparties: what to ask for, how to check it, how to tie it to the person you deal with, and how to enforce it on chain.</p>
+    <h1 id="require-a-certificate-before-a-deal">Require a certificate before a deal</h1>
+<p>A proof of funds letter before a trade is routine. A POF certificate does the same job on chain: the counterparty shows
+that a subject holds at least a tier, live, without showing a statement, a balance or a wallet history.</p>
+<h2 id="1-agree-what-you-need">1. Agree what you need<a class="anchor" href="#1-agree-what-you-need" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Asset and minimum tier.</strong> Tiers are floors: SOL 1, 10, 100, 1,000, 10,000; USDC 100, 1,000, 10,000, 100,000,
+1,000,000. Ask for the tier that covers the deal, not the exact size.</li><li><strong>The subject.</strong> A wallet, an <code>@handle</code>, or a <strong>badge</strong> made for this deal. A badge is the cleanest for one
+counterparty: it is a fresh key linked to nothing else, and it can be revoked when the deal is done.</li><li><strong>Freshness.</strong> Certificates last 216,000 slots by default and can be renewed. For a large deal, ask for one issued or
+renewed within a window you name, in slots.</li></ul>
+<h2 id="2-check-it-live">2. Check it live<a class="anchor" href="#2-check-it-live" aria-label="Link to this section">#</a></h2>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">curl -s &quot;https://&lt;site&gt;/v1/certificates/badge:&lt;key&gt;?asset=SOL&amp;minTier=4&quot;</code></pre></div>
+<p>Look at <code>check.ok</code> and <code>check.reason</code>, then at the certificate itself:</p>
+<ul><li><code>status</code> is <code>live</code> at <code>slot</code>;</li><li><code>issuedSlot</code> is recent enough for you;</li><li><code>expirySlot</code> is after the slot you expect to settle.</li></ul>
+<p>From a terminal, reading the chain through your own RPC: <code>node cli/pof.js check badge:&lt;key&gt; --asset SOL --min-tier 4
+--rpc &lt;your RPC&gt;</code> (exit code 0 means it passes). In code:</p>
+<div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">const r = await fetch(`https://&lt;site&gt;/v1/certificates/${encodeURIComponent(subject)}?asset=SOL&amp;minTier=4`).then(r =&gt; r.json());
+const c = r.certificates.find(c =&gt; c.asset === &quot;SOL&quot;);
+const ok = r.check?.ok &amp;&amp; c &amp;&amp; r.slot - c.issuedSlot &lt;= MAX_AGE_SLOTS &amp;&amp; c.expirySlot &gt; SETTLE_SLOT;</code></pre></div>
+<h2 id="3-make-sure-you-are-dealing-with-the-holder">3. Make sure you are dealing with the holder<a class="anchor" href="#3-make-sure-you-are-dealing-with-the-holder" aria-label="Link to this section">#</a></h2>
+<p>A certificate is public. Anyone can send you the address of somebody else's. Ask the counterparty to sign, with the key
+shown in the certificate as <code>controller</code>, a message you choose: your deal reference and a recent slot. For a wallet
+certificate that key is the wallet; for a badge it is the badge key; for a handle it is the certificate's own controller
+key (or ask them to post or message from the handle).</p>
+<div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">import { ed25519Verify, decodeBase58 } from &quot;@pof/sdk&quot;;
+const message = new TextEncoder().encode(`deal ${dealRef} at slot ${slot}`);
+const valid = await ed25519Verify(decodeBase58(c.controller), message, signatureBytes);</code></pre></div>
+<h2 id="4-check-again-at-settlement">4. Check again at settlement<a class="anchor" href="#4-check-again-at-settlement" aria-label="Link to this section">#</a></h2>
+<p>A certificate can be revoked between your first check and the trade. Read it again right before you settle, or keep
+<code>node cli/pof.js watch &lt;subject&gt;</code> running: it prints every status change. If the counterparty moves the certified funds,
+the certificate is revoked as soon as the spend is shown, normally by a keeper
+(<a href="/docs/revocation">Revocation</a>).</p>
+<h2 id="5-enforce-it-on-chain">5. Enforce it on chain<a class="anchor" href="#5-enforce-it-on-chain" aria-label="Link to this section">#</a></h2>
+<p>If the deal runs through your own Solana program (an escrow, an allowlist, an order book), make the program ask <code>pof</code>
+itself with one CPI:</p>
+<div class="code" data-lang="rust"><span class="code-lang">rust</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-rust">pub fn open_deal(ctx: Context&lt;OpenDeal&gt;, subject_hash: [u8; 32], settle_slot: u64) -&gt; Result&lt;()&gt; {
+    let a = &amp;ctx.accounts;
+    let view = pof::cpi::require_certificate(
+        CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info() }),
+        subject_hash, 0 /* SOL */, 4 /* ≥ 1,000 SOL */,
+    )?.get();
+    require_keys_eq!(view.controller, a.counterparty.key());   // the signer controls the certificate
+    require!(view.expiry_slot &gt;= settle_slot, DealError::CertificateEndsBeforeSettlement);
+    // ... open the deal
+    Ok(())
+}</code></pre></div>
+<p><code>require_certificate</code> fails unless the certificate is live, unexpired, of that asset and at least that tier. It does not
+know who is calling, so always compare <code>controller</code> with the signer. A check at open time can go stale: re-check at
+settlement, or let anyone close a deal whose certificate died, the way <code>pof_gate</code> lets anyone <code>evict</code>. The full CPI
+reference, the accounts and the SDK helper are in <a href="/developers">Developers</a>.</p>
+<h2 id="what-a-certificate-does-not-tell-you">What a certificate does not tell you<a class="anchor" href="#what-a-certificate-does-not-tell-you" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Ownership.</strong> It proves control of the funds' ring, not who owns them (<a href="/docs/trust">Trust points</a>, item 6).</li><li><strong>The amount or the rest of the balance.</strong> Only that the disclosed notes reach the tier.</li><li><strong>That the funds will still be there.</strong> It is live until a spend is shown. Check at settlement.</li><li><strong>Anything about the Verifier's honesty beyond the log.</strong> The Verifier sees the disclosed amounts and signs; its every
+signature is in a public log you can audit (<a href="/docs/transparency-log">The transparency log</a>).</li></ul>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/guides/gate-a-community"><span>Previous</span>Gate a Telegram group or a Discord role</a><a class="next" href="/docs/guides/revoke-renew-move"><span>Next</span>Revoke, renew, and moving your funds</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#1-agree-what-you-need">1. Agree what you need</a></li><li class="d2"><a href="#2-check-it-live">2. Check it live</a></li><li class="d2"><a href="#3-make-sure-you-are-dealing-with-the-holder">3. Make sure you are dealing with the holder</a></li><li class="d2"><a href="#4-check-again-at-settlement">4. Check again at settlement</a></li><li class="d2"><a href="#5-enforce-it-on-chain">5. Enforce it on chain</a></li><li class="d2"><a href="#what-a-certificate-does-not-tell-you">What a certificate does not tell you</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

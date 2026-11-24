@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fees and the $POF holder rule · Proof of Funds</title>
+<meta name="description" content="What a certificate costs, where the fee goes, who pays nothing, and what comes back.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/docs/fees">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Fees and the $POF holder rule · Proof of Funds">
+<meta property="og:description" content="What a certificate costs, where the fee goes, who pays nothing, and what comes back.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/docs/fees">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>The paper</summary><ol class="docs-list"><li><a href="/docs"><span class="n">01</span>Proof of Funds</a></li><li><a href="/docs/trust"><span class="n">02</span>Trust points</a></li><li><a href="/docs/motivation"><span class="n">03</span>Motivation</a></li><li><a href="/docs/system-model"><span class="n">04</span>System model</a></li><li><a href="/docs/protocol"><span class="n">05</span>The protocol</a></li><li><a href="/docs/threat-model"><span class="n">06</span>Threat model</a></li><li><a href="/docs/revocation"><span class="n">07</span>Revocation</a></li><li><a href="/docs/transparency-log"><span class="n">08</span>The transparency log</a></li><li><a href="/docs/privacy"><span class="n">09</span>Privacy guidance</a></li><li><a href="/docs/fees" aria-current="page"><span class="n">10</span>Fees and the $POF holder rule</a></li><li><a href="/docs/phase-2"><span class="n">11</span>Phase 2</a></li><li><a href="/docs/zk"><span class="n">12</span>Zero-knowledge circuit</a></li><li><a href="/docs/status"><span class="n">13</span>Status</a></li><li><a href="/docs/faq"><span class="n">14</span>FAQ</a></li><li><a href="/docs/glossary"><span class="n">15</span>Glossary</a></li><li><a href="/docs/litepaper"><span class="n">16</span>Proof of Funds, the litepaper</a></li></ol></details><details class="docs-pick" open><summary>Guides</summary><ol class="docs-list"><li><a href="/docs/guides"><span class="n">G</span>All guides</a></li><li><a href="/docs/guides/first-certificate"><span class="n">G1</span>Get your first certificate with Phantom</a></li><li><a href="/docs/guides/prove-x-handle"><span class="n">G2</span>Prove an X handle</a></li><li><a href="/docs/guides/verify-a-proof"><span class="n">G3</span>Verify someone's proof</a></li><li><a href="/docs/guides/gate-a-community"><span class="n">G4</span>Gate a Telegram group or a Discord role</a></li><li><a href="/docs/guides/otc-deals"><span class="n">G5</span>Require a certificate before a deal</a></li><li><a href="/docs/guides/revoke-renew-move"><span class="n">G6</span>Revoke, renew, and moving your funds</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    <p class="kicker">What a certificate costs, where the fee goes, who pays nothing, and what comes back.</p>
+    <h1 id="fees-and-the-pof-holder-rule">Fees and the $POF holder rule</h1>
+<h2 id="what-a-certificate-costs">What a certificate costs<a class="anchor" href="#what-a-certificate-costs" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>item</th><th>amount</th><th>goes to</th><th>comes back</th></tr></thead><tbody><tr><td>Protocol fee, per <code>certify</code> and per <code>renew</code></td><td><code>fee_lamports</code> in Config: 10,000,000 lamports (0.01 SOL) at launch</td><td>the Treasury PDA <code>[&quot;treasury&quot;]</code></td><td>no</td></tr><tr><td>Certificate account rent</td><td>the rent-exempt minimum for the account (about 0.005 SOL)</td><td>held in the certificate account</td><td>yes, to the payer, at <code>expire</code></td></tr><tr><td>Network fee</td><td>the transaction's signature and priority fee</td><td>validators</td><td>no</td></tr><tr><td>Shielding into the vault, registering the vault</td><td>Rings fees and rent (RINGS.md §6: the registry record is 0.00115824 SOL of rent)</td><td>Rings</td><td>the registry rent stays with the record</td></tr></tbody></table></div>
+<p>The admin can change the fee with <code>set_fee</code> or <code>set_params</code>, but never above <strong>250,000,000 lamports (0.25 SOL)</strong>: the cap is
+a constant in the program (<code>FEE_CAP</code>). Every change emits a <code>ConfigSet</code> event.</p>
+<p>Revocation and expiry cost only the network fee of whoever sends them. Joining a Room costs the member account's rent,
+returned when the member leaves or is evicted.</p>
+<h2 id="who-pays-no-protocol-fee">Who pays no protocol fee<a class="anchor" href="#who-pays-no-protocol-fee" aria-label="Link to this section">#</a></h2>
+<p><strong>Holders of $POF.</strong> If the payer's canonical associated token account for the root mint (the $POF mint, called
+<code>root_mint</code> in Config) holds at least <code>holder_min</code> (1,000,000 $POF at launch) at the moment of <code>certify</code> or <code>renew</code>, the
+program takes no fee and counts the call as <code>exempt</code> in the Treasury. The check reads that one account, owned by the
+payer, of that mint; tokens held elsewhere do not count. Until the root mint is set in Config, nobody is exempt.</p>
+<p><strong>Relayed certificates.</strong> When the relayer is the payer, the program charges no on-chain fee and counts the call as
+<code>relayed</code>: the holder already paid the relayer. The relayer's quote is the Config fee, the certificate rent, a
+10,000-lamport network allowance and a unique tag of 1 to 99,999 lamports that identifies the payment, all in one transfer.
+The rent of a relayed certificate returns to the relayer at <code>expire</code>.</p>
+<p>The holder rule applies to the payer, so it applies when you submit <code>certify</code> yourself. A handle or badge certificate
+submitted from your own wallet as payer gets the exemption, and names that wallet on chain as the payer: you choose
+between the fee and that link (<a href="/docs/privacy">Privacy guidance</a>).</p>
+<h2 id="where-the-fees-go">Where the fees go<a class="anchor" href="#where-the-fees-go" aria-label="Link to this section">#</a></h2>
+<p>The Treasury holds the fees above its own rent and publishes its counters: <code>fees_in</code>, <code>fees_out</code>, certificates certified,
+renewed, revoked by spend, revoked by holder, expired, live, the sum of live tier minimums by asset, relayed and exempt
+calls, and the anchored log head. <code>withdraw_fees</code> sends the surplus to the <code>dev</code> key named in Config (and only the
+surplus: the Treasury's rent stays). Each withdrawal emits <code>FeesWithdrawn</code> with the amount.</p>
+<h2 id="the-pof-token">The $POF token<a class="anchor" href="#the-pof-token" aria-label="Link to this section">#</a></h2>
+<p>$POF is the protocol's token. It is created as a plain pump.fun token; its creator fees go to the dev wallet. Its only
+role in the protocol is the holder rule above. Its address is published on the site and in this repository's config once
+it exists, and not before.</p>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/privacy"><span>Previous</span>Privacy guidance</a><a class="next" href="/docs/phase-2"><span>Next</span>Phase 2</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-a-certificate-costs">What a certificate costs</a></li><li class="d2"><a href="#who-pays-no-protocol-fee">Who pays no protocol fee</a></li><li class="d2"><a href="#where-the-fees-go">Where the fees go</a></li><li class="d2"><a href="#the-pof-token">The $POF token</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>
