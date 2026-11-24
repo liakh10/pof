@@ -43,7 +43,7 @@
 and each component is versioned on its own with <a href="https://semver.org/" rel="noopener" target="_blank">Semantic Versioning</a>. Commit hashes point into
 <a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">liakh10/pof</a>. Nothing is deployed on mainnet yet, so every component is <strong>Unreleased</strong>;
 the first release of each will move its section under a version heading with its release slot.</p>
-<div class="table"><table><thead><tr><th>component</th><th>version</th><th>where</th></tr></thead><tbody><tr><td>program (<code>pof</code>, <code>pof_gate</code>)</td><td>0.1.0</td><td><code>program/</code></td></tr><tr><td>verifier (Verifier, log, relayer, keeper, X linker)</td><td>0.1.0</td><td><code>verifier/</code>, <code>api/attest</code>, <code>api/relay</code>, <code>api/link</code>, <code>api/keeper</code></td></tr><tr><td>client</td><td>0.1.0</td><td><code>client/</code>, <code>lab/</code></td></tr><tr><td>sdk (<code>@pof/sdk</code>)</td><td>0.1.0</td><td><code>sdk/</code></td></tr><tr><td>api (<code>/v1</code>, <code>/api/status</code>, <code>/api/spr</code>)</td><td>0.1.0</td><td><code>api/</code></td></tr><tr><td>mcp</td><td>0.1.0</td><td><code>mcp/</code></td></tr><tr><td>bots</td><td>0.1.0</td><td><code>bots/</code></td></tr><tr><td>witness and cli</td><td>0.1.0</td><td><code>witness/</code>, <code>cli/</code></td></tr><tr><td>contract</td><td>§1 to §8</td><td><code>CONTRACT.md</code>, <code>RINGS.md</code></td></tr><tr><td>embed (<code>&lt;pof-badge&gt;</code>)</td><td>0.1.0</td><td><code>embed/</code></td></tr><tr><td>zk (phase 2)</td><td>in development</td><td><code>zk/</code></td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>component</th><th>version</th><th>where</th></tr></thead><tbody><tr><td>program (<code>pof</code>, <code>pof_gate</code>)</td><td>0.1.0</td><td><code>program/</code></td></tr><tr><td>verifier (Verifier, log, relayer, keeper, X linker)</td><td>0.1.0</td><td><code>verifier/</code>, <code>api/attest</code>, <code>api/relay</code>, <code>api/link</code>, <code>api/keeper</code></td></tr><tr><td>client</td><td>0.1.0</td><td><code>client/</code>, <code>lab/</code></td></tr><tr><td>sdk (<code>@pof/sdk</code>)</td><td>0.2.0</td><td><code>sdk/</code></td></tr><tr><td>api (<code>/v1</code>, <code>/api/status</code>, <code>/api/spr</code>)</td><td>0.1.0</td><td><code>api/</code></td></tr><tr><td>mcp</td><td>0.1.0</td><td><code>mcp/</code></td></tr><tr><td>bots</td><td>0.1.0</td><td><code>bots/</code></td></tr><tr><td>witness and cli</td><td>0.1.0</td><td><code>witness/</code>, <code>cli/</code></td></tr><tr><td>contract</td><td>§1 to §8</td><td><code>CONTRACT.md</code>, <code>RINGS.md</code></td></tr><tr><td>embed (<code>&lt;pof-badge&gt;</code>)</td><td>0.1.0</td><td><code>embed/</code></td></tr><tr><td>site</td><td>0.1.0</td><td>site root, <code>site/</code>, <code>ui/</code></td></tr><tr><td>zk (phase 2)</td><td>in development</td><td><code>zk/</code></td></tr></tbody></table></div>
 <h2 id="program">program<a class="anchor" href="#program" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased-010">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010" aria-label="Link to this section">#</a></h3>
 <h4 id="added">Added<a class="anchor" href="#added" aria-label="Link to this section">#</a></h4>
@@ -53,9 +53,11 @@ the first release of each will move its section under a version heading with its
 before it), <code>renew</code>, <code>revoke_spent</code> (nullifier PDA, or a nullifier-tree membership path to one of the 100 on-chain
 roots), <code>revoke_by_holder</code>, <code>expire</code>, <code>anchor_log</code> (the signed log head, only growing), <code>require_certificate</code> (CPI gate),
 <code>withdraw_fees</code>, <code>close_begin</code>, <code>close_config</code>. Fee exemption for payers holding 1,000,000 $POF and for the relayer. (<code>54aa589</code>)</li><li><code>pof_gate</code>: Rooms (<code>create_room</code>, <code>set_room</code>, <code>join</code> through <code>require_certificate</code>, permissionless <code>evict</code>, <code>leave</code>,
-<code>close_room</code>, <code>release_room</code>). No fees, no admin. (<code>54aa589</code>)</li><li>IDLs in <code>program/idl/</code>, consumed by the SDK, the Verifier and the API. (<code>54aa589</code>)</li><li><code>launch.mjs</code>, <code>wind-down.mjs</code>, <code>ops.mjs</code>; the suite, wind-down, rehearsal and own-CA tests. (<code>73d71dd</code>)</li></ul>
+<code>close_room</code>, <code>release_room</code>). No fees, no admin. (<code>54aa589</code>)</li><li>IDLs in <code>program/idl/</code>, consumed by the SDK, the Verifier and the API. (<code>54aa589</code>)</li><li><code>launch.mjs</code>, <code>wind-down.mjs</code>, <code>ops.mjs</code>; the suite, wind-down, rehearsal and own-CA tests. (<code>73d71dd</code>)</li><li><code>revoke_signed(valid_until)</code>: the controller's ed25519 signature over the 156 POF-REVOKE1 bytes, submitted and paid by
+anyone, so no wallet signs or pays a holder's revoke. (<code>b605c03</code>, <code>74654cb</code>)</li><li>The staged full-depth revoke (<code>open_path</code>, <code>stage_path</code>, <code>revoke_spent_staged</code>, <code>close_path</code>) in legacy transactions,
+tested on a real mainnet path; <code>revoke_verifier_key</code> and <code>void_by_key</code> (status 4, voided). (<code>bdfdf93</code>)</li><li>The program test report: unit 7/7, suite 32/32 twice, wind-down 7/7, rehearsal 23/23, own-CA 12/12. (<code>ad07261</code>)</li></ul>
 <h4 id="changed">Changed<a class="anchor" href="#changed" aria-label="Link to this section">#</a></h4>
-<ul><li>Config gains <code>held_delay</code> and <code>held_until</code>; IDLs refreshed. (<code>73d71dd</code>)</li></ul>
+<ul><li>Config gains <code>held_delay</code> and <code>held_until</code>; IDLs refreshed. (<code>73d71dd</code>)</li><li>Launch <code>validity_slots</code> is 216,000; the program's cap is 1,512,000 (it was 13,000,000). (<code>b605c03</code>)</li><li><code>launch.mjs</code> stops on a Verifier or relayer key mismatch; launch and wind-down never print the RPC key. (<code>74654cb</code>)</li></ul>
 <h4 id="security">Security<a class="anchor" href="#security" aria-label="Link to this section">#</a></h4>
 <ul><li>POF-07: remaking a certificate pays the prior payer the rent only; a donated surplus goes to the Treasury. POF-17: a
 lowered rotation delay waits out the old one. POF-22: <code>renew</code> refuses an expired certificate. (<code>73d71dd</code>)</li></ul>
@@ -68,12 +70,18 @@ compared and never returned. (<code>47bc6ce</code>, <code>9034e44</code>)</li><l
 create-if-absent appends. (<code>47bc6ce</code>, <code>9034e44</code>)</li><li>The relayer (quote, exact-lamport payment, rolling 24-hour cap, balance floor), the keeper (sealed kits, spend scan,
 <code>revoke_spent</code>, <code>anchor_log</code>), the X linker (fxtwitter), rate limits, error codes. (<code>47bc6ce</code>, <code>9034e44</code>)</li><li>Deterministic bundle with a published hash (<code>verifier/dist/BUILD.json</code>); the Vercel functions over it; a key script that
 writes keys to <code>~/.config/pof</code> (mode 600) and prints public keys only. (<code>47bc6ce</code>, <code>b0edfcc</code>)</li><li>Keeper escrow: every kit sealed to each keeper registered in <code>verifier/keepers.json</code> and published at
-<code>GET /api/keeper/escrow</code>; <code>scripts/witness-keeper.mjs</code>, an independent keeper in one file. (<code>035f6a6</code>)</li><li><code>renew</code> with the holder's salts. (<code>035f6a6</code>)</li><li>The keeper writes <code>keeper/last-scan.json</code> for the status page. (<code>d84df76</code>)</li></ul>
+<code>GET /api/keeper/escrow</code>; <code>scripts/witness-keeper.mjs</code>, an independent keeper in one file. (<code>035f6a6</code>)</li><li><code>renew</code> with the holder's salts. (<code>035f6a6</code>)</li><li>The keeper writes <code>keeper/last-scan.json</code> for the status page. (<code>d84df76</code>)</li><li>Relay credits: blind RSA-FDH credits bought by a private transfer to the relayer's house ring, unlinkable to the
+certificate they pay for (<code>lib/blind.mjs</code>, shared with the client); the credit key and house ring pinned per network in
+<code>lib/credit-pins.json</code>. (<code>432b0cd</code>, <code>2a36df1</code>)</li><li>The relayed revoke, <code>POST /api/relay/revoke</code>: checks the controller's POF-REVOKE1 signature and submits
+<code>revoke_signed</code>. (<code>432b0cd</code>, <code>1d05f29</code>)</li><li>The verifier test report; mainnet read-only checks and the local end-to-end with their outputs. (<code>3033364</code>, <code>641800c</code>, <code>b0ece0a</code>)</li><li><code>keys.mjs --vercel</code> pushes keys to the project env through stdin only. (<code>8c03fa9</code>)</li></ul>
 <h4 id="changed-1">Changed<a class="anchor" href="#changed-1" aria-label="Link to this section">#</a></h4>
-<ul><li>Default certificate validity is 216,000 slots (the program still accepts up to <code>validity_slots</code>). (<code>035f6a6</code>)</li><li>The Vercel build verifies that the bundle equals the published hash and fails the deploy otherwise. (<code>0387b66</code>)</li><li>Rate-limit counters are named by a keyed hash of the client address per window, swept by the keeper. (<code>d84df76</code>)</li></ul>
+<ul><li>Default certificate validity is 216,000 slots (the program still accepts up to <code>validity_slots</code>). (<code>035f6a6</code>)</li><li>The Vercel build verifies that the bundle equals the published hash and fails the deploy otherwise. (<code>0387b66</code>)</li><li>Rate-limit counters are named by a keyed hash of the client address per window, swept by the keeper. (<code>d84df76</code>)</li><li>The bundle reads only files inside <code>verifier/</code> (the IDL is vendored), and the build fails on any outside input. (<code>b35bc58</code>)</li><li>An attestation is issued at the later of the slot and tree reads, so <code>ROOT_TOO_OLD</code> cannot race. (<code>3033364</code>)</li></ul>
 <h4 id="security-1">Security<a class="anchor" href="#security-1" aria-label="Link to this section">#</a></h4>
 <ul><li>POF-02: the ring owner signs the disclosure message v2 (<code>ring.proof</code>), always. (<code>d84df76</code>)</li><li>POF-03, POF-09: an X code is redeemable only with the starter's secret; link ids are bound to the controller
-(<code>POF-LINK2</code>); a second start never cancels a first. (<code>d84df76</code>)</li><li>POF-04: note locks are atomic create-if-absent generations. (<code>d84df76</code>)</li><li>POF-05, POF-06: kits are kept per attestation until they can no longer land or their certificate dies. (<code>d84df76</code>)</li><li>POF-08: the relayer refuses before it uses a payment, and releases it on a failed <code>certify</code>. (<code>d84df76</code>)</li><li>POF-01: keeper escrow (above). (<code>035f6a6</code>)</li></ul>
+(<code>POF-LINK2</code>); a second start never cancels a first. (<code>d84df76</code>)</li><li>POF-04: note locks are atomic create-if-absent generations. (<code>d84df76</code>)</li><li>POF-05, POF-06: kits are kept per attestation until they can no longer land or their certificate dies. (<code>d84df76</code>)</li><li>POF-08: the relayer refuses before it uses a payment, and releases it on a failed <code>certify</code>. (<code>d84df76</code>)</li><li>POF-01: keeper escrow (above). (<code>035f6a6</code>)</li><li>POF-26: the X controller signs the disclosure message (<code>subject.controllerProof</code>). POF-28: lock releases are tombstone
+generations; the relayer refunds only a <code>certify</code> that surely did not land. (<code>302a98f</code>) POF-30: payment and credit
+marks are bound to the whole attestation. (<code>11b629a</code>)</li><li>CR-01 to CR-04 (credit key pinning, repeated claims, OpenSSL signing, retired keys), RV-01 (the relayed revoke checked
+against the controller, with a valid-until slot). (<code>2a36df1</code>)</li></ul>
 <h2 id="client">client<a class="anchor" href="#client" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased-010-2">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-2" aria-label="Link to this section">#</a></h3>
 <h4 id="added-2">Added<a class="anchor" href="#added-2" aria-label="Link to this section">#</a></h4>
@@ -85,20 +93,29 @@ echoed). (<code>084ea11</code>)</li></ul>
 <ul><li>POF-02: the vault key signs the disclosure message v2. POF-03: X link with the secret kept in the tab. POF-10: the kit key
 comes from the vault seed, not <code>nk</code>; old kits are re-sealed. POF-11: vault message v2 with domain, purpose and warning,
 determinism check, random vault key with a passphrase backup otherwise. POF-12: X and badge certificates go through the
-relayer, paid from the vault; a wallet payer needs explicit consent. (<code>d9bec9f</code>)</li></ul>
+relayer, paid from the vault; a wallet payer needs explicit consent. (<code>d9bec9f</code>)</li><li>Round 2: verified, cached Poseidon WASM; USDC and mixed assets end to end on the clone; note-age countdown and an
+optional random delay; structured privacy states; the random vault key kept only in a passphrase box (POF-27); the X
+controller signature (POF-26); the wallet matrix (Phantom, Solflare, Backpack, Wallet Standard, MPC-style, phones).
+(<code>542b844</code>)</li><li>Round 3: blind relay credits (claim v2), the relayed revoke. (<code>b22ca29</code>) Pinned credit key and house ring (CR-01), the
+controller's revoke signature checked before sending (RV-01). (<code>3f5c1f0</code>, <code>72ba781</code>, <code>6f8a43a</code>)</li><li>LocalRings reads version 1 transactions. (<code>5f95342</code>)</li></ul>
 <h2 id="sdk">sdk<a class="anchor" href="#sdk" aria-label="Link to this section">#</a></h2>
-<h3 id="unreleased-010-3">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-3" aria-label="Link to this section">#</a></h3>
+<h3 id="unreleased-020">[Unreleased] 0.2.0<a class="anchor" href="#unreleased-020" aria-label="Link to this section">#</a></h3>
+<h4 id="changed-2">Changed<a class="anchor" href="#changed-2" aria-label="Link to this section">#</a></h4>
+<ul><li>The IDL with the held rotation delay; log checks require <code>trustedKeys</code>; release tarball 0.2.0. (<code>6ee8fa6</code>)</li></ul>
 <h4 id="added-3">Added<a class="anchor" href="#added-3" aria-label="Link to this section">#</a></h4>
+<ul><li>Examples: an Anchor OTC desk gated by <code>require_certificate</code>, a static gated page, MCP configuration. (<code>6ee8fa6</code>)</li></ul>
+<h3 id="unreleased-010-3">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-3" aria-label="Link to this section">#</a></h3>
+<h4 id="added-4">Added<a class="anchor" href="#added-4" aria-label="Link to this section">#</a></h4>
 <ul><li><code>@pof/sdk</code>: subjects, PDAs, IDL-driven account decoding, a chain reader, RFC 9162 log proofs, CPI accounts; no runtime
 dependencies. (<code>1955110</code>, <code>82a06d2</code>)</li><li>Local-validator integration suite. (<code>7402298</code>)</li><li>README with examples and a release tarball installable from the repository. (<code>4b00ca8</code>)</li><li>Witness cosignatures (<code>cosignMessage</code>, <code>verifyCosignature</code>). (<code>39e02d9</code>)</li></ul>
-<h4 id="changed-2">Changed<a class="anchor" href="#changed-2" aria-label="Link to this section">#</a></h4>
+<h4 id="changed-3">Changed<a class="anchor" href="#changed-3" aria-label="Link to this section">#</a></h4>
 <ul><li>Expiry read as the program does: live through <code>expiry_slot</code>. (<code>4b00ca8</code>)</li></ul>
 <h4 id="security-3">Security<a class="anchor" href="#security-3" aria-label="Link to this section">#</a></h4>
 <ul><li>POF-13: log heads and entries verify only against Verifier keys from Config and the <code>VerifierSet</code> history. POF-18:
 certificates matched to log leaves by the signed bytes. (<code>39e02d9</code>)</li></ul>
 <h2 id="api">api<a class="anchor" href="#api" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased-010-4">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-4" aria-label="Link to this section">#</a></h3>
-<h4 id="added-4">Added<a class="anchor" href="#added-4" aria-label="Link to this section">#</a></h4>
+<h4 id="added-5">Added<a class="anchor" href="#added-5" aria-label="Link to this section">#</a></h4>
 <ul><li><code>/v1</code>: certificates, rooms, stats, config, verified log head and proofs; OpenAPI 3.1. (<code>c3e6f87</code>, <code>82a06d2</code>)</li><li><code>/v1/log/consistency</code>, <code>/v1/witness</code>, <code>/v1/badge/{subject}.svg</code>. (<code>39e02d9</code>)</li><li><code>/api/status</code>: RPC, program, Rings tree root age, indexer against on-chain roots, Verifier key and bundle, relayer band,
 keeper, log head signature and consistency; uptime history in Blob; the sample cron parked. (<code>c51636c</code>)</li></ul>
 <h4 id="security-4">Security<a class="anchor" href="#security-4" aria-label="Link to this section">#</a></h4>
@@ -107,50 +124,67 @@ Blob reused for 30 s, at most 6 runs a minute. POF-20 (status): the Verifier ori
 own URLs, never the Host header. (<code>55b8394</code>, <code>fb1e902</code>)</li><li>POF-20: service URLs no longer derived from the Host header when the environment is unset. (<code>39e02d9</code>)</li></ul>
 <h2 id="mcp">mcp<a class="anchor" href="#mcp" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased-010-5">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-5" aria-label="Link to this section">#</a></h3>
-<h4 id="added-5">Added<a class="anchor" href="#added-5" aria-label="Link to this section">#</a></h4>
+<h4 id="added-6">Added<a class="anchor" href="#added-6" aria-label="Link to this section">#</a></h4>
 <ul><li>MCP server with read-only tools (<code>check_proof_of_funds</code>, <code>get_certificates</code>, <code>list_certificates</code>, <code>get_room</code>,
 <code>list_rooms</code>, <code>get_stats</code>, <code>get_log_proof</code>, <code>get_log_head</code>), stdio and Streamable HTTP at <code>/mcp</code>. (<code>4d3a3e3</code>)</li></ul>
 <h4 id="security-5">Security<a class="anchor" href="#security-5" aria-label="Link to this section">#</a></h4>
 <ul><li>POF-14: batch at most 10, body at most 64 KB, per-address limit. POF-24: room names treated as untrusted. (<code>39e02d9</code>)</li></ul>
 <h2 id="bots">bots<a class="anchor" href="#bots" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased-010-6">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-6" aria-label="Link to this section">#</a></h3>
-<h4 id="added-6">Added<a class="anchor" href="#added-6" aria-label="Link to this section">#</a></h4>
+<h4 id="added-7">Added<a class="anchor" href="#added-7" aria-label="Link to this section">#</a></h4>
 <ul><li>Telegram gate bot and Discord role bot over Rooms, the <code>/link</code> page, the sweep (cron parked). (<code>413fbda</code>)</li></ul>
 <h4 id="security-6">Security<a class="anchor" href="#security-6" aria-label="Link to this section">#</a></h4>
 <ul><li>POF-03 (bot side): X subjects link only with a signature by the certificate's on-chain controller. POF-15: the sweep
 runs in turns with a cursor. POF-21: Discord role hierarchy respected. (<code>39e02d9</code>)</li></ul>
 <h2 id="embed">embed<a class="anchor" href="#embed" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased-010-7">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-7" aria-label="Link to this section">#</a></h3>
-<h4 id="added-7">Added<a class="anchor" href="#added-7" aria-label="Link to this section">#</a></h4>
+<h4 id="added-8">Added<a class="anchor" href="#added-8" aria-label="Link to this section">#</a></h4>
 <ul><li><code>&lt;pof-badge&gt;</code>: a web component that shows a subject's certificate live (REVOKED with its slot), with an iframe
 fallback. (<code>c25f503</code>)</li></ul>
 <h2 id="witness-and-cli">witness and cli<a class="anchor" href="#witness-and-cli" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased-010-8">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-8" aria-label="Link to this section">#</a></h3>
-<h4 id="added-8">Added<a class="anchor" href="#added-8" aria-label="Link to this section">#</a></h4>
+<h4 id="added-9">Added<a class="anchor" href="#added-9" aria-label="Link to this section">#</a></h4>
 <ul><li><code>witness/</code>: an independent log monitor that cosigns heads or records alarms (CONTRACT §8); certificate monitor; the
 project's witness cron parked. (<code>6780b93</code>, <code>39e02d9</code>)</li><li><code>cli/</code>: <code>pof check</code>, <code>watch</code>, <code>rooms</code>, <code>config</code>, <code>stats</code>, <code>log head|proof|verify</code> (keys and anchor read from chain).
 (<code>c4f9a99</code>)</li></ul>
+<h4 id="security-7">Security<a class="anchor" href="#security-7" aria-label="Link to this section">#</a></h4>
+<ul><li>W-01 (unlogged certificates raise an alarm, found by their signed bytes), W-02 (heads only by the active Verifier key),
+W-03 (witness gossip, split view). (<code>f359010</code>)</li></ul>
+<h2 id="site">site<a class="anchor" href="#site" aria-label="Link to this section">#</a></h2>
+<h3 id="unreleased-010-9">[Unreleased] 0.1.0<a class="anchor" href="#unreleased-010-9" aria-label="Link to this section">#</a></h3>
+<h4 id="added-10">Added<a class="anchor" href="#added-10" aria-label="Link to this section">#</a></h4>
+<ul><li>The Swiss poster system, the home page with the live certificate wall, the docs, guides, reports, changelog and
+developers pages, and the <code>/api/rpc</code> proxy. (<code>3fec3ab</code>)</li><li><code>/get</code>, <code>/c</code> with an in-browser log proof, <code>/verify</code>, <code>/log</code>, <code>/status</code>, <code>/rooms</code>; the live share card. (<code>6cf2008</code>)</li><li>The film, the restyled <code>/link</code>, the CSP; the relay credit key fingerprint checked on <code>/get</code> and shown on <code>/status</code>.
+(<code>1e9dfa2</code>, <code>982bdf0</code>, <code>d933b70</code>, <code>a4309aa</code>, <code>8008170</code>)</li></ul>
+<h4 id="changed-4">Changed<a class="anchor" href="#changed-4" aria-label="Link to this section">#</a></h4>
+<ul><li>Deploy: the static site is served from the repository root; build artefacts, research folders and local env files are
+kept out of the upload. (<code>2dfd1ea</code>, <code>7b27c21</code>, <code>0586a00</code>)</li></ul>
 <h2 id="contract">contract<a class="anchor" href="#contract" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased">[Unreleased]<a class="anchor" href="#unreleased" aria-label="Link to this section">#</a></h3>
-<h4 id="added-9">Added<a class="anchor" href="#added-9" aria-label="Link to this section">#</a></h4>
+<h4 id="added-11">Added<a class="anchor" href="#added-11" aria-label="Link to this section">#</a></h4>
 <ul><li><code>CONTRACT.md</code> §1 to §7 (<code>1e4c9d1</code>, <code>7eb3bcd</code>, <code>5e2a7ca</code>, <code>54aa589</code>, <code>457d9a3</code>); §8 log witnesses (<code>5906c78</code>).</li><li><code>RINGS.md</code>: the Privacy Rings facts POF relies on, each checked against mainnet reads (<code>1413cf0</code>, <code>f396ca5</code>, <code>084ea11</code>).</li></ul>
-<h4 id="changed-3">Changed<a class="anchor" href="#changed-3" aria-label="Link to this section">#</a></h4>
+<h4 id="changed-5">Changed<a class="anchor" href="#changed-5" aria-label="Link to this section">#</a></h4>
 <ul><li>§3: <code>controller</code> added, 240 bytes (<code>54aa589</code>). §4: <code>ring.proof</code> over the disclosure message v2, the X link with a secret
 and a bound controller; §7: the anchor is <code>anchor_log</code> (<code>0387b66</code>).</li></ul>
 <h2 id="docs-and-reports">docs and reports<a class="anchor" href="#docs-and-reports" aria-label="Link to this section">#</a></h2>
 <h3 id="unreleased-1">[Unreleased]<a class="anchor" href="#unreleased-1" aria-label="Link to this section">#</a></h3>
-<h4 id="added-10">Added<a class="anchor" href="#added-10" aria-label="Link to this section">#</a></h4>
+<h4 id="added-12">Added<a class="anchor" href="#added-12" aria-label="Link to this section">#</a></h4>
 <ul><li><code>/developers</code> content and the devx test report (<code>ec99afb</code>); the Rings client test report (<code>d449f65</code>).</li><li>The internal security review, round 1: 25 findings, failing proofs in <code>audit/test/</code> (<code>9407010</code>, <code>cf763b5</code>); round 2
-re-review: the High findings fixed and re-tested, POF-26 to POF-29 new (<code>78234b3</code>).</li><li>The protocol paper in <code>docs-src/</code> and the litepaper (<code>c0fd4df</code>, <code>0218cba</code>); <code>README.md</code>, <code>SECURITY.md</code>, <code>LICENSE</code>
-(Apache-2.0), this changelog.</li></ul>
+re-review: the High findings fixed and re-tested, POF-26 to POF-29 new (<code>78234b3</code>); round 3, the zk path (ZK-01
+Critical, ZK-02 to ZK-04 High) and the witness (<code>889cc50</code>); round 4, blind credits and the relayed revoke (<code>fb1ab58</code>).</li><li>The second internal review, <code>reports/audit2.md</code>: 11 findings (2 Medium, 4 Low, 5 Info), failing tests in
+<code>audit2/test/</code> (<code>da61cb1</code>).</li><li>Test reports: program (<code>ad07261</code>), verifier (<code>3033364</code>), Rings client round 2 (<code>b992105</code>).</li><li>The protocol paper in <code>docs-src/</code> and the litepaper (<code>c0fd4df</code>, <code>0218cba</code>); <code>README.md</code>, <code>SECURITY.md</code>, <code>LICENSE</code>
+(Apache-2.0), this changelog.</li><li>User guides in <code>docs-src/guides/</code> and a FAQ section for non-developers (<code>0296c1f</code>); the vault isolates the nullifier
+key, not identity, and what still links (<code>5e82f9f</code>, <code>893780f</code>); the validity bound, the relayed revoke and the log as a
+permanent history (A2-06, A2-09).</li></ul>
 <h2 id="zk">zk<a class="anchor" href="#zk" aria-label="Link to this section">#</a></h2>
 <p>In development (<code>zk/</code>, <code>62937c7</code>): the phase 2 Groth16 circuit (circom 2, 4 notes, the Rings Poseidon), witness and
 escrow code, parity tests against the Rings SDK and mainnet leaves, a development setup, the browser prover and the
-<code>certify_zk</code> patch for <code>pof</code>, documented in <code>docs-src/zk.md</code>. Not deployed: <code>certify_zk</code> stays off until a public
-ceremony has run. It will get its own version when it ships.</p>
+<code>certify_zk</code> patch for <code>pof</code>, documented in <code>docs-src/zk.md</code>. A development setup (2^17, with a transcript) and fixes for the round 3 findings, with
+<code>certify_zk</code> passing 12/12 on a local validator (<code>d7f850b</code>). Not deployed: <code>certify_zk</code> stays off until the findings are
+re-reviewed and a public ceremony has run. It will get its own version when it ships.</p>
     <nav class="docs-next" aria-label="Pages"><span></span></nav>
   </article>
-  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#program">program</a></li><li class="d3"><a href="#unreleased-010">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#verifier">verifier</a></li><li class="d3"><a href="#unreleased-010-1">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#client">client</a></li><li class="d3"><a href="#unreleased-010-2">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#sdk">sdk</a></li><li class="d3"><a href="#unreleased-010-3">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#api">api</a></li><li class="d3"><a href="#unreleased-010-4">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#mcp">mcp</a></li><li class="d3"><a href="#unreleased-010-5">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#bots">bots</a></li><li class="d3"><a href="#unreleased-010-6">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#embed">embed</a></li><li class="d3"><a href="#unreleased-010-7">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#witness-and-cli">witness and cli</a></li><li class="d3"><a href="#unreleased-010-8">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#contract">contract</a></li><li class="d3"><a href="#unreleased">[Unreleased]</a></li><li class="d2"><a href="#docs-and-reports">docs and reports</a></li><li class="d3"><a href="#unreleased-1">[Unreleased]</a></li><li class="d2"><a href="#zk">zk</a></li></ol></aside>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#program">program</a></li><li class="d3"><a href="#unreleased-010">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#verifier">verifier</a></li><li class="d3"><a href="#unreleased-010-1">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#client">client</a></li><li class="d3"><a href="#unreleased-010-2">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#sdk">sdk</a></li><li class="d3"><a href="#unreleased-020">[Unreleased] 0.2.0</a></li><li class="d3"><a href="#unreleased-010-3">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#api">api</a></li><li class="d3"><a href="#unreleased-010-4">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#mcp">mcp</a></li><li class="d3"><a href="#unreleased-010-5">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#bots">bots</a></li><li class="d3"><a href="#unreleased-010-6">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#embed">embed</a></li><li class="d3"><a href="#unreleased-010-7">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#witness-and-cli">witness and cli</a></li><li class="d3"><a href="#unreleased-010-8">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#site">site</a></li><li class="d3"><a href="#unreleased-010-9">[Unreleased] 0.1.0</a></li><li class="d2"><a href="#contract">contract</a></li><li class="d3"><a href="#unreleased">[Unreleased]</a></li><li class="d2"><a href="#docs-and-reports">docs and reports</a></li><li class="d3"><a href="#unreleased-1">[Unreleased]</a></li><li class="d2"><a href="#zk">zk</a></li></ol></aside>
 </div>
 </main>
 <footer class="foot">
@@ -165,7 +199,7 @@ ceremony has run. It will get its own version when it ships.</p>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">183a34daf1fa54d20002e7cc143a4023b100f324225d6dc4fcc8f1f3d6ed3dde</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">ee23bf475bd8aae2406fa04cd5b6f39e8b3be8e2612222bde129639d1bea42b0</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

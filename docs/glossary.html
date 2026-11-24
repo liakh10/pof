@@ -84,6 +84,7 @@ proves the spend.</p>
 <p><strong>Vault.</strong> The ring the client certifies from, separate from the wallet's own ring. Its spending key is derived from one
 wallet signature over the vault message (or is random, with a passphrase backup, for wallets that do not sign
 deterministically).</p>
+<p><strong>Voided.</strong> Status 4: the certificate was signed by a Verifier key the admin has since revoked (<code>void_by_key</code>).</p>
 <p><strong>Verifier.</strong> The off-chain service that checks a disclosure package and signs the attestation. Keeps no amount, opening
 or <code>nk</code>.</p>
 <p><strong>Witness.</strong> An independent monitor of the transparency log that checks each signed head against the chain and the heads
@@ -105,7 +106,7 @@ before it, cosigns it, and records alarms (CONTRACT §8).</p>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">183a34daf1fa54d20002e7cc143a4023b100f324225d6dc4fcc8f1f3d6ed3dde</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">ee23bf475bd8aae2406fa04cd5b6f39e8b3be8e2612222bde129639d1bea42b0</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

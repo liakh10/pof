@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proof of Funds: second internal security review (audit2) · Proof of Funds</title>
+<meta name="description" content="A second reviewer, working apart from the first one. The findings were written before reading
+reports/audit.md. Only then were they compared with it. There was no reports/fuzz.md at review time. Each finding below is marked new or as a
+duplicate of an audit.md">
+<link rel="canonical" href="https://proofoffunds.vercel.app/reports/audit2">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Proof of Funds: second internal security review (audit2) · Proof of Funds">
+<meta property="og:description" content="A second reviewer, working apart from the first one. The findings were written before reading
+reports/audit.md. Only then were they compared with it. There was no reports/fuzz.md at review time. Each finding below is marked new or as a
+duplicate of an audit.md">
+<meta property="og:url" content="https://proofoffunds.vercel.app/reports/audit2">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="2.5"/><circle r="37" fill="none" stroke="var(--signal)" stroke-width="8"/><circle r="26" fill="var(--ink)"/><path d="M -11 0 L -3 8 L 12 -7" stroke="var(--paper)" stroke-width="7" fill="none" stroke-linecap="square" stroke-linejoin="miter"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>Test reports</summary><ol class="docs-list"><li><a href="/reports/program"><span class="n">01</span>Program test report: pof and pofgate</a></li><li><a href="/reports/verifier"><span class="n">02</span>Test report: the Verifier, the transparency log, the relayer, the keeper and the X-handle linker</a></li><li><a href="/reports/rings"><span class="n">03</span>Test report: the Privacy Rings client (browser client, lab, proxies)</a></li><li><a href="/reports/devx"><span class="n">04</span>Test report: developer surfaces (API, SDK, MCP, bots)</a></li><li><a href="/reports/audit"><span class="n">05</span>Proof of Funds: internal security review</a></li><li><a href="/reports/zk"><span class="n">06</span>Test report: phase 2, the zero-knowledge proof of funds (zk/)</a></li><li><a href="/reports/audit2" aria-current="page"><span class="n">07</span>Proof of Funds: second internal security review (audit2)</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    
+    <h1 id="proof-of-funds-second-internal-security-review-audit2">Proof of Funds: second internal security review (audit2)</h1>
+<p>A second reviewer, working apart from the first one. The findings were written before reading
+<a href="/reports/audit"><code>reports/audit.md</code></a>. Only then were they compared with it. There was no <code>reports/fuzz.md</code> at review time. Each finding below is marked <strong>new</strong> or as a
+duplicate of an audit.md finding. This is an internal review inside the POF build, not a third-party audit.</p>
+<h2 id="1-scope">1. Scope<a class="anchor" href="#1-scope" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>Commit reviewed</td><td><code>982bdf0</code> at the start, re-checked at <code>5f95342</code> (the tests below run at <code>5f95342</code>)</td></tr><tr><td>On chain</td><td><code>program/programs/pof</code> (<code>lib.rs</code>, <code>ext.rs</code>, <code>errors.rs</code>), <code>program/programs/pof_gate</code></td></tr><tr><td>Off chain</td><td><code>verifier/src</code> (verify, rings, locks, log, merkle, keeper, escrow, relayer, credits, linker, limits, store, app), <code>verifier/lib/blind.mjs</code>, <code>witness/</code>, <code>api/*</code> (attest, relay, link, keeper, rpc, spr, card, share, bots, witness), <code>client/pof-client.js</code>, <code>client/server/spr-proxy.js</code>, <code>ui/*.js</code>, <code>vercel.json</code></td></tr><tr><td>Docs read first</td><td><code>CONTRACT.md</code>, <code>RINGS.md</code>, <code>README.md</code>, <code>docs-src/trust.md</code>, <code>docs-src/threat-model.md</code>, <code>docs-src/privacy.md</code></td></tr><tr><td>Production</td><td><code>https://proofoffunds.vercel.app</code>, read-only: about 30 requests in total, at most 3 to any one endpoint. No certificate was requested. No transaction was sent.</td></tr><tr><td>Not covered</td><td><code>zk/</code> (phase 2), <code>sdk/</code> internals, <code>mcp/</code> tools, the Helius Rings programs themselves</td></tr></tbody></table></div>
+<h2 id="2-method">2. Method<a class="anchor" href="#2-method" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Code read</strong>, line by line, for the programs, the Verifier and the client's certify and revoke paths. For each
+instruction and endpoint the question was: who can call it, what it trusts, and what it writes.</li><li><strong>Cross-checks</strong> of each byte layout between its producers and its consumers: the program, <code>verifier/src/contract.ts</code>,
+<code>client/pof-client.js</code> and <code>program/js/pof.mjs</code>. These cover the attestation, the signed tree head, the link id and the revoke bytes.</li><li><strong>Failing tests</strong> in <a href="https://github.com/liakh10/pof/blob/main/audit2/test" rel="noopener" target="_blank"><code>audit2/test/</code></a>. Run them with <code>node --test audit2/test/</code>. Each one asserts the
+intended behaviour, so it fails today and should pass once the finding is fixed. At <code>5f95342</code> all 6 fail, as intended.</li><li><strong>Production probes</strong>: response headers, error bodies, CORS, the static files served by <code>outputDirectory: &quot;.&quot;</code>, and
+whether the expensive endpoints answer an uncached random subject. The Vercel firewall configuration could not be read
+with the access available, so rate rules at the edge are <strong>unverified</strong>.</li></ul>
+<h2 id="3-findings">3. Findings<a class="anchor" href="#3-findings" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>id</th><th>severity</th><th>title</th><th>where</th><th>status</th><th>vs audit.md</th></tr></thead><tbody><tr><td>A2-01</td><td><strong>Medium</strong></td><td>The relayed holder revoke cannot land: the client signs 148 bytes and sends no <code>validUntil</code>, while the program and the relayer need 156</td><td><code>client/pof-client.js:621-645</code> vs <code>lib.rs:355-366,795-808</code>, <code>verifier/src/relayer.ts:125-133</code></td><td>open, test</td><td><strong>new</strong> (a regression of the RV-01 fix)</td></tr><tr><td>A2-02</td><td><strong>Medium</strong> (config)</td><td>Note lock (&quot;one note, one live certificate&quot;) is not tied to the Config's <code>max_attest_age</code>, and does not follow the certificate without a chain</td><td><code>verifier/src/app.ts:73-80</code>, <code>verifier/src/locks.ts:21-28</code></td><td>open, test</td><td><strong>new</strong></td></tr><tr><td>A2-03</td><td>Low</td><td>Relayer payment matching: by amount only, from any positive balance change, in the last 60 signatures</td><td><code>verifier/src/program.ts</code> <code>incoming</code>, <code>relayer.ts:28,85-95</code></td><td>open</td><td>partly <strong>dup POF-16</strong> (60-signature window); expire-refund and quote-grinding parts new</td></tr><tr><td>A2-04</td><td>Low</td><td>Cost amplification on unthrottled, uncacheable endpoints</td><td><code>api/card.js</code>, <code>api/share.js</code>, <code>api/v1</code>, <code>verifier/src/log.ts</code> <code>range</code>, <code>escrow.ts</code> <code>list</code></td><td>open</td><td>partly <strong>dup POF-14</strong> (rpc, spr, mcp); card, share, v1, log range and escrow new</td></tr><tr><td>A2-05</td><td>Low</td><td>The same blind-credit RSA key and house ring are pinned for mainnet and devnet</td><td><code>verifier/lib/credit-pins.json</code></td><td>open, test</td><td><strong>new</strong></td></tr><tr><td>A2-06</td><td>Low (privacy)</td><td>The public log and escrow keep every attempt and each subject's whole tier history</td><td><code>verify.ts:231-234</code>, <code>escrow.ts:45-52</code>, <code>app.ts</code> <code>keeperEscrow</code></td><td>open</td><td><strong>new</strong></td></tr><tr><td>A2-07</td><td>Info (privacy)</td><td>The /get flow defaults to no random delay; at today's Rings traffic the anonymity set of a handle certificate is a few deposits</td><td><code>site/pages/get.html:98</code>, <code>ui/get.js:294</code></td><td>open</td><td>partly <strong>dup POF-12 / CR-05</strong></td></tr><tr><td>A2-08</td><td>Info (privacy)</td><td>Kits keep salts, nullifiers and subject ↔ vault in plain text in <code>localStorage</code></td><td><code>client/pof-client.js:425-440</code></td><td>open</td><td><strong>new</strong></td></tr><tr><td>A2-09</td><td>Info</td><td>Docs say <code>validity_slots</code> can be 6,480,000; the program caps it at 1,512,000</td><td><code>docs-src/trust.md:88</code>, <code>faq.md:75</code>, <code>protocol.md:166,205</code></td><td>open, test</td><td><strong>new</strong></td></tr><tr><td>A2-10</td><td>Info</td><td><code>spr-proxy</code> returns the upstream response untouched (headers, unscrubbed body) whenever upstream sends <code>access-control-allow-origin</code></td><td><code>client/server/spr-proxy.js</code> (<code>sprProxy</code>, <code>proverProxy</code>)</td><td>open</td><td><strong>new</strong></td></tr><tr><td>A2-11</td><td>Info</td><td>The site root is the repository root (<code>outputDirectory: &quot;.&quot;</code>): one <code>.vercelignore</code> slip publishes local files</td><td><code>vercel.json</code>, <code>.vercelignore</code></td><td>open</td><td><strong>new</strong></td></tr></tbody></table></div>
+<p>No Critical or High finding in this round. The program review found nothing beyond what §5 lists as sound.</p>
+<h3 id="a2-01-medium-the-relayed-holder-revoke-cannot-land">A2-01 · Medium · The relayed holder revoke cannot land<a class="anchor" href="#a2-01-medium-the-relayed-holder-revoke-cannot-land" aria-label="Link to this section">#</a></h3>
+<p><strong>What.</strong> The program checks 156 bytes: <code>&quot;POF-REVOKE1&quot; ‖ program ‖ certificate ‖ subject_hash ‖ asset ‖ nullset_hash ‖
+issued_slot ‖ valid_until</code> (<code>revoke_bytes</code>, <code>revoke_signed(valid_until)</code>). Commit <code>1d05f29</code> moved the relayer to the
+same 156 bytes. A revoke without <code>validUntil</code> is now refused (<code>BAD_VALID_UNTIL</code>).</p>
+<p>The browser client did not follow. <code>revokeBytesOf</code> still builds the old 148 bytes, with no <code>valid_until</code>, and
+<code>revokeRelayed</code> posts <code>{ subjectHash, asset, signature }</code> only.</p>
+<p><strong>Impact.</strong> No X-handle or badge holder can revoke through the relayer. The other way is <code>revoke_by_holder</code>, and there
+the controller key must sign a transaction. Doing that without linking a wallet takes a funded controller, which the
+client does not set up. So &quot;revoke first, then move&quot; (the privacy guidance, and the client's own <code>REVOKE_FIRST</code>
+notice) fails for exactly the subjects it exists for. A holder then either:</p>
+<ul><li>moves the money, and the keeper's <code>revoke_spent</code> publishes the nullifier, which links the handle to the vault and so to
+the funding wallet; or</li><li>waits for the certificate to expire.</li></ul>
+<p><strong>Proof.</strong> <code>audit2/test/revoke-bytes.test.mjs</code> builds a kit and runs the client's own <code>revokeBytesOf</code>. It gets 148
+bytes, where <code>lib.rs</code> wants 156. It also shows that <code>revokeRelayed</code> sends no <code>validUntil</code>.</p>
+<p><strong>Fix.</strong></p>
+<ul><li>Client: append <code>valid_until</code> (suggested: the current slot + 1,500) to the signed bytes, and send it as <code>validUntil</code>.</li><li>Add one shared test vector to the program, the verifier and the client tests.</li></ul>
+<h3 id="a2-02-medium-configuration-note-lock-not-tied-to-the-program">A2-02 · Medium (configuration) · Note lock not tied to the program<a class="anchor" href="#a2-02-medium-configuration-note-lock-not-tied-to-the-program" aria-label="Link to this section">#</a></h3>
+<p><strong>What.</strong> <code>NoteLocks.binding</code> releases a note lock, when no live certificate holds it on chain, at
+<code>issuedSlot + certifyWindow</code>. Two things decide whether that is safe:</p>
+<ol><li><code>certifyWindow</code> comes from <code>POF_CERTIFY_WINDOW_SLOTS</code>, default 300, and nothing compares it with the Config. The admin
+can raise <code>max_attest_age</code> to 9,000 with <code>set_params</code> (<code>Params::check</code>).
+<ul><li>Say <code>max_attest_age</code> &gt; <code>certifyWindow</code>.</li><li>A holder takes an attestation for subject A and does not submit it.</li><li>After <code>certifyWindow</code> slots, the holder takes one for subject B on the same note.</li><li>Both still land: two live certificates on one note, the exact thing POF-04 closed.</li></ul></li><li><code>app.ts</code> builds the chain only when <code>POF_RELAYER_KEY</code> is set. With <code>chain = null</code>, a lock binds for <code>certifyWindow</code>
+slots only, even while A's certificate is live for a day.</li></ol>
+<p>Production has a relayer key today: <code>/api/relay/quote</code> answers <code>CHAIN_OFF</code> from the program, not <code>RELAY_OFF</code>. So point 2
+is latent there.</p>
+<p><strong>Proof.</strong> <code>audit2/test/locks.test.mjs</code>: both scenarios hand the note to B.</p>
+<p><strong>Fix.</strong></p>
+<ul><li>Read <code>max_attest_age</code> from the Config, at start-up and on each attest, and use the larger of it and the env value.</li><li>Refuse to attest, with <code>CHAIN_OFF</code>, when no chain is configured, instead of falling back to the short window.</li></ul>
+<h3 id="a2-03-low-relayer-payment-matching">A2-03 · Low · Relayer payment matching<a class="anchor" href="#a2-03-low-relayer-payment-matching" aria-label="Link to this section">#</a></h3>
+<p><code>incoming()</code> counts any positive change of the relayer's balance in a transaction the relayer did not pay for. It reads
+only the last 60 signatures, and a payment is matched by its exact amount.</p>
+<ul><li><strong>Window (dup POF-16).</strong> About 60 dust transfers (about 0.0003 SOL) push an honest payment out of view. The holder then
+gets <code>NOT_PAID</code>, and the payment is stranded.</li><li><strong>Refunds count as payments (new).</strong> <code>expire</code> on a relayer-paid certificate returns its lamports to the relayer, in a
+transaction the caller pays for. If <code>fee_lamports</code> is 0:
+<ol><li>pre-fund that certificate PDA with <code>network + tag</code> lamports;</li><li>call <code>expire</code>;</li><li>the relayer's balance change equals a quote this attacker holds, so the relayer's own rent is accepted as the
+attacker's payment.</li></ol></li><li><strong>Quote grinding (new).</strong> Quotes are not bound to anyone, and the tag has 99,999 values. An attacker who sees a pending
+payment on chain can request quotes until one matches its amount, then spend the victim's payment first. This needs on
+the order of 10^5 quote requests, behind per-instance buckets.</li></ul>
+<p><strong>Fix:</strong> a reference key per quote, Solana Pay style, put into the payment transaction and looked up with
+<code>getSignaturesForAddress(reference)</code>. Count only SystemProgram transfers whose source is not a POF PDA.</p>
+<h3 id="a2-04-low-cost-amplification">A2-04 · Low · Cost amplification<a class="anchor" href="#a2-04-low-cost-amplification" aria-label="Link to this section">#</a></h3>
+<p>These have no per-client limit in code, and a fresh subject or query string bypasses the CDN.</p>
+<div class="table"><table><thead><tr><th>endpoint</th><th>what one request costs</th></tr></thead><tbody><tr><td><code>/api/card/&lt;any&gt;.png</code></td><td>an RPC lookup and a resvg render; measured at 1.3 s and 140 KB for a random subject (<code>x-vercel-cache: MISS</code>)</td></tr><tr><td><code>/c/&lt;any&gt;</code></td><td>an RPC lookup</td></tr><tr><td><code>/v1/certificates/&lt;any&gt;</code></td><td>an RPC lookup</td></tr><tr><td><code>/api/attest/log?from=</code></td><td>up to 256 Blob reads per call, behind a 120-a-minute per-instance bucket</td></tr><tr><td><code>/api/keeper/escrow</code></td><td>a full Blob <code>list</code>, plus up to 500 Blob reads per call</td></tr></tbody></table></div>
+<p>The edge firewall could not be inspected. If it has no rule here, these are the cheapest ways to grow the Vercel and
+Helius bills.</p>
+<p><strong>Fix:</strong></p>
+<ul><li>A Firewall rate rule per IP on <code>/api/card</code>, <code>/c</code>, <code>/v1</code>, <code>/api/attest/log</code> and <code>/api/keeper/escrow</code>.</li><li>Normalise the cache key, by stripping unknown query parameters.</li><li>Cap the escrow list at about 100 entries, and cache the listing.</li></ul>
+<h3 id="a2-05-low-one-credit-key-for-two-networks">A2-05 · Low · One credit key for two networks<a class="anchor" href="#a2-05-low-one-credit-key-for-two-networks" aria-label="Link to this section">#</a></h3>
+<p><code>credit-pins.json</code> pins the same RSA modulus, <code>kid</code> and house ring for <code>mainnet</code> and <code>devnet</code>. Any devnet relayer that
+holds that key (a staging deployment, or a future devnet test of credits) will sign credits for transfers paid in faucet
+SOL. The mainnet relayer accepts those credits, because <code>Credits.spend</code> checks only <code>kid</code> and the RSA signature.
+Mainnet then pays rent and fees for them, up to the daily cap.</p>
+<p>Today the lab uses a throwaway key, so this is latent.</p>
+<p><strong>Fix:</strong> a separate key and <code>kid</code> per network. A test exists: <code>audit2/test/config.test.mjs</code>.</p>
+<h3 id="a2-06-low-the-log-is-a-permanent-public-history-of-attempts-and-tiers">A2-06 · Low · The log is a permanent public history of attempts and tiers<a class="anchor" href="#a2-06-low-the-log-is-a-permanent-public-history-of-attempts-and-tiers" aria-label="Link to this section">#</a></h3>
+<p>Every attestation the Verifier signs goes into the public log, and into the public escrow listing. This includes
+attestations that never landed on chain. Each one carries the subject hash, the asset, the tier, the issue slot, the
+payer and the controller.</p>
+<p>An X subject hash is <code>sha256(&quot;pof:x:&quot; ‖ handle)</code>, which a dictionary of handles reverses. So the log tells anyone:</p>
+<ul><li>that a given handle asked for a certificate, even if it never submitted one;</li><li>every tier it has held, through renews and remakes, long after the certificate is revoked or closed.</li></ul>
+<p>The docs say the log holds &quot;no amounts&quot;, which is true. They do not say that it holds this.</p>
+<p><strong>Fix:</strong></p>
+<ul><li>State it on the privacy page.</li><li>Consider issuing the X subject hash with a per-handle salt known to the holder. That needs a contract change, so a
+minimum fix is the docs.</li></ul>
+<h3 id="a2-07-info-default-timing">A2-07 · Info · Default timing<a class="anchor" href="#a2-07-info-default-timing" aria-label="Link to this section">#</a></h3>
+<p>The /get page defaults to &quot;Random delay: No&quot;, and the Verifier's minimum note age is 150 slots. RINGS.md measured
+about 20 tree transactions in 2,825 slots, roughly one every 140 slots. A certificate's issue slot, tier and note count
+(all public) are then consistent with only a handful of recent public deposits, and each deposit names its vault and its
+depositor.</p>
+<p><strong>Fix:</strong> turn the delay on by default, and widen it (for example 1,500 to 9,000 slots) for handle and badge subjects.</p>
+<h3 id="a2-08-info-kits-in-plain-text">A2-08 · Info · Kits in plain text<a class="anchor" href="#a2-08-info-kits-in-plain-text" aria-label="Link to this section">#</a></h3>
+<p><code>saveKit</code> seals the openings and the badge secret. It stores these in clear in <code>localStorage</code> (<code>pof:kits:v1</code>):</p>
+<ul><li><code>revoke: [{ salt, nullifier }]</code>;</li><li>the subject value, such as the handle;</li><li><code>ringOwner</code> (the vault).</li></ul>
+<p>Any script on the origin, an extension, or anyone with the device can link handle, vault and funding wallet, and can
+watch for the spend. The export file carries the same.</p>
+<p><strong>Fix:</strong> seal the whole kit except <code>attestation</code> and <code>subjectHash</code>, under <code>kitKey</code>. Keep the revoke pair recoverable
+through the vault seed.</p>
+<h3 id="a2-09-info-validity-in-the-docs">A2-09 · Info · Validity in the docs<a class="anchor" href="#a2-09-info-validity-in-the-docs" aria-label="Link to this section">#</a></h3>
+<p><code>trust.md:88</code>, <code>faq.md:75</code> and <code>protocol.md:166,205</code> give 6,480,000 slots as the program's bound. In fact
+<code>VALIDITY_MAX = 1_512_000</code> and the launch value is 216,000. A test exists: <code>audit2/test/config.test.mjs</code>.</p>
+<h3 id="a2-10-info-proxy-passthrough">A2-10 · Info · Proxy passthrough<a class="anchor" href="#a2-10-info-proxy-passthrough" aria-label="Link to this section">#</a></h3>
+<p>In <code>sprProxy</code> and <code>proverProxy</code>, the check <code>if (r.headers.get('access-control-allow-origin')) return r;</code> is meant to
+pass the proxy's own error responses through. But a real upstream response that carries that header is also returned
+as it is: every upstream header, and a body the <code>api-key</code> scrub never ran on.</p>
+<p>The production indexer answer seen in this review had the proxy's own headers, so the path did not trigger.</p>
+<p><strong>Fix:</strong> mark the proxy's own responses (a symbol, or a wrapper type), not a header the upstream can also send.</p>
+<h3 id="a2-11-info-repository-root-served-as-the-site">A2-11 · Info · Repository root served as the site<a class="anchor" href="#a2-11-info-repository-root-served-as-the-site" aria-label="Link to this section">#</a></h3>
+<p>With <code>outputDirectory: &quot;.&quot;</code>, every deployed file is public. Some examples:</p>
+<ul><li><code>/verifier/src/app.ts</code>;</li><li><code>/client/server/spr-proxy.js</code>;</li><li><code>/vercel.json</code>;</li><li><code>/.vercelignore</code>.</li></ul>
+<p>Every <code>.js</code> file in the repository also counts as a <code>'self'</code> script under the CSP.</p>
+<p>A local <code>.env.local</code> (Blob read-write token) sits in the folder. It returned 404 in production, and <code>.gitignore</code> covers
+it. But a CLI deploy relies on <code>.vercelignore</code> alone, which does not list it.</p>
+<p><strong>Fix:</strong> build the site into its own output folder, and add <code>.env*</code> to <code>.vercelignore</code>.</p>
+<h2 id="4-production-observations-read-only">4. Production observations (read-only)<a class="anchor" href="#4-production-observations-read-only" aria-label="Link to this section">#</a></h2>
+<p><strong>Response headers.</strong></p>
+<ul><li>HSTS is <code>max-age=63072000; includeSubDomains; preload</code>.</li><li>The CSP is <code>default-src 'self'</code>, scripts <code>'self' 'wasm-unsafe-eval'</code>, <code>frame-ancestors 'none'</code>.</li><li><code>X-Frame-Options: DENY</code> and <code>nosniff</code> are set on pages and APIs.</li><li>The API answers CORS <code>*</code>, as designed for public reads.</li></ul>
+<p><strong>Error bodies.</strong></p>
+<ul><li>Errors are short <code>{ error: { code, message } }</code> objects: no stack, no URL, no key.</li><li><code>/api/keeper/scan</code> without the cron secret answers 403.</li></ul>
+<p><strong>Live services before launch.</strong></p>
+<ul><li><code>/api/attest</code> and <code>/api/link/start</code> are live and sign.</li><li><code>/api/relay/quote</code> answers <code>CHAIN_OFF</code>, because the program has no Config on mainnet yet.</li><li>The log is empty and its head is signed by <code>3pmA4cQP…3ZUR</code>.</li><li>The escrow lists one keeper, <code>pof-1</code>.</li></ul>
+<p><strong>Proxies.</strong> <code>/api/rpc</code> refuses methods outside its list (for example <code>requestAirdrop</code>). <code>/api/spr</code> passes indexer
+methods with the project's key. Both are open by design, POF-14.</p>
+<p><strong>Static files.</strong> <code>/.env.local</code>, <code>/.env</code>, <code>/.vercel/project.json</code>, <code>/program/target/...</code>, <code>/lab/</code>, <code>/bench/</code> and
+<code>/fuzz/</code> all answer 404.</p>
+<h2 id="5-what-held-up">5. What held up<a class="anchor" href="#5-what-held-up" aria-label="Link to this section">#</a></h2>
+<p>Checked specifically, and found sound:</p>
+<ul><li><strong>Signature check.</strong> <code>ext::signed_before</code> accepts exactly one signature, with all offsets in the Ed25519 instruction.
+The key and the message are read from the verified offsets, and the expected bytes are rebuilt on chain from the
+instruction arguments and the payer signer.</li><li><strong>Signing domains.</strong> <code>POF1</code>, <code>POF-STH1</code>, <code>POF-LINK2</code> and <code>POF-REVOKE1</code> are separated by their first bytes, and the
+lengths are fixed.</li><li><strong>Lamports.</strong> <code>certify</code> over an existing account refuses a live certificate and a not-newer <code>issued_slot</code>. It buys
+the old payer out at exactly the rent, and moves any surplus to the treasury after the CPIs. <code>expire</code> closes the
+account to the recorded payer. The treasury counters cannot underflow.</li><li><strong>The <code>$ROOT</code> exemption.</strong> Only the canonical ATA counts. The owner, the mint, the token program and the account
+state are checked, and the account cannot be squatted. Borrowing tokens within one transaction exempts that one
+payment only.</li><li><strong><code>revoke_spent</code>.</strong>
+<ul><li>Path (a) derives the PDA from the passed tree and the nullifier, and checks owner, length and tag.</li><li>Path (b) always hashes 40 levels, with zeros filled in from a constant table that a unit test checks, and has the
+leaf index below 2^40. So a leaf of the indexed tree cannot be swapped with an internal node, even though both
+are 2-input Poseidon.</li><li>An all-zero root slot in the history would need a Poseidon preimage of zero.</li></ul></li><li><strong><code>revoke_signed</code>.</strong> It is bound to the certificate address, the nullset and the issue slot. It is checked against the
+controller, refused after <code>valid_until</code>, and refused unless the certificate is live.</li><li><strong><code>pof_gate</code>.</strong> <code>join</code> goes through the CPI with the PDA checked, and the returned controller must sign. <code>evict</code> reads
+the certificate directly and accepts only the PDA address.</li><li><strong>Verifier.</strong>
+<ul><li>It refuses a ring owner proof that is missing or wrong, and a subject or controller proof that is missing or wrong.</li><li><code>nk</code> is checked against the registry <code>npk</code>.</li><li>It recomputes the commitments with the SDK and re-hashes each 32-level path to an on-chain root.</li><li>The nullifiers are derived here. Non-inclusion is re-hashed to an on-chain nullifier root, with <code>low &lt; nf &lt; high</code>
+checked.</li><li>It refuses duplicate notes and mixed trees.</li><li><code>nk</code> is zeroed in <code>finally</code>, and nothing secret goes into an error.</li></ul></li><li><strong>Transparency log.</strong> The RFC 9162 inclusion and consistency verification matches §2.1.3.2 and §2.1.4.2. Appends are
+create-if-absent with no gaps.</li><li><strong>Blind credits.</strong>
+<ul><li>RSA-FDH with e = 65537 and a 3,072-bit modulus, signed through OpenSSL with blinding (<code>RSA_NO_PADDING</code>).</li><li>The client verifies every unblinded signature against the pinned key.</li><li>A claim is bound to the transfer signer.</li><li>A spent token is marked by create-if-absent and bound to the attestation.</li></ul></li><li><strong>Linker.</strong> It contacts only the fixed fxtwitter host (no SSRF), and the secret is needed to redeem a code.</li><li><strong>Bot webhooks.</strong> Telegram refuses when its secret is unset. Discord checks its ed25519 signature.</li><li><strong>Site scripts.</strong> Server and chain strings reach <code>innerHTML</code> only through <code>esc()</code>, including on-chain room names.</li></ul>
+<h2 id="6-residual-risks-beyond-auditmd-6">6. Residual risks (beyond audit.md §6)<a class="anchor" href="#6-residual-risks-beyond-auditmd-6" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Pre-launch keeper.</strong> The keeper and every cron are off. So a note spent between attestation and <code>certify</code> keeps its
+certificate live until expiry: one day at launch.</li><li><strong>The project's own witness.</strong> It runs in the same Vercel project with the same Blob store, so it is not independent.
+An independent witness is still needed.</li><li><strong>What the relayer key holds.</strong> The relayer key is also the house ring's spending key. Whoever reads that Vercel env
+holds both the relay float and all unspent credit revenue.</li><li><strong>Edge rate limits.</strong> Whether the edge rate-limits <code>/api/attest</code>, <code>/api/spr*</code>, <code>/mcp</code>, <code>/v1</code> and <code>/api/card</code> could
+not be confirmed (A2-04, POF-14).</li></ul>
+<h2 id="7-changes">7. Changes<a class="anchor" href="#7-changes" aria-label="Link to this section">#</a></h2>
+<ul><li>2026-11-25 · audit2 · first round: 11 findings (2 Medium, 4 Low, 5 Info), 6 failing tests in <code>audit2/test/</code>; compared with audit.md after writing.</li></ul>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/reports/zk"><span>Previous</span>Test report: phase 2, the zero-knowledge proof of funds (zk/)</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#1-scope">1. Scope</a></li><li class="d2"><a href="#2-method">2. Method</a></li><li class="d2"><a href="#3-findings">3. Findings</a></li><li class="d3"><a href="#a2-01-medium-the-relayed-holder-revoke-cannot-land">A2-01 · Medium · The relayed holder revoke cannot land</a></li><li class="d3"><a href="#a2-02-medium-configuration-note-lock-not-tied-to-the-program">A2-02 · Medium (configuration) · Note lock not tied to the program</a></li><li class="d3"><a href="#a2-03-low-relayer-payment-matching">A2-03 · Low · Relayer payment matching</a></li><li class="d3"><a href="#a2-04-low-cost-amplification">A2-04 · Low · Cost amplification</a></li><li class="d3"><a href="#a2-05-low-one-credit-key-for-two-networks">A2-05 · Low · One credit key for two networks</a></li><li class="d3"><a href="#a2-06-low-the-log-is-a-permanent-public-history-of-attempts-and-tiers">A2-06 · Low · The log is a permanent public history of attempts and tiers</a></li><li class="d3"><a href="#a2-07-info-default-timing">A2-07 · Info · Default timing</a></li><li class="d3"><a href="#a2-08-info-kits-in-plain-text">A2-08 · Info · Kits in plain text</a></li><li class="d3"><a href="#a2-09-info-validity-in-the-docs">A2-09 · Info · Validity in the docs</a></li><li class="d3"><a href="#a2-10-info-proxy-passthrough">A2-10 · Info · Proxy passthrough</a></li><li class="d3"><a href="#a2-11-info-repository-root-served-as-the-site">A2-11 · Info · Repository root served as the site</a></li><li class="d2"><a href="#4-production-observations-read-only">4. Production observations (read-only)</a></li><li class="d2"><a href="#5-what-held-up">5. What held up</a></li><li class="d2"><a href="#6-residual-risks-beyond-auditmd-6">6. Residual risks (beyond audit.md §6)</a></li><li class="d2"><a href="#7-changes">7. Changes</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">ee23bf475bd8aae2406fa04cd5b6f39e8b3be8e2612222bde129639d1bea42b0</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

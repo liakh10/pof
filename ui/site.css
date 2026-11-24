@@ -165,9 +165,9 @@ input::placeholder { color: var(--ink-3); }
 .seal .sig { transition: stroke var(--t-slow) var(--ease); }
 .seal.pulse .brk { animation: sig-pulse 1.2s var(--ease); }
 @keyframes sig-pulse { 0% { stroke-width: 22; } 100% { stroke-width: 14; } }
-/* the break opens: one clean 30° gap at the upper right */
+/* the break opens: one clean 36° gap at the upper right */
 .seal.breaking .brk.broken { animation: break-open 1100ms var(--ease) both; }
-@keyframes break-open { from { stroke-dasharray: 1130.97 0; stroke-dashoffset: -989.60; } to { stroke-dasharray: 1036.73 94.25; stroke-dashoffset: -1036.73; } }
+@keyframes break-open { from { stroke-dasharray: 1130.97 0; stroke-dashoffset: -989.60; } to { stroke-dasharray: 1017.88 113.10; stroke-dashoffset: -1046.15; } }
 .mark { flex: none; }
 
 /* ------------------------------------------------------------------ home: the poster */

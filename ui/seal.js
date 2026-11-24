@@ -4,7 +4,7 @@
 
    Geometry (viewBox units): module M = 18. The disc is 7M, the segmented ring sits at 8M, then one ring every M from 9M to
    25M. Three weights only: hair 2, mid 6, band 14. Two rings carry the signal colour: the band at 10M and the mid at 14M.
-   States: live (signal rings whole), revoked (the band at 10M opens with one clean 30° break at the upper right and turns to
+   States: live (signal rings whole), revoked (the band at 10M opens with one clean 36° break at the upper right and turns to
    ink; the mid signal ring goes to ink), expired (signal rings and disc go quiet). Motion: ui/site.css (.seal .rg draw,
    .seal .spin rotate, .seal.breaking opens the break). */
 
@@ -25,7 +25,7 @@ export const PLAN = (() => {
   }
   return out;
 })();
-export const BREAK = { at: 315, deg: 30 };   // the break: centred at 315° (upper right), 30° wide
+export const BREAK = { at: 315, deg: 36 };   // the break: centred at 315° (upper right), 36° wide
 /** stroke-dasharray / stroke-dashoffset in real lengths (no pathLength: every renderer agrees) for a ring of radius r with
     one clean gap of `deg` centred at `at` degrees (0 = 3 o'clock, clockwise) */
 export function gapDash(r, deg = BREAK.deg, at = BREAK.at) {

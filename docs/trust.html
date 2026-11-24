@@ -73,9 +73,11 @@ finding A2-06).</p>
 <h2 id="2-the-verifiers-signing-key-and-the-program-admin">2. The Verifier's signing key and the program admin<a class="anchor" href="#2-the-verifiers-signing-key-and-the-program-admin" aria-label="Link to this section">#</a></h2>
 <p>The program accepts attestations signed by one ed25519 key at a time, stored in its <code>Config</code>. The admin can:</p>
 <ul><li><strong>pause</strong> certify and renew at once (<code>set_paused</code>), for a leaked key; revocation and expiry never pause;</li><li><strong>propose a new key</strong> (<code>set_verifier</code>), which takes over only after a delay counted in slots (216,000 slots at launch,
-never fewer than 9,000), so a key cannot be swapped in quietly; anyone can read the pending key and its slot in <code>Config</code>;</li><li>set the fee, up to a hard cap of 0.25 SOL per certify or renew; set the validity between 9,000 and 1,512,000 slots;
+never fewer than 9,000), so a key cannot be swapped in quietly; anyone can read the pending key and its slot in <code>Config</code>;</li><li><p>set the fee, up to a hard cap of 0.25 SOL per certify or renew; set the validity between 9,000 and 1,512,000 slots;
 enable or disable an asset. A tier table, once set,
-cannot be changed, so an issued tier never changes meaning.</li></ul>
+cannot be changed, so an issued tier never changes meaning.</p></li><li><strong>revoke a Verifier key at once</strong> (<code>revoke_verifier_key</code>, up to 4 keys): from that slot every certificate the key signed
+stops passing <code>require_certificate</code> and Rooms, and anyone can mark each one voided (<code>void_by_key</code>). This is the remedy
+for a leaked key; it also means the admin can end every certificate one key signed, in one transaction.</li></ul>
 <p>The admin cannot sign attestations. The <code>pof</code> program is deployed with the upgradeable loader, and its upgrade
 authority is the admin key: whoever holds it can change the program. Check the current authority on chain
 (<code>solana program show pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code>); any change to it is recorded in the
@@ -151,7 +153,7 @@ with failing tests for each finding. A finding stays listed there, with its stat
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">183a34daf1fa54d20002e7cc143a4023b100f324225d6dc4fcc8f1f3d6ed3dde</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">ee23bf475bd8aae2406fa04cd5b6f39e8b3be8e2612222bde129639d1bea42b0</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

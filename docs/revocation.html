@@ -39,8 +39,8 @@
   <article class="prose" data-docs>
     <p class="kicker">The three ways a certificate ends, what each one reveals, and who can do it.</p>
     <h1 id="revocation">Revocation</h1>
-<p>A certificate ends in one of three ways. Each one is an instruction anyone can check on chain, and each one emits an event.</p>
-<div class="table"><table><thead><tr><th>how</th><th>who</th><th>when</th><th>what becomes public</th></tr></thead><tbody><tr><td><code>revoke_spent</code></td><td>anyone holding a disclosed note's salt and nullifier</td><td>a disclosed note is spent on the Rings program</td><td>that note's salt and nullifier (status 1)</td></tr><tr><td><code>revoke_by_holder</code></td><td>the certificate's controller, signing the transaction</td><td>any time</td><td>nothing beyond the revocation (status 2)</td></tr><tr><td><code>revoke_signed</code></td><td>anyone (normally the relayer) submitting the controller's signed revoke statement</td><td>any time, until the statement's <code>valid_until</code> slot</td><td>the same as <code>revoke_by_holder</code> (status 2)</td></tr><tr><td><code>expire</code></td><td>anyone</td><td>after <code>expiry_slot</code> (or during the wind-down)</td><td>nothing; the account closes and its rent goes back to its payer</td></tr></tbody></table></div>
+<p>A certificate ends in one of these ways. Each one is an instruction anyone can check on chain, and each one emits an event.</p>
+<div class="table"><table><thead><tr><th>how</th><th>who</th><th>when</th><th>what becomes public</th></tr></thead><tbody><tr><td><code>revoke_spent</code></td><td>anyone holding a disclosed note's salt and nullifier</td><td>a disclosed note is spent on the Rings program</td><td>that note's salt and nullifier (status 1)</td></tr><tr><td><code>revoke_by_holder</code></td><td>the certificate's controller, signing the transaction</td><td>any time</td><td>nothing beyond the revocation (status 2)</td></tr><tr><td><code>revoke_signed</code></td><td>anyone (normally the relayer) submitting the controller's signed revoke statement</td><td>any time, until the statement's <code>valid_until</code> slot</td><td>the same as <code>revoke_by_holder</code> (status 2)</td></tr><tr><td><code>expire</code></td><td>anyone</td><td>after <code>expiry_slot</code> (or during the wind-down)</td><td>nothing; the account closes and its rent goes back to its payer</td></tr><tr><td><code>void_by_key</code></td><td>anyone</td><td>after the admin revoked the Verifier key that signed it (<code>revoke_verifier_key</code>)</td><td>that its signing key was revoked (status 4, voided)</td></tr></tbody></table></div>
 <p>A certificate whose status byte is still &quot;live&quot; but whose <code>expiry_slot</code> has passed reads as <strong>expired</strong> everywhere (the
 program's gate, the SDK, the API) before anyone calls <code>expire</code>.</p>
 <h2 id="revokespent-proving-a-spend-from-chain-state">revoke_spent: proving a spend from chain state<a class="anchor" href="#revokespent-proving-a-spend-from-chain-state" aria-label="Link to this section">#</a></h2>
@@ -54,9 +54,14 @@ program: 11 bytes, first byte 8. The program checks the account at that address 
 <p><strong>(b) The nullifier tree.</strong> The pool may later close nullifier PDAs once their batch is folded into the indexed nullifier
 tree (height 40). Then the caller passes <code>membership = { leaf_index, next_value, path }</code>: the leaf
 <code>Poseidon(nullifier, next_value)</code> and its siblings must hash to one of the 100 nullifier roots stored at offset 17,232 of
-the tree account. About 35,000 compute units with the Poseidon syscall. A full 40-level path does not fit a legacy
-transaction; a staged variant that writes the path into a buffer account over two transactions (<code>open_path</code>,
-<code>stage_path</code>, <code>revoke_spent_staged</code>) is being added to the program (CONTRACT §5 (b')).</p>
+the tree account. About 35,000 compute units with the Poseidon syscall.</p>
+<p><strong>(b') The staged path.</strong> A full 40-level path does not fit a legacy transaction, so it can also be written in steps:
+<code>open_path</code> creates the revoker's own buffer account <code>[&quot;path&quot;, revoker, certificate]</code> with the nullifier, its next value,
+its leaf index and the first 20 siblings; <code>stage_path</code> adds the other 20; <code>revoke_spent_staged(index, salt)</code> hashes all
+40 levels to a root, requires it to be one of the 100 nullifier roots the tree account holds at that moment, checks the
+salted hash, revokes, and closes the buffer (its rent back to the revoker). Each step is a legacy transaction (about
+22,600, 5,300 and 68,400 compute units). Only the revoker writes its buffer; <code>close_path</code> drops it. It was tested
+against a real mainnet path.</p>
 <p>An absent or closed PDA is never read as &quot;unspent&quot;; there is no path that trusts a statement from the Verifier or from us.</p>
 <p>After the revocation, <code>revealed_index</code>, <code>revealed_salt</code> and <code>revealed_nullifier</code> are set on the certificate and in the
 <code>Revoked</code> event (with <code>path</code> 0 for the PDA, 1 for the tree). Anyone can then check that the revealed nullifier is the one
@@ -102,6 +107,12 @@ does it at <code>POST /api/relay/revoke</code> after checking the signature agai
 names the certificate's own values, so it cannot revoke a renewed or remade certificate, and it is refused once the slot
 is past <code>valid_until</code> (the client suggests the current slot plus 1,500), so a signed revoke cannot be held back and used
 later.</p>
+<h2 id="voidbykey-when-a-verifier-key-is-revoked">void_by_key: when a Verifier key is revoked<a class="anchor" href="#voidbykey-when-a-verifier-key-is-revoked" aria-label="Link to this section">#</a></h2>
+<p>If a Verifier key leaks, or is retired after a rotation, the admin calls <code>revoke_verifier_key(key)</code> (up to 4 revoked keys
+are kept in Config). From that slot the key signs nothing the program accepts, and <strong>every certificate it signed fails
+<code>require_certificate</code> and Rooms at once</strong>, whether or not anyone has touched it yet. Anyone may then call <code>void_by_key</code> on
+each such certificate to mark it voided (status 4) and update the Treasury's counters. A holder whose certificate was
+voided this way certifies again with the current key; the notes are unaffected.</p>
 <h2 id="expire">expire<a class="anchor" href="#expire" aria-label="Link to this section">#</a></h2>
 <p>After <code>expiry_slot</code>, anyone may call <code>expire</code>. The account closes and its rent goes back to the certificate's payer:
 the wallet for a wallet certificate, the relayer for a relayed one. During a wind-down (<code>close_begin</code>), anyone may expire
@@ -114,10 +125,10 @@ and has the same controller. When any of that stops being true, anyone may <code
 certificate account directly (no CPI), so a closed certificate evicts too. The bots remove the member from the chat on
 their sweep after launch.</p>
 <h2 id="what-a-reader-should-conclude">What a reader should conclude<a class="anchor" href="#what-a-reader-should-conclude" aria-label="Link to this section">#</a></h2>
-<div class="table"><table><thead><tr><th>the reader sees</th><th>it means</th></tr></thead><tbody><tr><td>live, slot ≤ expiry</td><td>the Verifier checked the notes at <code>issued_slot</code>, and no spend of them has been shown since</td></tr><tr><td>revoked_spent at slot s</td><td>a disclosed note was spent at or before s, proven from the Rings accounts</td></tr><tr><td>revoked_by_holder at slot s</td><td>the controller withdrew it at s</td></tr><tr><td>expired</td><td>the attestation is older than its validity; the notes were not re-checked</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>the reader sees</th><th>it means</th></tr></thead><tbody><tr><td>live, slot ≤ expiry</td><td>the Verifier checked the notes at <code>issued_slot</code>, and no spend of them has been shown since</td></tr><tr><td>revoked_spent at slot s</td><td>a disclosed note was spent at or before s, proven from the Rings accounts</td></tr><tr><td>revoked_by_holder at slot s</td><td>the controller withdrew it at s</td></tr><tr><td>expired</td><td>the attestation is older than its validity; the notes were not re-checked</td></tr><tr><td>voided at slot s</td><td>the Verifier key that signed it was revoked by the admin; it says nothing about the notes</td></tr></tbody></table></div>
     <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/threat-model"><span>Previous</span>Threat model</a><a class="next" href="/docs/transparency-log"><span>Next</span>The transparency log</a></nav>
   </article>
-  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#revokespent-proving-a-spend-from-chain-state">revoke_spent: proving a spend from chain state</a></li><li class="d2"><a href="#who-holds-the-pairs">Who holds the pairs</a></li><li class="d2"><a href="#what-a-revocation-by-spend-reveals">What a revocation by spend reveals</a></li><li class="d2"><a href="#revokebyholder">revoke_by_holder</a></li><li class="d2"><a href="#revokesigned-a-holders-revoke-with-no-wallet-in-it">revoke_signed: a holder's revoke with no wallet in it</a></li><li class="d2"><a href="#expire">expire</a></li><li class="d2"><a href="#rooms-follow-the-certificate">Rooms follow the certificate</a></li><li class="d2"><a href="#what-a-reader-should-conclude">What a reader should conclude</a></li></ol></aside>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#revokespent-proving-a-spend-from-chain-state">revoke_spent: proving a spend from chain state</a></li><li class="d2"><a href="#who-holds-the-pairs">Who holds the pairs</a></li><li class="d2"><a href="#what-a-revocation-by-spend-reveals">What a revocation by spend reveals</a></li><li class="d2"><a href="#revokebyholder">revoke_by_holder</a></li><li class="d2"><a href="#revokesigned-a-holders-revoke-with-no-wallet-in-it">revoke_signed: a holder's revoke with no wallet in it</a></li><li class="d2"><a href="#voidbykey-when-a-verifier-key-is-revoked">void_by_key: when a Verifier key is revoked</a></li><li class="d2"><a href="#expire">expire</a></li><li class="d2"><a href="#rooms-follow-the-certificate">Rooms follow the certificate</a></li><li class="d2"><a href="#what-a-reader-should-conclude">What a reader should conclude</a></li></ol></aside>
 </div>
 </main>
 <footer class="foot">
@@ -132,7 +143,7 @@ their sweep after launch.</p>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">183a34daf1fa54d20002e7cc143a4023b100f324225d6dc4fcc8f1f3d6ed3dde</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">ee23bf475bd8aae2406fa04cd5b6f39e8b3be8e2612222bde129639d1bea42b0</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>
