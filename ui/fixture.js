@@ -30,7 +30,7 @@ export async function fixtureSource() {
   const sign = async m => new Uint8Array(await crypto.subtle.sign({ name: 'Ed25519' }, kp.privateKey, m));
   const relayer = key();
   const bundle = await sdk.sha256('pof-verifier fixture bundle');
-  await rpc.putConfig({ admin: key(), dev: key(), relayer, verifier, next_verifier: DEFAULT, root_mint: DEFAULT, params: { fee_lamports: 20_000_000, holder_min: 1_000_000_000_000, validity_slots: 6_480_000, max_attest_age: 300, max_root_lag: 9000, rotation_delay: 216_000 } }, PROGRAM);
+  await rpc.putConfig({ admin: key(), dev: key(), relayer, verifier, next_verifier: DEFAULT, root_mint: DEFAULT, params: { fee_lamports: 20_000_000, holder_min: 1_000_000_000_000, validity_slots: 216_000, max_attest_age: 300, max_root_lag: 9000, rotation_delay: 216_000 } }, PROGRAM);
 
   // the log: leaves and their hashes
   const leaves = [], leafHashes = [];
@@ -44,7 +44,7 @@ export async function fixtureSource() {
     const nullset = await sdk.sha256(...hashes);
     const nonce = sdk.toHex(bytes(16));
     const issued = at - 12;
-    const expiry = issued + 6_480_000;
+    const expiry = issued + 216_000;
     const att = sdk.buildAttestation({ programId: PROGRAM, subjectKind: kind, subjectHash: sdk.toHex(hash), asset, tier, treeRoot: sdk.toHex(bytes(32)), rootSlot: issued - 40, noteCount: notes, nullsetHash: sdk.toHex(nullset), issuedSlot: issued, expirySlot: expiry, payer: payer || (kind === 0 ? value : relayer), controller, nonce });
     const sig = await sign(att);
     const slotLe = new Uint8Array(8); new DataView(slotLe.buffer).setBigUint64(0, BigInt(issued), true);
@@ -71,13 +71,13 @@ export async function fixtureSource() {
     const asset = rnd() < 0.68 ? 0 : 1;
     const tier = pick([1, 2, 2, 3, 3, 3, 4, 4, 5]);
     const kind = pick([0, 0, 1, 1, 1, 2]);
-    plan.push({ kind, asset, tier, at: SLOT0 - Math.floor(rnd() * 600_000) - 500 });
+    plan.push({ kind, asset, tier, at: SLOT0 - Math.floor(rnd() * 190_000) - 500 });
   }
   plan.sort((a, b) => a.at - b.at);
   for (const p of plan) {
     const r = rnd();
-    if (r < 0.16) await addCertificate({ ...p, status: 1, revokedAt: p.at + Math.floor(rnd() * 90_000) });
-    else if (r < 0.22) await addCertificate({ ...p, status: 2, revokedAt: p.at + Math.floor(rnd() * 90_000) });
+    if (r < 0.16) await addCertificate({ ...p, status: 1, revokedAt: p.at + Math.floor(rnd() * 20_000) });
+    else if (r < 0.22) await addCertificate({ ...p, status: 2, revokedAt: p.at + Math.floor(rnd() * 20_000) });
     else await addCertificate(p);
   }
 
@@ -195,7 +195,7 @@ export async function fixtureSource() {
       },
       async witness() { throw fail('not_found', 'no witness has published yet'); },
     },
-    async verifierFacts() { return { verifierKey: verifier, relayer, bundleHash: sdk.toHex(bundle), minAgeSlots: 150, validitySlots: 6_480_000, assets: {} }; },
+    async verifierFacts() { return { verifierKey: verifier, relayer, bundleHash: sdk.toHex(bundle), minAgeSlots: 150, validitySlots: 216_000, assets: {} }; },
     chain: () => client,
     rpc: async (method) => { if (method === 'getSlot') return now(); throw fail('rpc', 'not in the fixture'); },
   };
