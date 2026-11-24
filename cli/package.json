@@ -1,0 +1,10 @@
+{
+  "name": "@pof/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "pof: check Proof of Funds certificates, rooms and the transparency log from a terminal. Reads the chain through your RPC; no runtime dependencies.",
+  "type": "module",
+  "bin": { "pof": "./pof.js" },
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/" }
+}
