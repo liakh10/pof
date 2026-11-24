@@ -251,11 +251,16 @@ export async function logGet(base, qs, f = fetch) {
   return p;
 }
 
+/** server-to-server reads of the log skip its public per-IP limit with the shared internal secret (env only) */
+export function internalHeaders(env = process.env) {
+  return env.POF_INTERNAL_SECRET ? { accept: "application/json", "x-pof-internal": env.POF_INTERNAL_SECRET } : { accept: "application/json" };
+}
+
 async function logFetch(base, qs, f = fetch) {
   logStats.fetched++;
   let res;
   try {
-    res = await f(`${base}?${qs}`, { headers: { accept: "application/json" } });
+    res = await f(`${base}?${qs}`, { headers: internalHeaders() });
   } catch {
     throw new HttpError(502, "log_unreachable", "the transparency log did not answer");
   }

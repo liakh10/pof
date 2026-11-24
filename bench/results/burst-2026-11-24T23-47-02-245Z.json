@@ -1,0 +1,167 @@
+[
+  {
+    "name": "mcp: 300 calls from ONE ip, 50 at once",
+    "requests": 300,
+    "statuses": {
+      "200": 40,
+      "429": 260
+    },
+    "p50": 12.436000000001513,
+    "p99": 81.6718329999967,
+    "rpcCalls": {
+      "getMultipleAccounts": 40
+    },
+    "rpcTotal": 40,
+    "other": {},
+    "memo": {
+      "hits": 0,
+      "misses": 0
+    }
+  },
+  {
+    "name": "mcp: 300 calls from 300 ips, 50 at once",
+    "requests": 300,
+    "statuses": {
+      "200": 300
+    },
+    "p50": 37.99937499999942,
+    "p99": 58.07941699999719,
+    "rpcCalls": {
+      "getMultipleAccounts": 300
+    },
+    "rpcTotal": 300,
+    "other": {},
+    "memo": {
+      "hits": 0,
+      "misses": 0
+    }
+  },
+  {
+    "name": "attest: 30 from ONE ip, 10 at once",
+    "requests": 30,
+    "statuses": {
+      "200": 6,
+      "429": 24
+    },
+    "p50": 1.9636669999999867,
+    "p99": 434.2182500000017,
+    "rpcCalls": {},
+    "rpcTotal": 0,
+    "other": {
+      "blob.get": 18,
+      "blob.put": 18,
+      "indexer.slot": 6,
+      "indexer.registryNullifierKey": 6,
+      "indexer.treeHead": 6,
+      "indexer.merklePaths": 6,
+      "indexer.spent": 6,
+      "indexer.creation": 6,
+      "blob.create": 6
+    },
+    "memo": {
+      "hits": 0,
+      "misses": 0
+    }
+  },
+  {
+    "name": "v1 list: 200 at once on a cold cache (single-flight)",
+    "requests": 200,
+    "statuses": {
+      "200": 200
+    },
+    "p50": 77.14112499999828,
+    "p99": 86.07524999999805,
+    "rpcCalls": {
+      "getProgramAccounts": 1
+    },
+    "rpcTotal": 1,
+    "other": {},
+    "memo": {
+      "hits": 199,
+      "misses": 2
+    }
+  },
+  {
+    "name": "v1 stats: 200 at once on a cold cache",
+    "requests": 200,
+    "statuses": {
+      "200": 200
+    },
+    "p50": 365.4651669999985,
+    "p99": 366.1511250000003,
+    "rpcCalls": {
+      "getProgramAccounts": 1,
+      "getAccountInfo": 2,
+      "getMultipleAccounts": 2,
+      "getSignaturesForAddress": 1
+    },
+    "rpcTotal": 6,
+    "other": {
+      "logblob.get": 8
+    },
+    "memo": {
+      "hits": 1195,
+      "misses": 6
+    }
+  },
+  {
+    "name": "v1 log proof: 500 random entries, 50 at once",
+    "requests": 500,
+    "statuses": {
+      "200": 500
+    },
+    "p50": 44.40254199999981,
+    "p99": 1200.746665999999,
+    "rpcCalls": {
+      "getProgramAccounts": 1,
+      "getMultipleAccounts": 2,
+      "getSignaturesForAddress": 1
+    },
+    "rpcTotal": 4,
+    "other": {
+      "logblob.get": 1040
+    },
+    "memo": {
+      "hits": 1996,
+      "misses": 4
+    }
+  },
+  {
+    "name": "v1 log proof: 500 random entries again, warm mirror",
+    "requests": 500,
+    "statuses": {
+      "200": 500
+    },
+    "p50": 38.046290999998746,
+    "p99": 46.86899999999878,
+    "rpcCalls": {},
+    "rpcTotal": 0,
+    "other": {},
+    "memo": {
+      "hits": 2000,
+      "misses": 0
+    }
+  },
+  {
+    "name": "status: 200 at once on a cold cache",
+    "requests": 200,
+    "statuses": {
+      "200": 200
+    },
+    "p50": 177.099041999998,
+    "p99": 178.72291699999914,
+    "rpcCalls": {
+      "getSlot": 1,
+      "getMultipleAccounts": 1,
+      "getAccountInfo": 2
+    },
+    "rpcTotal": 4,
+    "other": {
+      "logblob.get": 8
+    },
+    "memo": {
+      "hits": 0,
+      "misses": 0
+    }
+  }
+]

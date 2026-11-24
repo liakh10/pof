@@ -123,7 +123,9 @@ export interface LogEntryJson {
 export declare class LogReader {
     base: string;
     private f;
-    constructor(base: string, f?: typeof fetch);
+    private headers;
+    /** `headers`: extra request headers, e.g. a server-side reader's `x-pof-internal` (never set it in a browser) */
+    constructor(base: string, f?: typeof fetch, headers?: Record<string, string>);
     private get;
     head(): Promise<SignedTreeHead>;
     entry(i: number): Promise<LogEntryJson>;

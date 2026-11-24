@@ -335,3 +335,19 @@ test("a burst on a cold mirror pages the log once; a failing log is backed off, 
   assert.ok(n <= 1 + 4, `30 requests on a busy log cost ${n} calls (head and one round of at most 4 pages)`);
   await w.rpc.putConfig({ verifier: log.verifierKey });
 });
+
+test("server-side log reads carry x-pof-internal from env, and only then", async () => {
+  const { clearMemo, internalHeaders } = await import("../_lib.js");
+  assert.deepEqual(internalHeaders({}), { accept: "application/json" });
+  const saved = process.env.POF_INTERNAL_SECRET;
+  process.env.POF_INTERNAL_SECRET = "s3cret";
+  clearMemo();
+  const seen = [];
+  const spy = async (u, init) => { seen.push(init?.headers?.["x-pof-internal"]); return log.fetch(u); };
+  await handleV1({ method: "GET", path: "log/head", query: {}, env, fetch: spy });
+  assert.ok(seen.length && seen.every((h) => h === "s3cret"));
+  if (saved === undefined) delete process.env.POF_INTERNAL_SECRET;
+  else process.env.POF_INTERNAL_SECRET = saved;
+  const r = await handleV1({ method: "GET", path: "log/head", query: {}, env, fetch: spy });
+  assert.equal(r.body.includes("s3cret"), false, "the secret never reaches a response");
+});

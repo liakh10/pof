@@ -120,15 +120,17 @@ const logRoute = V.node(async (req) => {
 const attestRoute = V.node(V.areas.attest());
 
 let next = 0;
+let cpuBase = process.cpuUsage();
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   try {
     if (u.pathname === "/__stats") {
       res.writeHead(200, { "content-type": "application/json" });
-      return res.end(JSON.stringify({ counts, memo: lib.memoStats, mirror: lib.mirrorStats?.(), logReads: lib.logStats, packages: packages.length, nextPackage: next, loadMs, warmMs, fillMs, mem: process.memoryUsage() }));
+      return res.end(JSON.stringify({ cpu: process.cpuUsage(cpuBase), counts, memo: lib.memoStats, mirror: lib.mirrorStats?.(), logReads: lib.logStats, packages: packages.length, nextPackage: next, loadMs, warmMs, fillMs, mem: process.memoryUsage() }));
     }
     if (u.pathname === "/__reset") {
       for (const k of Object.keys(counts)) delete counts[k];
+      cpuBase = process.cpuUsage();
       lib.memoStats.hits = lib.memoStats.misses = 0;
       if (u.searchParams.has("memo")) lib.clearMemo();
       process.env.POF_MEMO_OFF = u.searchParams.get("memoOff") === "1" ? "1" : "";

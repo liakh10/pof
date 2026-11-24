@@ -1,0 +1,58 @@
+[
+  {
+    "name": "@pof/sdk (import only)",
+    "importMs": 10.838125000000002,
+    "firstMs": null,
+    "rssMB": 40.4375,
+    "errors": []
+  },
+  {
+    "name": "/v1 (api/v1/index.js)",
+    "importMs": 14.839832999999999,
+    "firstMs": 45.019208,
+    "rssMB": 68.390625,
+    "errors": []
+  },
+  {
+    "name": "/mcp (api/mcp.js)",
+    "importMs": 32.025875,
+    "firstMs": 37.289916,
+    "rssMB": 60.546875,
+    "errors": []
+  },
+  {
+    "name": "/api/bots (link page)",
+    "importMs": 23.390791,
+    "firstMs": 29.454209000000006,
+    "rssMB": 52.4375,
+    "errors": []
+  },
+  {
+    "name": "/api/status",
+    "importMs": 22.211916000000002,
+    "firstMs": 64.727459,
+    "rssMB": 65.75,
+    "errors": []
+  },
+  {
+    "name": "/api/witness (import only)",
+    "importMs": 22.069083,
+    "firstMs": null,
+    "rssMB": 41.546875,
+    "errors": []
+  },
+  {
+    "name": "Verifier bundle (import only)",
+    "importMs": 85.613333,
+    "firstMs": null,
+    "rssMB": 84.296875,
+    "errors": []
+  },
+  {
+    "name": "Helius SDK + Poseidon WASM init",
+    "importMs": 278.414042,
+    "firstMs": 20.319500000000005,
+    "rssMB": null,
+    "errors": []
+  }
+]

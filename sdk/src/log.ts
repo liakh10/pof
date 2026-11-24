@@ -294,11 +294,12 @@ export interface LogEntryJson { index: number; leaf: Hex; leafHash?: Hex }
 
 /** A small reader for GET /api/attest/log (?head, ?entry, ?proof, ?consistency, ?from&to). */
 export class LogReader {
-  constructor(public base: string, private f: typeof fetch = fetch) {
+  /** `headers`: extra request headers, e.g. a server-side reader's `x-pof-internal` (never set it in a browser) */
+  constructor(public base: string, private f: typeof fetch = fetch, private headers: Record<string, string> = {}) {
     this.base = base.replace(/\/$/, "");
   }
   private async get<T>(qs: string): Promise<T> {
-    const r = await this.f(`${this.base}?${qs}`, { headers: { accept: "application/json" } });
+    const r = await this.f(`${this.base}?${qs}`, { headers: { accept: "application/json", ...this.headers } });
     const j: any = await r.json().catch(() => null);
     if (!r.ok || !j) throw new Error(`log ${qs}: ${j?.error?.message ?? j?.message ?? r.status}`);
     return j as T;

@@ -1,0 +1,416 @@
+{
+  "meta": {
+    "at": "2026-11-24T23:46:32.983Z",
+    "node": "v20.20.2",
+    "cpu": "Apple M2 Pro",
+    "cores": 10,
+    "memGB": 16,
+    "loadavg": [
+      49.27978515625,
+      32.185546875,
+      30.28955078125
+    ],
+    "rpcMs": 30,
+    "indexerMs": 60,
+    "blobMs": 40,
+    "certs": 5000,
+    "seconds": 10
+  },
+  "results": [
+    {
+      "name": "v1 certificate by @handle",
+      "requests": 5798,
+      "rps": 578.841592699542,
+      "errors": 0,
+      "statuses": {
+        "200": 5798
+      },
+      "p50": 33.33962499999325,
+      "p95": 40.24179100000765,
+      "p99": 63.428625000000466,
+      "max": 106.0924159999995,
+      "mean": 34.508448752673466,
+      "cpuMsPerReq": 0.7796093480510521,
+      "rpcPerReq": 1,
+      "rpcByMethod": {
+        "getMultipleAccounts": 5798
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "v1 certificate by bare key (wallet+badge)",
+      "requests": 5768,
+      "rps": 575.1435721336658,
+      "errors": 0,
+      "statuses": {
+        "200": 5768
+      },
+      "p50": 33.99991699999373,
+      "p95": 39.39441699998861,
+      "p99": 48.70608299999731,
+      "max": 80.26083400000061,
+      "mean": 34.707739256934794,
+      "cpuMsPerReq": 0.893000866851595,
+      "rpcPerReq": 1,
+      "rpcByMethod": {
+        "getMultipleAccounts": 5768
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "v1 certificate with gate check",
+      "requests": 6040,
+      "rps": 601.8305213366849,
+      "errors": 0,
+      "statuses": {
+        "200": 6040
+      },
+      "p50": 32.87941600001068,
+      "p95": 36.503833999988274,
+      "p99": 41.689125000004424,
+      "max": 52.91666699999769,
+      "mean": 33.22246960562932,
+      "cpuMsPerReq": 0.46223178807947024,
+      "rpcPerReq": 1,
+      "rpcByMethod": {
+        "getMultipleAccounts": 6040
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "v1 list (memo on)",
+      "requests": 63383,
+      "rps": 6336.992466798556,
+      "errors": 0,
+      "statuses": {
+        "200": 63383
+      },
+      "p50": 1.5920830000104615,
+      "p95": 6.878250000008848,
+      "p99": 20.37645799999882,
+      "max": 276.58283300000767,
+      "mean": 3.1553180340627978,
+      "cpuMsPerReq": 0.10501519334837417,
+      "rpcPerReq": 0,
+      "rpcByMethod": {},
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 63383,
+        "misses": 1
+      }
+    },
+    {
+      "name": "v1 list (memo off)",
+      "requests": 87,
+      "rps": 8.469131339108324,
+      "errors": 0,
+      "statuses": {
+        "200": 87
+      },
+      "p50": 412.4698749999952,
+      "p95": 855.1140420000011,
+      "p99": 1525.155625000014,
+      "max": 1525.155625000014,
+      "mean": 465.9270986206903,
+      "cpuMsPerReq": 100.13777011494254,
+      "rpcPerReq": 1,
+      "rpcByMethod": {
+        "getProgramAccounts": 87
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "v1 room with members (memo on)",
+      "requests": 99103,
+      "rps": 9844.052886800275,
+      "errors": 0,
+      "statuses": {
+        "200": 99103
+      },
+      "p50": 1.2266670000099111,
+      "p95": 4.427750000002561,
+      "p99": 9.671875,
+      "max": 116.01570800002082,
+      "mean": 2.0198989634016957,
+      "cpuMsPerReq": 0.08040347920850024,
+      "rpcPerReq": 0.003057425103175484,
+      "rpcByMethod": {
+        "getAccountInfo": 101,
+        "getProgramAccounts": 101,
+        "getMultipleAccounts": 101
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 99002,
+        "misses": 101
+      }
+    },
+    {
+      "name": "v1 room with members (memo off)",
+      "requests": 2073,
+      "rps": 205.60872686553145,
+      "errors": 0,
+      "statuses": {
+        "200": 2073
+      },
+      "p50": 94.1237919999985,
+      "p95": 132.15941700001713,
+      "p99": 228.26204100000905,
+      "max": 297.82125000000815,
+      "mean": 96.93558949107513,
+      "cpuMsPerReq": 2.231565846599132,
+      "rpcPerReq": 3,
+      "rpcByMethod": {
+        "getAccountInfo": 2073,
+        "getProgramAccounts": 2073,
+        "getMultipleAccounts": 2073
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "v1 stats (memo off)",
+      "requests": 47,
+      "rps": 4.534688570282261,
+      "errors": 0,
+      "statuses": {
+        "200": 47
+      },
+      "p50": 861.7184169999964,
+      "p95": 1115.1257920000062,
+      "p99": 1295.000291000004,
+      "max": 1295.000291000004,
+      "mean": 875.5375248936124,
+      "cpuMsPerReq": 256.65225531914894,
+      "rpcPerReq": 7,
+      "rpcByMethod": {
+        "getProgramAccounts": 94,
+        "getAccountInfo": 94,
+        "getMultipleAccounts": 94,
+        "getSignaturesForAddress": 47
+      },
+      "otherPerReq": 8,
+      "other": {
+        "logblob.get": 376
+      },
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "v1 stats",
+      "requests": 10573,
+      "rps": 1053.9999524987238,
+      "errors": 0,
+      "statuses": {
+        "200": 10573
+      },
+      "p50": 16.524834000010742,
+      "p95": 28.49062500000582,
+      "p99": 53.51579100001254,
+      "max": 213.65466699999524,
+      "mean": 18.97360441984293,
+      "cpuMsPerReq": 1.050517828430909,
+      "rpcPerReq": 0.0003783221413033198,
+      "rpcByMethod": {
+        "getAccountInfo": 3,
+        "getProgramAccounts": 1
+      },
+      "otherPerReq": 0.0022699328478199185,
+      "other": {
+        "logblob.get": 24
+      },
+      "memo": {
+        "hits": 63432,
+        "misses": 7
+      }
+    },
+    {
+      "name": "v1 log proof (verified)",
+      "requests": 6047,
+      "rps": 603.9421632876742,
+      "errors": 0,
+      "statuses": {
+        "200": 6047
+      },
+      "p50": 26.60633300000336,
+      "p95": 77.38712500000838,
+      "p99": 116.77733299997635,
+      "max": 178.0227920000034,
+      "mean": 33.09714076682669,
+      "cpuMsPerReq": 1.922122374731272,
+      "rpcPerReq": 0.000165371258475277,
+      "rpcByMethod": {
+        "getProgramAccounts": 1
+      },
+      "otherPerReq": 0.005291880271208864,
+      "other": {
+        "logblob.get": 32
+      },
+      "memo": {
+        "hits": 24183,
+        "misses": 5
+      }
+    },
+    {
+      "name": "v1 badge svg",
+      "requests": 5086,
+      "rps": 507.2520369082304,
+      "errors": 0,
+      "statuses": {
+        "200": 5086
+      },
+      "p50": 36.99229200000991,
+      "p95": 51.87470899999607,
+      "p99": 81.17762500001118,
+      "max": 169.61533299999428,
+      "mean": 39.4225343419191,
+      "cpuMsPerReq": 0.7397306331104994,
+      "rpcPerReq": 1,
+      "rpcByMethod": {
+        "getMultipleAccounts": 5086
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "mcp check_proof_of_funds",
+      "requests": 5276,
+      "rps": 525.346929336559,
+      "errors": 0,
+      "statuses": {
+        "200": 5276
+      },
+      "p50": 36.68379200002528,
+      "p95": 46.381040999986,
+      "p99": 58.13162500000908,
+      "max": 84.85854200000176,
+      "mean": 37.94381180970431,
+      "cpuMsPerReq": 0.47171929492039427,
+      "rpcPerReq": 1,
+      "rpcByMethod": {
+        "getMultipleAccounts": 5276
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "mcp get_room",
+      "requests": 51285,
+      "rps": 5126.9010687494765,
+      "errors": 0,
+      "statuses": {
+        "200": 51285
+      },
+      "p50": 2.5819159999955446,
+      "p95": 8.56491700001061,
+      "p99": 17.983875000005355,
+      "max": 219.19533299998147,
+      "mean": 3.8985092646387574,
+      "cpuMsPerReq": 0.1188555523057424,
+      "rpcPerReq": 0.0058496636443404505,
+      "rpcByMethod": {
+        "getAccountInfo": 100,
+        "getProgramAccounts": 100,
+        "getMultipleAccounts": 100
+      },
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 51185,
+        "misses": 100
+      }
+    },
+    {
+      "name": "attest (Verifier, fake Rings)",
+      "requests": 208,
+      "rps": 20.565295903465465,
+      "errors": 0,
+      "statuses": {
+        "200": 208
+      },
+      "p50": 384.5158330000122,
+      "p95": 421.309957999998,
+      "p99": 441.9750420000055,
+      "max": 442.39520800000173,
+      "mean": 388.2304090336547,
+      "cpuMsPerReq": 13.023149038461538,
+      "rpcPerReq": 0,
+      "rpcByMethod": {},
+      "otherPerReq": 13,
+      "other": {
+        "blob.get": 624,
+        "blob.put": 624,
+        "indexer.slot": 208,
+        "indexer.registryNullifierKey": 208,
+        "indexer.treeHead": 208,
+        "indexer.merklePaths": 208,
+        "indexer.spent": 208,
+        "indexer.creation": 208,
+        "blob.create": 208
+      },
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    {
+      "name": "status (cached)",
+      "requests": 129440,
+      "rps": 12938.961030314022,
+      "errors": 0,
+      "statuses": {
+        "200": 129440
+      },
+      "p50": 1.1483750000188593,
+      "p95": 3.546249999984866,
+      "p99": 6.096374999993714,
+      "max": 37.13916700001573,
+      "mean": 1.5451928556319239,
+      "cpuMsPerReq": 0.047702927997527816,
+      "rpcPerReq": 0,
+      "rpcByMethod": {},
+      "otherPerReq": 0,
+      "other": {},
+      "memo": {
+        "hits": 0,
+        "misses": 0
+      }
+    }
+  ]
+}

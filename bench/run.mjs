@@ -49,7 +49,7 @@ const reset = async (memo = false, memoOff = false) => {
 const upstream = async () => {
   const r = await (await fetch(`${RPC}/__stats`)).json();
   const h = await (await fetch(`${BASE}/__stats`)).json();
-  return { rpc: r.counts, other: h.counts, memo: h.memo };
+  return { rpc: r.counts, other: h.counts, memo: h.memo, cpuMs: (h.cpu.user + h.cpu.system) / 1000 };
 };
 const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
 
@@ -79,12 +79,20 @@ for (const s of scenarios) {
   // warm one request (the first call fills per-instance caches), then measure
   await reset(true, !!s.memoOff);
   const warm = s.make(0, 0);
-  if (!s.name.startsWith("attest")) await fetch(BASE + warm.path, { method: warm.method ?? "GET", headers: warm.headers, body: warm.body }).then((r) => r.arrayBuffer());
+  if (!s.name.startsWith("attest")) {
+    // warm until the endpoint answers 200 (the log mirror pages the whole log in on first use)
+    for (let t = 0; t < 120; t++) {
+      const r = await fetch(BASE + warm.path, { method: warm.method ?? "GET", headers: warm.headers, body: warm.body });
+      await r.arrayBuffer();
+      if (r.status === 200) break;
+      await new Promise((ok) => setTimeout(ok, 1000));
+    }
+  }
   await reset(false, !!s.memoOff);
   const r = await load({ base: BASE, vus: s.vus ?? 20, seconds: SECS, total: s.total ?? Infinity, make: s.make });
   const u = await upstream();
-  results.push({ name: s.name, ...r, rpcPerReq: sum(u.rpc) / r.requests, rpcByMethod: u.rpc, otherPerReq: sum(u.other) / r.requests, other: u.other, memo: u.memo });
-  console.log(`${s.name.padEnd(44)} ${r.requests.toString().padStart(6)} req ${r.rps.toFixed(0).padStart(5)}/s  p50 ${r.p50.toFixed(1)} p95 ${r.p95.toFixed(1)} p99 ${r.p99.toFixed(1)} ms  rpc/req ${(sum(u.rpc) / r.requests).toFixed(2)}  other/req ${(sum(u.other) / r.requests).toFixed(2)}  ${JSON.stringify(r.statuses)}`);
+  results.push({ name: s.name, ...r, cpuMsPerReq: u.cpuMs / r.requests, rpcPerReq: sum(u.rpc) / r.requests, rpcByMethod: u.rpc, otherPerReq: sum(u.other) / r.requests, other: u.other, memo: u.memo });
+  console.log(`${s.name.padEnd(44)} ${r.requests.toString().padStart(6)} req ${r.rps.toFixed(0).padStart(5)}/s  p50 ${r.p50.toFixed(1)} p95 ${r.p95.toFixed(1)} p99 ${r.p99.toFixed(1)} ms  cpu/req ${(u.cpuMs / r.requests).toFixed(2)} ms  rpc/req ${(sum(u.rpc) / r.requests).toFixed(2)}  other/req ${(sum(u.other) / r.requests).toFixed(2)}  ${JSON.stringify(r.statuses)}`);
 }
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const meta = {

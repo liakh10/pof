@@ -31,7 +31,8 @@ if (!fs.existsSync(keyFile)) {
 }
 const signer = signerFromSecret(Uint8Array.from(JSON.parse(fs.readFileSync(keyFile, "utf8"))));
 const w = new Witness({
-  reader: new LogReader(logUrl),
+  // POF_INTERNAL_SECRET: only for the project's own server-side witness; an independent witness reads the public log
+  reader: new LogReader(logUrl, fetch, process.env.POF_INTERNAL_SECRET ? { "x-pof-internal": process.env.POF_INTERNAL_SECRET } : {}),
   client: new PofClient({ rpc, programId: opt("program", undefined) }),
   signer,
   state: new FileState(opt("out", "witness.json")),

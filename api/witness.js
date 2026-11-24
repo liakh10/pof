@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   if (!secret || !env.SOLANA_RPC || !env.POF_LOG_URL || !env.BLOB_READ_WRITE_TOKEN) return out(503, { error: "witness not configured (WITNESS_KEY, SOLANA_RPC, POF_LOG_URL, Blob)" });
   try {
     const w = new Witness({
-      reader: new LogReader(env.POF_LOG_URL),
+      reader: new LogReader(env.POF_LOG_URL, fetch, env.POF_INTERNAL_SECRET ? { "x-pof-internal": env.POF_INTERNAL_SECRET } : {}),
       client: new PofClient({ rpc: env.SOLANA_RPC, programId: env.POF_PROGRAM_ID || undefined }),
       signer: signerFromSecret(secret),
       state: new BlobState(),
