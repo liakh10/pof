@@ -33,12 +33,13 @@ The public inputs are the two roots, the asset, the tier minimum, a context valu
 | Who sees the nullifier key | the Verifier, for one request | nobody |
 | Who checks membership and non-spending | the Verifier, against on-chain roots | the program, by verifying the proof against on-chain roots |
 | Who can revoke on spend | holders of the salts (holder, keeper) | holders of the revocation key (and the holder) |
-| Trusted setup | none | a Groth16 setup for the circuit (the ceremony scripts and transcript live in `zk/`) |
+| Trusted setup | none | a Groth16 setup per circuit: today a development setup made on one machine; a public ceremony runs before `certify_zk` is switched on |
 | The X handle check | X and fxtwitter | unchanged |
 | Timing and funding links | as in [Privacy guidance](privacy) | unchanged: a proof hides amounts, not the public deposit |
 
 ## Status
 
-Phase 2 is in development in `zk/`. It is not deployed, and no certificate today is issued by a proof. The
+Phase 2 is in development in `zk/`: the circuit (4 notes per proof), a development setup, the browser prover and the
+on-chain instruction `certify_zk` are built and tested. It is not deployed, and no certificate today is issued by a proof. The
 [zero-knowledge circuit](zk) page describes the circuit, the setup and the on-chain verifier in full; the
 [changelog](https://github.com/liakh10/pof/blob/main/CHANGELOG.md) records when it ships.

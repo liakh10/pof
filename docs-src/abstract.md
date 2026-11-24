@@ -38,7 +38,7 @@ zero-knowledge proof.
 | The payer (the wallet itself, or the relayer for handles and badges) and the controller key | everyone |
 | The amounts of the disclosed notes | the Verifier, during one request; nobody else |
 | The ring the notes sit in, and its nullifier key | the Verifier, during one request; nobody else |
-| Which notes back it | nobody, while it is live; one note becomes public if the certificate is revoked by a spend |
+| Which notes back it | the Verifier (during the request) and the registered keepers (as salted nullifiers they watch); nobody else while it is live; one note becomes public if the certificate is revoked by a spend |
 | The rest of the ring's balance and history | nobody (POF never sees notes you do not disclose) |
 | The wallet that funded a vault ring | everyone, on chain, from the deposit itself (see [Privacy guidance](privacy)) |
 

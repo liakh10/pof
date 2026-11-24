@@ -16,7 +16,7 @@ on chain at the moment you fund the vault. This page lists what each step reveal
 | Register the vault | the vault owner key and its public keys; the wallet that paid, in the same transaction | nothing |
 | Shield into the vault | the depositing wallet, **the amount**, and the vault as recipient | nothing |
 | Link an X handle | the post you make (you may delete it after the check) | the handle, your IP |
-| Attest | nothing | the subject, the vault, its `nk`, the openings and amounts of the disclosed notes, your IP |
+| Attest | nothing | the subject, the vault, its `nk`, the openings and amounts of the disclosed notes, your IP; the registered keepers get the salts and nullifiers |
 | Pay the relayer | a withdrawal from the vault (by default), the amount (fee + rent + a unique tag) and the slot | the payment |
 | Certify | subject (hash for a handle), asset, tier, slots, payer, controller, note count | the same |
 | Revoke by holder | the revocation and its slot | the same |
