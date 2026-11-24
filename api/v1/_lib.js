@@ -66,6 +66,10 @@ export function certJson(c, subjectValue = null) {
     noteCount: c.noteCount,
     payer: c.payer,
     verifierKey: c.verifier,
+    controller: c.controller,
+    issuedSlot: c.issuedSlot,
+    renewals: c.renewals,
+    revealed: c.revealed,
   };
 }
 
@@ -176,7 +180,22 @@ export async function verifiedHead(base, client, f) {
   const head = await logGet(base, "head", f);
   const programId = client?.programId ?? sdk.POF_PROGRAM_ID;
   const signatureValid = await sdk.verifyTreeHead(head, programId).catch(() => false);
-  return { ...head, signatureValid, programId };
+  // the latest head anchored on chain by anchor_log (Treasury), and whether this head is consistent with it
+  let anchor = null;
+  const t = client ? await client.getTreasury().catch(() => null) : null;
+  if (t?.log) {
+    anchor = { ...t.log, consistent: null };
+    if (t.log.treeSize === head.treeSize) anchor.consistent = t.log.rootHash === String(head.rootHash).toLowerCase();
+    else if (t.log.treeSize < head.treeSize) {
+      try {
+        const c = await logGet(base, `consistency=${t.log.treeSize}&size=${head.treeSize}`, f);
+        anchor.consistent = await sdk.verifyConsistency({ size1: t.log.treeSize, size2: head.treeSize, root1: t.log.rootHash, root2: head.rootHash, proof: c.path ?? c.proof ?? [] });
+      } catch {
+        anchor.consistent = null;
+      }
+    } else anchor.consistent = false;
+  }
+  return { ...head, signatureValid, programId, anchor };
 }
 
 export async function verifiedProof(base, client, index, f) {

@@ -12,7 +12,7 @@ export { encodeBase58, decodeBase58, toAddress, toAddressBytes, isAddress } from
 export type { AddressLike } from "./base58.js";
 export { findProgramAddress, createProgramAddress, isOnCurve } from "./pda.js";
 export { sha256, toHex, fromHex, ed25519Verify } from "./bytes.js";
-export { decodeAccount, encodeAccount, encodeInstruction, fieldOffset } from "./borsh.js";
+export { decodeAccount, encodeAccount, encodeAccountPartial, encodeInstruction, fieldOffset, zeroValue } from "./borsh.js";
 export type { Idl } from "./borsh.js";
 export { POF_IDL, POF_GATE_IDL, POF_IDL_IS_DRAFT, POF_GATE_IDL_IS_DRAFT } from "./idl/index.js";
 export declare const SDK_VERSION = "0.1.0";

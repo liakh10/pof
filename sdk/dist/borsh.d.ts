@@ -58,3 +58,7 @@ export declare function decodeAccount(idl: Idl, name: string, data: Uint8Array):
 export declare function encodeAccount(idl: Idl, name: string, value: Record<string, any>): Uint8Array;
 /** Instruction data: discriminator ‖ borsh(args). */
 export declare function encodeInstruction(idl: Idl, name: string, args: Record<string, any>): Uint8Array;
+/** A zero value for any IDL type (fixtures fill the fields they care about on top of it). */
+export declare function zeroValue(idl: Idl, t: IdlType): any;
+/** Encode an account from a partial value: missing fields are zero. */
+export declare function encodeAccountPartial(idl: Idl, name: string, value: Record<string, any>): Uint8Array;

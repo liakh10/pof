@@ -19,7 +19,7 @@ function subproof(m, D, b) {
   if (m <= k) return [...subproof(m, D.slice(0, k), b), mth(D.slice(k))];
   return [...subproof(m - k, D.slice(k), false), mth(D.slice(0, k))];
 }
-const leafData = (i) => { const b = Buffer.alloc(345); b[0] = 1; b.writeUInt32LE(i, 1); return new Uint8Array(b); };
+const leafData = (i) => { const b = Buffer.alloc(377); b[0] = 1; b.writeUInt32LE(i, 1); return new Uint8Array(b); };
 
 test("inclusion proofs verify for every index of trees 1..33, and fail when tampered", async () => {
   for (let n = 1; n <= 33; n++) {
@@ -64,11 +64,11 @@ test("signed tree heads and full log entries verify (CONTRACT §7)", async () =>
   const verifierKey = sdk.encodeBase58(vkBytes);
   const att = sdk.buildAttestation({
     programId: sdk.POF_PROGRAM_ID, subjectKind: 0, subjectHash: "aa".repeat(32), asset: 0, tier: 2, treeRoot: "bb".repeat(32),
-    rootSlot: 1, noteCount: 1, nullsetHash: "cc".repeat(32), issuedSlot: 2, expirySlot: 3, payer: verifierKey, nonce: "dd".repeat(16),
+    rootSlot: 1, noteCount: 1, nullsetHash: "cc".repeat(32), issuedSlot: 2, expirySlot: 3, payer: verifierKey, controller: verifierKey, nonce: "dd".repeat(16),
   });
   const sig = crypto.sign(null, att, privateKey);
   const leaf = Buffer.concat([Buffer.from([1]), att, sig, vkBytes, Buffer.alloc(32, 7), Buffer.from(new BigUint64Array([555n]).buffer)]);
-  assert.equal(leaf.length, 345);
+  assert.equal(leaf.length, 377);
   const parsed = sdk.parseLeaf(leaf);
   assert.equal(parsed.loggedSlot, 555);
   assert.equal(parsed.attestation.tier, 2);
@@ -91,6 +91,7 @@ test("signed tree heads and full log entries verify (CONTRACT §7)", async () =>
   assert.equal(wrongIdx.ok, false);
   assert.equal(wrongIdx.checks.included, false);
   const forged = Buffer.from(leaf); forged[71] ^= 1;
+  assert.equal(parsed.attestation.controller, verifierKey);
   const f = await sdk.verifyLogEntry({ leaf: forged, index: 4, proof: { treeSize: all.length, rootHash: root, path } });
   assert.equal(f.checks.attestationSigned, false);
   const untrusted = await sdk.verifyLogEntry({ leaf, index: 4, proof: { treeSize: all.length, rootHash: root, path }, head, trustedKeys: ["11111111111111111111111111111111"] });

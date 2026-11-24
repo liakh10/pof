@@ -41,6 +41,18 @@ export interface Certificate {
   payer: string;
   logIndex: number | null;
   verifier: string;
+  /** the key that may revoke the certificate and join rooms with it (CONTRACT §3) */
+  controller: string | null;
+  /** the slot the Verifier read when it signed (changes on renew) */
+  issuedSlot: number | null;
+  /** hex, the Rings state root the notes were checked against */
+  treeRoot: string | null;
+  rootSlot: number | null;
+  /** hex, sha256 of the salted nullifier hashes (§5) */
+  nullsetHash: string | null;
+  renewals: number;
+  /** after revoke_spent: the disclosed note's index, salt and nullifier, public from then on */
+  revealed: { index: number; salt: string; nullifier: string } | null;
 }
 
 export interface Room {
@@ -54,6 +66,10 @@ export interface Room {
   memberCount: number;
   createdSlot: number | null;
   name: string | null;
+  /** false when the creator closed it to new joins */
+  open: boolean;
+  joined: number;
+  evicted: number;
   raw: Record<string, any>;
 }
 
@@ -64,6 +80,9 @@ export interface Member {
   subjectHash: string;
   certificate: string | null;
   joinedSlot: number | null;
+  subjectKind: number | null;
+  controller: string | null;
+  payer: string | null;
 }
 
 function pick(raw: Record<string, any>, ...names: string[]): any {
@@ -87,7 +106,10 @@ export function decodeCertificate(address: string, data: Uint8Array): Certificat
   const tier = Number(pick(r, "tier"));
   const status = Number(pick(r, "status"));
   const noteCount = Number(pick(r, "note_count", "noteCount") ?? 0);
-  const hashes: any[] = pick(r, "nullifier_hashes", "nullifierHashes", "nullset", "nullifiers") ?? [];
+  const hashes: any[] = pick(r, "null_hashes", "nullifier_hashes", "nullifierHashes", "nullifiers") ?? [];
+  const revIdx = num(pick(r, "revealed_index", "revealedIndex"));
+  const optHex = (v: any) => (v === undefined || v === null ? null : hex(v));
+  const optKey = (v: any) => (v === undefined || v === null ? null : String(v));
   const revoked = num(pick(r, "revoked_slot", "revokedSlot"));
   const kind = Number(pick(r, "subject_kind", "subjectKind"));
   const logIndex = num(pick(r, "log_index", "logIndex"));
@@ -110,6 +132,16 @@ export function decodeCertificate(address: string, data: Uint8Array): Certificat
     payer: String(pick(r, "payer") ?? ""),
     logIndex: logIndex === 18446744073709552000 ? null : logIndex,
     verifier: String(pick(r, "verifier", "verifier_key", "verifierKey") ?? ""),
+    controller: optKey(pick(r, "controller")),
+    issuedSlot: num(pick(r, "issued_slot", "issuedSlot")),
+    treeRoot: optHex(pick(r, "tree_root", "treeRoot")),
+    rootSlot: num(pick(r, "root_slot", "rootSlot")),
+    nullsetHash: optHex(pick(r, "nullset_hash", "nullsetHash")),
+    renewals: num(pick(r, "renewals")) ?? 0,
+    revealed:
+      revIdx !== null && revIdx !== 255
+        ? { index: revIdx, salt: hex(pick(r, "revealed_salt")), nullifier: hex(pick(r, "revealed_nullifier")) }
+        : null,
   };
 }
 
@@ -128,7 +160,10 @@ export function decodeRoom(address: string, data: Uint8Array): Room {
     minTierLabel: ASSETS[asset]?.tiers[minTier] !== undefined ? tierLabel(asset, minTier) : `tier ${minTier}`,
     memberCount: num(pick(r, "member_count", "memberCount", "members")) ?? 0,
     createdSlot: num(pick(r, "created_slot", "createdSlot")),
-    name: typeof name === "string" ? name.replace(/\0+$/, "") : name instanceof Uint8Array ? new TextDecoder().decode(name).replace(/\0+$/, "") : null,
+    name: typeof name === "string" ? name.replace(/\0+$/, "") || null : name instanceof Uint8Array ? new TextDecoder().decode(name).replace(/\0+$/, "") || null : null,
+    open: pick(r, "open") === undefined ? true : !!pick(r, "open"),
+    joined: num(pick(r, "joined")) ?? 0,
+    evicted: num(pick(r, "evicted")) ?? 0,
     raw: r,
   };
 }
@@ -142,11 +177,83 @@ export function decodeMember(address: string, data: Uint8Array): Member {
     subjectHash: hex(pick(r, "subject_hash", "subjectHash")),
     certificate: cert ? String(cert) : null,
     joinedSlot: num(pick(r, "joined_slot", "joinedSlot")),
+    subjectKind: num(pick(r, "subject_kind", "subjectKind")),
+    controller: pick(r, "controller") ? String(pick(r, "controller")) : null,
+    payer: pick(r, "payer") ? String(pick(r, "payer")) : null,
   };
 }
 
-export function decodeConfig(data: Uint8Array): Record<string, any> {
-  return decodeAccount(pofIdl, "Config", data);
+export interface PofConfig {
+  admin: string;
+  dev: string;
+  relayer: string;
+  verifier: string;
+  nextVerifier: string | null;
+  nextVerifierSlot: number;
+  rootMint: string;
+  feeLamports: number;
+  holderMin: string;
+  validitySlots: number;
+  maxAttestAge: number;
+  maxRootLag: number;
+  rotationDelay: number;
+  /** by POF asset id: enabled, mint, decimals and the tier minimums in base units */
+  assets: { id: number; enabled: boolean; mint: string; decimals: number; mins: string[] }[];
+  paused: boolean;
+  closing: boolean;
+  launchSlot: number;
+  raw: Record<string, any>;
+}
+
+const DEFAULT_KEY = "11111111111111111111111111111111";
+
+export function decodeConfig(data: Uint8Array): PofConfig {
+  const r = decodeAccount(pofIdl, "Config", data);
+  const p = r.params ?? {};
+  return {
+    admin: String(r.admin), dev: String(r.dev ?? ""), relayer: String(r.relayer ?? ""), verifier: String(r.verifier),
+    nextVerifier: r.next_verifier && r.next_verifier !== DEFAULT_KEY ? String(r.next_verifier) : null,
+    nextVerifierSlot: num(r.next_verifier_slot) ?? 0,
+    rootMint: String(r.root_mint ?? ""),
+    feeLamports: num(p.fee_lamports ?? r.fee_lamports) ?? 0,
+    holderMin: String(p.holder_min ?? "0"),
+    validitySlots: num(p.validity_slots ?? r.validity_slots) ?? 0,
+    maxAttestAge: num(p.max_attest_age) ?? 0,
+    maxRootLag: num(p.max_root_lag) ?? 0,
+    rotationDelay: num(p.rotation_delay) ?? 0,
+    assets: (r.assets ?? []).map((a: any, id: number) => ({
+      id, enabled: !!a.enabled, mint: String(a.mint), decimals: Number(a.decimals), mins: (a.mins ?? []).map((m: any) => String(m)),
+    })),
+    paused: !!r.paused, closing: !!r.closing, launchSlot: num(r.launch_slot) ?? 0,
+    raw: r,
+  };
+}
+
+/** The verifier key certify accepts at `slot` (CONTRACT §6: next_verifier once its slot is reached). */
+export function activeVerifier(c: PofConfig, slot: number): string {
+  return c.nextVerifier && slot >= c.nextVerifierSlot ? c.nextVerifier : c.verifier;
+}
+
+export interface Treasury {
+  feesIn: string; feesOut: string; certified: number; renewed: number; revokedSpent: number; revokedHolder: number;
+  expired: number; live: number;
+  /** sum of tier minimums of live certificates by POF asset id, base units */
+  liveMin: string[];
+  open: number; relayed: number; exempt: number;
+  /** the transparency log head anchored on chain by anchor_log */
+  log: { treeSize: number; rootHash: string; slot: number } | null;
+}
+
+export function decodeTreasury(data: Uint8Array): Treasury {
+  const r = decodeAccount(pofIdl, "Treasury", data);
+  const n = (k: string) => num(r[k]) ?? 0;
+  const size = n("log_size");
+  return {
+    feesIn: String(r.fees_in ?? 0), feesOut: String(r.fees_out ?? 0), certified: n("certified"), renewed: n("renewed"),
+    revokedSpent: n("revoked_spent"), revokedHolder: n("revoked_holder"), expired: n("expired"), live: n("live"),
+    liveMin: (r.live_min ?? []).map((x: any) => String(x)), open: n("open"), relayed: n("relayed"), exempt: n("exempt"),
+    log: size ? { treeSize: size, rootHash: hex(r.log_head), slot: n("log_slot") } : null,
+  };
 }
 
 /** Live means: status byte live AND the expiry slot not yet reached. */

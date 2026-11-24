@@ -481,6 +481,24 @@
                           "type": "boolean"
                         }
                       }
+                    },
+                    "renewed": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "relayed": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "openCertificates": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
                     }
                   }
                 }
@@ -626,6 +644,125 @@
           }
         }
       }
+    },
+    "/config": {
+      "get": {
+        "operationId": "getConfig",
+        "summary": "The program's Config: active verifier key, fee, validity, tier tables (base units)",
+        "responses": {
+          "200": {
+            "description": "config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer"
+                    },
+                    "programId": {
+                      "type": "string"
+                    },
+                    "gateProgramId": {
+                      "type": "string"
+                    },
+                    "verifier": {
+                      "type": "string",
+                      "description": "the key certify accepts now"
+                    },
+                    "nextVerifier": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "nextVerifierSlot": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "relayer": {
+                      "type": "string"
+                    },
+                    "rootMint": {
+                      "type": "string"
+                    },
+                    "feeLamports": {
+                      "type": "integer"
+                    },
+                    "holderMin": {
+                      "type": "string"
+                    },
+                    "validitySlots": {
+                      "type": "integer"
+                    },
+                    "maxAttestAge": {
+                      "type": "integer"
+                    },
+                    "maxRootLag": {
+                      "type": "integer"
+                    },
+                    "paused": {
+                      "type": "boolean"
+                    },
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "symbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "mint": {
+                            "type": "string"
+                          },
+                          "decimals": {
+                            "type": "integer"
+                          },
+                          "tiers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "tier": {
+                                  "type": "integer"
+                                },
+                                "minimum": {
+                                  "type": "string",
+                                  "description": "base units"
+                                },
+                                "label": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -740,6 +877,41 @@
           },
           "verifierKey": {
             "type": "string"
+          },
+          "controller": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "the key that may revoke it and join rooms with it"
+          },
+          "issuedSlot": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "the slot the Verifier read when it signed (moves on renew)"
+          },
+          "renewals": {
+            "type": "integer"
+          },
+          "revealed": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "after revoke_spent: the disclosed note's index, salt and nullifier (public from then on)",
+            "properties": {
+              "index": {
+                "type": "integer"
+              },
+              "salt": {
+                "type": "string"
+              },
+              "nullifier": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -800,6 +972,30 @@
           },
           "programId": {
             "type": "string"
+          },
+          "anchor": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "the latest head anchored on chain (Treasury, anchor_log) and whether this head is consistent with it (RFC 9162 consistency proof)",
+            "properties": {
+              "treeSize": {
+                "type": "integer"
+              },
+              "rootHash": {
+                "type": "string"
+              },
+              "slot": {
+                "type": "integer"
+              },
+              "consistent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
           }
         }
       },

@@ -119,3 +119,38 @@ test("CPI accounts for require_certificate and a pof_gate join instruction", asy
   assert.ok(w3 instanceof TransactionInstruction);
   assert.equal(w3.keys.length, ix.keys.length);
 });
+
+test("Config and Treasury decode; stats prefer the program's own counters", async () => {
+  const { client, rpc } = await world();
+  const v = Keypair.generate().publicKey.toBase58();
+  const nv = Keypair.generate().publicKey.toBase58();
+  await rpc.putConfig({
+    admin: v, verifier: v, next_verifier: nv, next_verifier_slot: 6000,
+    params: { fee_lamports: 10_000_000, holder_min: 1_000_000_000_000n, validity_slots: 6_480_000, max_attest_age: 300, max_root_lag: 9000, rotation_delay: 216000 },
+    assets: [
+      { enabled: true, mint: "So11111111111111111111111111111111111111112", decimals: 9, mins: [1e9, 1e10, 1e11, 1e12, 1e13] },
+      { enabled: true, mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, mins: [1e8, 1e9, 1e10, 1e11, 1e12] },
+      { enabled: false, mint: "11111111111111111111111111111111", decimals: 0, mins: [0, 0, 0, 0, 0] },
+      { enabled: false, mint: "11111111111111111111111111111111", decimals: 0, mins: [0, 0, 0, 0, 0] },
+    ],
+  });
+  const c = await client.getConfig();
+  assert.equal(c.activeVerifier, v, "before the rotation slot");
+  rpc.slot = 6000;
+  assert.equal((await client.getConfig()).activeVerifier, nv, "after it");
+  assert.equal(c.feeLamports, 10_000_000);
+  assert.equal(c.assets[0].mins[3], "1000000000000");
+  // every tier minimum in the SDK's table matches the launch Config (CONTRACT §2)
+  for (const a of [0, 1]) for (let t = 1; t <= 5; t++)
+    assert.equal(BigInt(c.assets[a].mins[t - 1]), BigInt(sdk.tierMinimum(a, t)) * 10n ** BigInt(sdk.ASSETS[a].decimals));
+
+  rpc.slot = 5000;
+  await rpc.putTreasury({ certified: 12, revoked_spent: 4, revoked_holder: 1, expired: 2, live: 3, log_size: 9, log_head: new Uint8Array(32).fill(7), log_slot: 4900 });
+  const t = await client.getTreasury();
+  assert.deepEqual(t.log, { treeSize: 9, rootHash: "07".repeat(32), slot: 4900 });
+  const s = await client.stats();
+  assert.equal(s.total, 12);
+  assert.equal(s.revokedSpent, 4);
+  assert.equal(s.expired, 2);
+  assert.equal(s.live, 3);
+});

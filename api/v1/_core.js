@@ -50,6 +50,7 @@ export async function handleV1(req) {
           "GET /v1/rooms",
           "GET /v1/rooms/{room}",
           "GET /v1/stats",
+          "GET /v1/config",
           "GET /v1/log/head",
           "GET /v1/log/proof/{id}",
           "GET /v1/openapi.json",
@@ -120,26 +121,55 @@ export async function handleV1(req) {
       }
     }
 
+    if (head === "config" && rest.length === 0) {
+      const client = getClient(env);
+      const c = await remember("config", 30_000, () => client.getConfig());
+      if (!c) throw new HttpError(404, "not_found", "the pof Config account does not exist on this cluster yet");
+      return json(200, {
+        slot: c.slot,
+        programId: client.programId,
+        gateProgramId: client.gateProgramId,
+        verifier: c.activeVerifier,
+        nextVerifier: c.nextVerifier,
+        nextVerifierSlot: c.nextVerifierSlot || null,
+        relayer: c.relayer,
+        rootMint: c.rootMint,
+        feeLamports: c.feeLamports,
+        holderMin: c.holderMin,
+        validitySlots: c.validitySlots,
+        maxAttestAge: c.maxAttestAge,
+        maxRootLag: c.maxRootLag,
+        paused: c.paused,
+        assets: c.assets.filter((a) => a.enabled).map((a) => ({
+          id: a.id, symbol: sdk.ASSETS[a.id]?.symbol ?? null, mint: a.mint, decimals: a.decimals,
+          tiers: a.mins.map((m, i) => ({ tier: i + 1, minimum: m, label: sdk.ASSETS[a.id]?.tiers[i + 1] !== undefined ? sdk.tierLabel(a.id, i + 1) : null })),
+        })),
+      }, cache(30, 300));
+    }
+
     if (head === "stats" && rest.length === 0) {
       const client = getClient(env);
       const s = await remember("stats", 10_000, () => client.stats());
       let log = null;
       try {
         const h = await verifiedHead(logBase(env, req.origin), client, req.fetch);
-        log = { treeSize: h.treeSize, rootHash: h.rootHash, signatureValid: h.signatureValid };
+        log = { treeSize: h.treeSize, rootHash: h.rootHash, signatureValid: h.signatureValid, anchor: h.anchor };
       } catch {
         log = null;
       }
       return json(200, {
         slot: s.slot,
-        live: s.live,
+        live: s.treasury ? s.treasury.live : s.live,
         total: s.total,
         revoked: s.revokedSpent + s.revokedByHolder,
         revokedSpent: s.revokedSpent,
         revokedByHolder: s.revokedByHolder,
         expired: s.expired,
-        solCertified: s.byAsset.SOL?.certifiedMinimum ?? 0,
-        usdcCertified: s.byAsset.USDC?.certifiedMinimum ?? 0,
+        solCertified: s.treasury ? Number(BigInt(s.treasury.liveMin[0] ?? 0) / 10n ** 9n) : s.byAsset.SOL?.certifiedMinimum ?? 0,
+        usdcCertified: s.treasury ? Number(BigInt(s.treasury.liveMin[1] ?? 0) / 10n ** 6n) : s.byAsset.USDC?.certifiedMinimum ?? 0,
+        renewed: s.treasury?.renewed ?? null,
+        relayed: s.treasury?.relayed ?? null,
+        openCertificates: s.treasury?.open ?? null,
         byAsset: s.byAsset,
         bySubjectKind: s.bySubjectKind,
         log,

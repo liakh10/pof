@@ -43,6 +43,8 @@ async function common(subject, asset, programId) {
 }
 /**
  * The accounts to pass when your program CPIs into `pof::require_certificate(subject_hash, asset, min_tier)`.
+ * The call fails unless the certificate is live, unexpired and at least `min_tier`; on success it returns
+ * `CertView { subject_kind, tier, expiry_slot, controller }` as return data. Check `controller` against your signer.
  * Put them in your instruction's remaining accounts (or name them in your Accounts struct) in this order,
  * followed by the pof program account itself.
  */
@@ -65,8 +67,9 @@ export async function joinRoomInstruction(args) {
     const room = toAddress(args.room);
     const [member] = await memberAddress(room, c.hash, gateProgramId);
     const payer = toAddress(args.payer);
+    const controller = toAddress(args.controller ?? args.payer);
     const idl = POF_GATE_IDL;
-    const keys = resolveAccounts(idl, "join", { ...c, room, member, payer, signer: payer, user: payer, ...args.extra });
+    const keys = resolveAccounts(idl, "join", { ...c, room, member, payer, controller, ...args.extra });
     const ixArgs = { subject_hash: c.hash, asset, subject_kind: args.subject instanceof Uint8Array ? 0 : args.subject.kind };
     const data = encodeInstruction(idl, "join", ixArgs);
     return { programId: gateProgramId, keys, data, member, certificate: c.certificate };

@@ -5,7 +5,8 @@ import { toAddress, toAddressBytes, type AddressLike } from "./base58.js";
 import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, ASSETS, tierMinimum, parseAsset } from "./constants.js";
 import { parseSubjectQuery, subjectHash, type Subject } from "./subject.js";
 import {
-  certificateAddress, decodeCertificate, decodeMember, decodeRoom, effectiveStatus, layout,
+  certificateAddress, configAddress, treasuryAddress, decodeConfig, decodeTreasury, activeVerifier,
+  type PofConfig, type Treasury, decodeCertificate, decodeMember, decodeRoom, effectiveStatus, layout,
   type Certificate, type Member, type Room, type StatusName,
 } from "./accounts.js";
 
@@ -121,6 +122,23 @@ export class PofClient {
     return { slot, certificates };
   }
 
+  /** The program's Config: verifier keys, fee, validity, tier tables in base units. */
+  async getConfig(): Promise<(PofConfig & { activeVerifier: string; slot: number }) | null> {
+    const [addr] = await configAddress(this.programId);
+    const [acc, slot] = await Promise.all([this.rpc.getAccount(addr), this.rpc.getSlot()]);
+    if (!acc || acc.owner !== this.programId) return null;
+    const c = decodeConfig(acc.data);
+    return { ...c, activeVerifier: activeVerifier(c, slot), slot };
+  }
+
+  /** The Treasury's public counters, and the transparency log head anchored on chain. */
+  async getTreasury(): Promise<(Treasury & { address: string }) | null> {
+    const [addr] = await treasuryAddress(this.programId);
+    const acc = await this.rpc.getAccount(addr);
+    if (!acc || acc.owner !== this.programId) return null;
+    return { ...decodeTreasury(acc.data), address: addr };
+  }
+
   async getRoom(address: AddressLike): Promise<Room | null> {
     const addr = toAddress(address);
     const acc = await this.rpc.getAccount(addr);
@@ -163,7 +181,11 @@ export class PofClient {
     };
   }
 
-  /** Counters: live certificates, revocations, and the sum of live tier minimums per asset. */
+  /**
+   * Counters: live certificates, revocations, and the sum of live tier minimums per asset.
+   * The cumulative counters come from the Treasury when it exists (expired certificates are closed, so a scan cannot
+   * count them); the per-tier breakdown comes from a scan of the open certificates.
+   */
   async stats(): Promise<{
     slot: number;
     total: number;
@@ -173,10 +195,11 @@ export class PofClient {
     expired: number;
     byAsset: Record<string, { live: number; certifiedMinimum: number; byTier: Record<number, number> }>;
     bySubjectKind: Record<string, number>;
+    treasury: (Treasury & { address: string }) | null;
   }> {
-    const { slot, certificates } = await this.listCertificates();
+    const [{ slot, certificates }, treasury] = await Promise.all([this.listCertificates(), this.getTreasury()]);
     const out = {
-      slot, total: certificates.length, live: 0, revokedSpent: 0, revokedByHolder: 0, expired: 0,
+      slot, total: certificates.length, live: 0, revokedSpent: 0, revokedByHolder: 0, expired: 0, treasury,
       byAsset: {} as Record<string, { live: number; certifiedMinimum: number; byTier: Record<number, number> }>,
       bySubjectKind: { wallet: 0, x: 0, badge: 0 } as Record<string, number>,
     };
@@ -192,6 +215,13 @@ export class PofClient {
       b.live++;
       b.byTier[c.tier] = (b.byTier[c.tier] ?? 0) + 1;
       if (ASSETS[c.asset]?.tiers[c.tier] !== undefined) b.certifiedMinimum += tierMinimum(c.asset, c.tier);
+    }
+    if (treasury) {
+      // the program's own counters are authoritative for the cumulative numbers
+      out.total = treasury.certified;
+      out.revokedSpent = treasury.revokedSpent;
+      out.revokedByHolder = treasury.revokedHolder;
+      out.expired = Math.max(treasury.expired, out.expired);
     }
     return out;
   }

@@ -15,6 +15,8 @@ export interface Instruction {
 export declare function resolveAccounts(idl: Idl, ixName: string, given: Record<string, AddressLike | undefined>): AccountMeta[];
 /**
  * The accounts to pass when your program CPIs into `pof::require_certificate(subject_hash, asset, min_tier)`.
+ * The call fails unless the certificate is live, unexpired and at least `min_tier`; on success it returns
+ * `CertView { subject_kind, tier, expiry_slot, controller }` as return data. Check `controller` against your signer.
  * Put them in your instruction's remaining accounts (or name them in your Accounts struct) in this order,
  * followed by the pof program account itself.
  */
@@ -37,6 +39,8 @@ export declare function joinRoomInstruction(args: {
     asset: number | string;
     subject: Subject | Uint8Array;
     payer: AddressLike;
+    /** the certificate's controller (the wallet for kind 0, the badge key for kind 2); it signs. Default: the payer */
+    controller?: AddressLike;
     programId?: AddressLike;
     gateProgramId?: AddressLike;
     /** extra or renamed accounts if the program's IDL names them differently */

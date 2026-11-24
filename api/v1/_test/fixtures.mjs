@@ -32,7 +32,7 @@ export async function makeLog(n = 7) {
     const att = sdk.buildAttestation({
       programId: sdk.POF_PROGRAM_ID, subjectKind: 0, subjectHash: crypto.randomBytes(32).toString("hex"), asset: 0, tier: 1 + (i % 5),
       treeRoot: "bb".repeat(32), rootSlot: 100 + i, noteCount: 1, nullsetHash: "cc".repeat(32), issuedSlot: 200 + i, expirySlot: 9000,
-      payer: verifierKey, nonce: crypto.randomBytes(16).toString("hex"),
+      payer: verifierKey, controller: verifierKey, nonce: crypto.randomBytes(16).toString("hex"),
     });
     const sig = crypto.sign(null, att, privateKey);
     const slot = Buffer.alloc(8); slot.writeBigUInt64LE(BigInt(300 + i));

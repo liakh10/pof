@@ -37,7 +37,10 @@ export function decodeCertificate(address, data) {
     const tier = Number(pick(r, "tier"));
     const status = Number(pick(r, "status"));
     const noteCount = Number(pick(r, "note_count", "noteCount") ?? 0);
-    const hashes = pick(r, "nullifier_hashes", "nullifierHashes", "nullset", "nullifiers") ?? [];
+    const hashes = pick(r, "null_hashes", "nullifier_hashes", "nullifierHashes", "nullifiers") ?? [];
+    const revIdx = num(pick(r, "revealed_index", "revealedIndex"));
+    const optHex = (v) => (v === undefined || v === null ? null : hex(v));
+    const optKey = (v) => (v === undefined || v === null ? null : String(v));
     const revoked = num(pick(r, "revoked_slot", "revokedSlot"));
     const kind = Number(pick(r, "subject_kind", "subjectKind"));
     const logIndex = num(pick(r, "log_index", "logIndex"));
@@ -60,6 +63,15 @@ export function decodeCertificate(address, data) {
         payer: String(pick(r, "payer") ?? ""),
         logIndex: logIndex === 18446744073709552000 ? null : logIndex,
         verifier: String(pick(r, "verifier", "verifier_key", "verifierKey") ?? ""),
+        controller: optKey(pick(r, "controller")),
+        issuedSlot: num(pick(r, "issued_slot", "issuedSlot")),
+        treeRoot: optHex(pick(r, "tree_root", "treeRoot")),
+        rootSlot: num(pick(r, "root_slot", "rootSlot")),
+        nullsetHash: optHex(pick(r, "nullset_hash", "nullsetHash")),
+        renewals: num(pick(r, "renewals")) ?? 0,
+        revealed: revIdx !== null && revIdx !== 255
+            ? { index: revIdx, salt: hex(pick(r, "revealed_salt")), nullifier: hex(pick(r, "revealed_nullifier")) }
+            : null,
     };
 }
 export function decodeRoom(address, data) {
@@ -77,7 +89,10 @@ export function decodeRoom(address, data) {
         minTierLabel: ASSETS[asset]?.tiers[minTier] !== undefined ? tierLabel(asset, minTier) : `tier ${minTier}`,
         memberCount: num(pick(r, "member_count", "memberCount", "members")) ?? 0,
         createdSlot: num(pick(r, "created_slot", "createdSlot")),
-        name: typeof name === "string" ? name.replace(/\0+$/, "") : name instanceof Uint8Array ? new TextDecoder().decode(name).replace(/\0+$/, "") : null,
+        name: typeof name === "string" ? name.replace(/\0+$/, "") || null : name instanceof Uint8Array ? new TextDecoder().decode(name).replace(/\0+$/, "") || null : null,
+        open: pick(r, "open") === undefined ? true : !!pick(r, "open"),
+        joined: num(pick(r, "joined")) ?? 0,
+        evicted: num(pick(r, "evicted")) ?? 0,
         raw: r,
     };
 }
@@ -90,10 +105,47 @@ export function decodeMember(address, data) {
         subjectHash: hex(pick(r, "subject_hash", "subjectHash")),
         certificate: cert ? String(cert) : null,
         joinedSlot: num(pick(r, "joined_slot", "joinedSlot")),
+        subjectKind: num(pick(r, "subject_kind", "subjectKind")),
+        controller: pick(r, "controller") ? String(pick(r, "controller")) : null,
+        payer: pick(r, "payer") ? String(pick(r, "payer")) : null,
     };
 }
+const DEFAULT_KEY = "11111111111111111111111111111111";
 export function decodeConfig(data) {
-    return decodeAccount(pofIdl, "Config", data);
+    const r = decodeAccount(pofIdl, "Config", data);
+    const p = r.params ?? {};
+    return {
+        admin: String(r.admin), dev: String(r.dev ?? ""), relayer: String(r.relayer ?? ""), verifier: String(r.verifier),
+        nextVerifier: r.next_verifier && r.next_verifier !== DEFAULT_KEY ? String(r.next_verifier) : null,
+        nextVerifierSlot: num(r.next_verifier_slot) ?? 0,
+        rootMint: String(r.root_mint ?? ""),
+        feeLamports: num(p.fee_lamports ?? r.fee_lamports) ?? 0,
+        holderMin: String(p.holder_min ?? "0"),
+        validitySlots: num(p.validity_slots ?? r.validity_slots) ?? 0,
+        maxAttestAge: num(p.max_attest_age) ?? 0,
+        maxRootLag: num(p.max_root_lag) ?? 0,
+        rotationDelay: num(p.rotation_delay) ?? 0,
+        assets: (r.assets ?? []).map((a, id) => ({
+            id, enabled: !!a.enabled, mint: String(a.mint), decimals: Number(a.decimals), mins: (a.mins ?? []).map((m) => String(m)),
+        })),
+        paused: !!r.paused, closing: !!r.closing, launchSlot: num(r.launch_slot) ?? 0,
+        raw: r,
+    };
+}
+/** The verifier key certify accepts at `slot` (CONTRACT §6: next_verifier once its slot is reached). */
+export function activeVerifier(c, slot) {
+    return c.nextVerifier && slot >= c.nextVerifierSlot ? c.nextVerifier : c.verifier;
+}
+export function decodeTreasury(data) {
+    const r = decodeAccount(pofIdl, "Treasury", data);
+    const n = (k) => num(r[k]) ?? 0;
+    const size = n("log_size");
+    return {
+        feesIn: String(r.fees_in ?? 0), feesOut: String(r.fees_out ?? 0), certified: n("certified"), renewed: n("renewed"),
+        revokedSpent: n("revoked_spent"), revokedHolder: n("revoked_holder"), expired: n("expired"), live: n("live"),
+        liveMin: (r.live_min ?? []).map((x) => String(x)), open: n("open"), relayed: n("relayed"), exempt: n("exempt"),
+        log: size ? { treeSize: size, rootHash: hex(r.log_head), slot: n("log_slot") } : null,
+    };
 }
 /** Live means: status byte live AND the expiry slot not yet reached. */
 export function effectiveStatus(c, currentSlot) {

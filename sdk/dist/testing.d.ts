@@ -27,7 +27,11 @@ export declare class MemoryRpc implements RpcLike {
         logIndex?: number;
         verifier?: string;
         programId?: string;
+        controller?: string;
     }): Promise<string>;
+    /** Write the Treasury counters (live, revoked, …) and an anchored log head. */
+    putTreasury(t: Record<string, any>, programId?: string): Promise<string>;
+    putConfig(c: Record<string, any>, programId?: string): Promise<string>;
     putRoom(address: string, r: {
         creator: string;
         id: number;

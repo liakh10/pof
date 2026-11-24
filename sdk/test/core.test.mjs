@@ -71,10 +71,10 @@ test("assets, tiers and labels follow CONTRACT §2", () => {
 test("Certificate layout: encode, decode, offsets, effective status", async () => {
   const subject = sdk.walletSubject(Keypair.generate().publicKey);
   const hash = await sdk.subjectHash(subject);
-  const data = sdk.encodeAccount(sdk.POF_IDL, "Certificate", {
-    subject_kind: 0, subject_hash: hash, asset: 0, tier: 3, status: 0, certified_slot: 100, expiry_slot: 200, revoked_slot: 0,
-    note_count: 2, nullifier_hashes: Array.from({ length: 8 }, (_, i) => new Uint8Array(32).fill(i + 1)),
-    payer: "11111111111111111111111111111111", log_index: 7, verifier: "11111111111111111111111111111111", bump: 254,
+  const data = sdk.encodeAccountPartial(sdk.POF_IDL, "Certificate", {
+    subject_kind: 0, subject_hash: hash, asset: 0, tier: 3, status: 0, certified_slot: 100, issued_slot: 120, expiry_slot: 200, revoked_slot: 0,
+    note_count: 2, null_hashes: Array.from({ length: 8 }, (_, i) => new Uint8Array(32).fill(i + 1)), controller: subject.value,
+    payer: "11111111111111111111111111111111", log_index: 7, verifier: "11111111111111111111111111111111", revealed_index: 255, bump: 254,
   });
   const c = sdk.decodeCertificate("x", data);
   assert.equal(c.subjectHash, sdk.toHex(hash));
@@ -82,6 +82,11 @@ test("Certificate layout: encode, decode, offsets, effective status", async () =
   assert.equal(c.nullifierHashes.length, 2);
   assert.equal(c.revokedSlot, null);
   assert.equal(c.logIndex, 7);
+  assert.equal(c.controller, subject.value);
+  assert.equal(c.issuedSlot, 120);
+  assert.equal(c.revealed, null);
+  assert.equal(sdk.POF_IDL_IS_DRAFT, false);
+  assert.equal(sdk.POF_PROGRAM_ID, "pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT");
   assert.equal(sdk.effectiveStatus(c, 150), "live");
   assert.equal(sdk.effectiveStatus(c, 200), "expired");
   assert.equal(sdk.isLive(c, 199), true);
@@ -95,10 +100,12 @@ test("attestation bytes follow CONTRACT §3", () => {
   const a = {
     programId: sdk.POF_PROGRAM_ID, subjectKind: 1, subjectHash: "11".repeat(32), asset: 0, tier: 4, treeRoot: "22".repeat(32),
     rootSlot: 12345, noteCount: 3, nullsetHash: "33".repeat(32), issuedSlot: 12400, expirySlot: 99999,
-    payer: Keypair.generate().publicKey.toBase58(), nonce: "44".repeat(16),
+    payer: Keypair.generate().publicKey.toBase58(), controller: Keypair.generate().publicKey.toBase58(), nonce: "44".repeat(16),
   };
   const b = sdk.buildAttestation(a);
-  assert.equal(b.length, 208);
+  assert.equal(b.length, 240);
+  assert.equal(sdk.encodeBase58(b.slice(192, 224)), a.controller);
+  assert.equal(Buffer.from(b.slice(224)).toString("hex"), a.nonce);
   assert.equal(Buffer.from(b.slice(0, 4)).toString(), "POF1");
   assert.equal(b[70], 4);
   assert.equal(Buffer.from(b).readBigUInt64LE(103), 12345n);

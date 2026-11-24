@@ -23,6 +23,22 @@ export interface Certificate {
     payer: string;
     logIndex: number | null;
     verifier: string;
+    /** the key that may revoke the certificate and join rooms with it (CONTRACT §3) */
+    controller: string | null;
+    /** the slot the Verifier read when it signed (changes on renew) */
+    issuedSlot: number | null;
+    /** hex, the Rings state root the notes were checked against */
+    treeRoot: string | null;
+    rootSlot: number | null;
+    /** hex, sha256 of the salted nullifier hashes (§5) */
+    nullsetHash: string | null;
+    renewals: number;
+    /** after revoke_spent: the disclosed note's index, salt and nullifier, public from then on */
+    revealed: {
+        index: number;
+        salt: string;
+        nullifier: string;
+    } | null;
 }
 export interface Room {
     address: string;
@@ -35,6 +51,10 @@ export interface Room {
     memberCount: number;
     createdSlot: number | null;
     name: string | null;
+    /** false when the creator closed it to new joins */
+    open: boolean;
+    joined: number;
+    evicted: number;
     raw: Record<string, any>;
 }
 export interface Member {
@@ -44,11 +64,65 @@ export interface Member {
     subjectHash: string;
     certificate: string | null;
     joinedSlot: number | null;
+    subjectKind: number | null;
+    controller: string | null;
+    payer: string | null;
 }
 export declare function decodeCertificate(address: string, data: Uint8Array): Certificate;
 export declare function decodeRoom(address: string, data: Uint8Array): Room;
 export declare function decodeMember(address: string, data: Uint8Array): Member;
-export declare function decodeConfig(data: Uint8Array): Record<string, any>;
+export interface PofConfig {
+    admin: string;
+    dev: string;
+    relayer: string;
+    verifier: string;
+    nextVerifier: string | null;
+    nextVerifierSlot: number;
+    rootMint: string;
+    feeLamports: number;
+    holderMin: string;
+    validitySlots: number;
+    maxAttestAge: number;
+    maxRootLag: number;
+    rotationDelay: number;
+    /** by POF asset id: enabled, mint, decimals and the tier minimums in base units */
+    assets: {
+        id: number;
+        enabled: boolean;
+        mint: string;
+        decimals: number;
+        mins: string[];
+    }[];
+    paused: boolean;
+    closing: boolean;
+    launchSlot: number;
+    raw: Record<string, any>;
+}
+export declare function decodeConfig(data: Uint8Array): PofConfig;
+/** The verifier key certify accepts at `slot` (CONTRACT §6: next_verifier once its slot is reached). */
+export declare function activeVerifier(c: PofConfig, slot: number): string;
+export interface Treasury {
+    feesIn: string;
+    feesOut: string;
+    certified: number;
+    renewed: number;
+    revokedSpent: number;
+    revokedHolder: number;
+    expired: number;
+    live: number;
+    /** sum of tier minimums of live certificates by POF asset id, base units */
+    liveMin: string[];
+    open: number;
+    relayed: number;
+    exempt: number;
+    /** the transparency log head anchored on chain by anchor_log */
+    log: {
+        treeSize: number;
+        rootHash: string;
+        slot: number;
+    } | null;
+}
+export declare function decodeTreasury(data: Uint8Array): Treasury;
 /** Live means: status byte live AND the expiry slot not yet reached. */
 export declare function effectiveStatus(c: Pick<Certificate, "status" | "expirySlot">, currentSlot: number): StatusName;
 export declare function isLive(c: Pick<Certificate, "status" | "expirySlot">, currentSlot: number): boolean;

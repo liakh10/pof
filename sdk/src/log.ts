@@ -3,7 +3,9 @@ import { concat, ed25519Verify, equalBytes, fromHex, sha256, toHex, utf8, u64le 
 import { encodeBase58, toAddressBytes, type AddressLike } from "./base58.js";
 import { parseAttestation, verifyAttestationSignature, type Attestation } from "./attestation.js";
 
-export const LEAF_LEN = 345;
+/** 1 + 240 (§3) + 64 + 32 + 32 + 8. The 345-byte form carried the 208-byte draft attestation. */
+export const LEAF_LEN = 377;
+export const LEAF_LEN_V0 = 345;
 
 type Hex = string;
 const h = (x: Uint8Array | Hex) => (typeof x === "string" ? fromHex(x) : x);
@@ -152,17 +154,19 @@ export interface LogLeaf {
 
 export function parseLeaf(leaf: Uint8Array | Hex): LogLeaf {
   const b = h(leaf);
-  if (b.length !== LEAF_LEN) throw new Error(`a log leaf is ${LEAF_LEN} bytes, got ${b.length}`);
+  if (b.length !== LEAF_LEN && b.length !== LEAF_LEN_V0) throw new Error(`a log leaf is ${LEAF_LEN} bytes, got ${b.length}`);
   if (b[0] !== 1) throw new Error(`unknown log leaf version ${b[0]}`);
-  const att = b.slice(1, 209);
+  const n = b.length - 137; // attestation length
+  const att = b.slice(1, 1 + n);
+  const o = 1 + n;
   return {
     version: b[0],
     attestationBytes: toHex(att),
     attestation: parseAttestation(att),
-    signature: toHex(b.slice(209, 273)),
-    verifierKey: encodeBase58(b.slice(273, 305)),
-    bundleHash: toHex(b.slice(305, 337)),
-    loggedSlot: Number(new DataView(b.buffer, b.byteOffset).getBigUint64(337, true)),
+    signature: toHex(b.slice(o, o + 64)),
+    verifierKey: encodeBase58(b.slice(o + 64, o + 96)),
+    bundleHash: toHex(b.slice(o + 96, o + 128)),
+    loggedSlot: Number(new DataView(b.buffer, b.byteOffset).getBigUint64(o + 128, true)),
   };
 }
 

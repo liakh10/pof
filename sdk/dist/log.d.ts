@@ -1,6 +1,8 @@
 import { type AddressLike } from "./base58.js";
 import { type Attestation } from "./attestation.js";
-export declare const LEAF_LEN = 345;
+/** 1 + 240 (§3) + 64 + 32 + 32 + 8. The 345-byte form carried the 208-byte draft attestation. */
+export declare const LEAF_LEN = 377;
+export declare const LEAF_LEN_V0 = 345;
 type Hex = string;
 export declare function leafHash(leaf: Uint8Array): Promise<Uint8Array>;
 export declare function nodeHash(left: Uint8Array, right: Uint8Array): Promise<Uint8Array>;

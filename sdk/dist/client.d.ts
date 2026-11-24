@@ -2,7 +2,7 @@
 import { type RpcLike, type Commitment } from "./rpc.js";
 import { type AddressLike } from "./base58.js";
 import { type Subject } from "./subject.js";
-import { type Certificate, type Member, type Room, type StatusName } from "./accounts.js";
+import { type PofConfig, type Treasury, type Certificate, type Member, type Room, type StatusName } from "./accounts.js";
 export interface PofClientOptions {
     /** an RPC URL or anything implementing RpcLike */
     rpc: string | RpcLike;
@@ -65,6 +65,15 @@ export declare class PofClient {
         slot: number;
         certificates: LiveCertificate[];
     }>;
+    /** The program's Config: verifier keys, fee, validity, tier tables in base units. */
+    getConfig(): Promise<(PofConfig & {
+        activeVerifier: string;
+        slot: number;
+    }) | null>;
+    /** The Treasury's public counters, and the transparency log head anchored on chain. */
+    getTreasury(): Promise<(Treasury & {
+        address: string;
+    }) | null>;
     getRoom(address: AddressLike): Promise<Room | null>;
     listRooms(): Promise<Room[]>;
     /** A room with its members, each with the live status of the certificate behind it. */
@@ -77,7 +86,11 @@ export declare class PofClient {
             live: boolean;
         })[];
     } | null>;
-    /** Counters: live certificates, revocations, and the sum of live tier minimums per asset. */
+    /**
+     * Counters: live certificates, revocations, and the sum of live tier minimums per asset.
+     * The cumulative counters come from the Treasury when it exists (expired certificates are closed, so a scan cannot
+     * count them); the per-tier breakdown comes from a scan of the open certificates.
+     */
     stats(): Promise<{
         slot: number;
         total: number;
@@ -91,5 +104,8 @@ export declare class PofClient {
             byTier: Record<number, number>;
         }>;
         bySubjectKind: Record<string, number>;
+        treasury: (Treasury & {
+            address: string;
+        }) | null;
     }>;
 }

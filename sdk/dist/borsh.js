@@ -288,3 +288,35 @@ export function encodeInstruction(idl, name, args) {
         throw new Error(`IDL instruction ${name} not found`);
     return concat(Uint8Array.from(ix.discriminator), ...ix.args.map((a) => encode(idl, a.type, args[a.name])));
 }
+/** A zero value for any IDL type (fixtures fill the fields they care about on top of it). */
+export function zeroValue(idl, t) {
+    if (typeof t === "string") {
+        if (t === "bool")
+            return false;
+        if (t === "pubkey" || t === "publicKey")
+            return "11111111111111111111111111111111";
+        if (t === "string")
+            return "";
+        if (t === "bytes")
+            return new Uint8Array(0);
+        return 0;
+    }
+    if (t.array)
+        return t.array[0] === "u8" ? new Uint8Array(t.array[1]) : Array.from({ length: t.array[1] }, () => zeroValue(idl, t.array[0]));
+    if (t.vec)
+        return [];
+    if (t.option || t.coption)
+        return null;
+    if (t.defined) {
+        const d = typeDef(idl, t);
+        if (d.type.kind === "struct")
+            return Object.fromEntries((d.type.fields ?? []).map((f) => [f.name, zeroValue(idl, f.type)]));
+        return { kind: d.type.variants[0].name };
+    }
+    return null;
+}
+/** Encode an account from a partial value: missing fields are zero. */
+export function encodeAccountPartial(idl, name, value) {
+    const base = zeroValue(idl, { defined: { name } });
+    return encodeAccount(idl, name, { ...base, ...value });
+}
