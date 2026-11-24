@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proof of Funds · post proof, not wallet</title>
+<meta name="description" content="A public certificate that you hold at least a tier of SOL or USDC, proven from Helius Privacy Rings without showing the amount. It revokes itself the moment the money moves.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<link rel="stylesheet" href="/design/posters/posters.css">
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/design/posters/posters.js"></script>
+</head>
+<body class="pf" data-page="wall">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top pf-top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="28" height="28" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <p class="series" aria-hidden="true"><b data-series-n>01</b><span class="of">/06</span><span class="t" data-series-t>Function</span></p>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/" aria-current="page">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+
+<main id="main">
+
+<!-- 01 · the function -->
+<section class="poster p1 on" data-title="Function" aria-labelledby="p1-h">
+  <div class="bl" aria-hidden="true"></div>
+  <div class="p1-field" data-film>
+    <div class="p1-seal" data-seal="hero"></div>
+    <svg class="p1-prog" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="49" pathLength="1000" data-film-progress/></svg>
+    <button class="p1-play" type="button" data-film-play aria-label="Play the film, 36 seconds, with sound and captions"></button>
+    <p class="p1-filmlabel"><button type="button" data-film-play><svg viewBox="0 0 10 12" aria-hidden="true"><path d="M0 0 L10 6 L0 12 Z"/></svg><span data-film-label>Play the film</span></button><span class="len" data-film-len>0:36</span><button class="mute" type="button" data-film-mute hidden>Sound off</button></p>
+    <p class="p1-cap" data-film-cap aria-live="off"></p>
+    <span class="reg tl" aria-hidden="true"></span><span class="reg tr" aria-hidden="true"></span>
+  </div>
+  <h1 class="p1-h" id="p1-h"><span class="ln l"><span class="w">Post proof,</span></span><span class="ln r"><span class="w">not <em>wallet.</em></span></span></h1>
+  <div class="p1-strip pg">
+    <div class="p1-fn">
+      <p class="label">Proof of Funds · on Helius Privacy Rings</p>
+      <p class="fn">A public certificate that you hold at least a tier of SOL or USDC.</p>
+      <p class="fn2">It never shows the amount, it can hide the wallet, and it revokes itself the moment the money moves.</p>
+    </div>
+    <div class="p1-act">
+      <a class="btn" href="/get">Get certified</a>
+      <a class="btn ghost" href="/verify">Verify anyone</a>
+    </div>
+    <div class="p1-slot">
+      <p class="label quiet" data-live-label>Solana mainnet slot, read live</p>
+      <p class="slotnum" data-slot aria-live="off">&nbsp;</p>
+      <p class="slotsub" data-live-sub>The wall fills from the chain the moment the first certificate lands.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 02 · what a certificate says -->
+<section class="poster p2" data-title="A minimum" aria-labelledby="p2-h">
+  <div class="bl" aria-hidden="true"></div>
+  <div class="p2-art" aria-hidden="true"><div class="p2-seal" data-seal="half"></div></div>
+  <div class="pg pin">
+    <p class="pmeta"><b>02</b><span>What a certificate says</span></p>
+    <h2 class="ph p2-h" id="p2-h"><span class="ln"><span class="w">A minimum.</span></span><span class="ln"><span class="w">Never an <em>amount.</em></span></span></h2>
+    <div class="p2-scale">
+      <p class="label quiet">Tiers you can prove</p>
+      <table class="tiers">
+        <caption class="sr">Certificate tiers by asset</caption>
+        <tbody>
+          <tr><th scope="row">SOL</th><td><i class="ge">≥</i>1</td><td><i class="ge">≥</i>10</td><td><i class="ge">≥</i>100</td><td class="hot"><i class="ge">≥</i>1,000</td><td><i class="ge">≥</i>10,000</td></tr>
+          <tr><th scope="row">USDC</th><td><i class="ge">≥</i>100</td><td><i class="ge">≥</i>1,000</td><td><i class="ge">≥</i>10,000</td><td><i class="ge">≥</i>100,000</td><td><i class="ge">≥</i>1,000,000</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="p2-lists">
+      <div>
+        <h3 class="lh">It proves</h3>
+        <ol class="nl">
+          <li>The disclosed notes exist in the Rings tree and were unspent at the slot it names.</li>
+          <li>Together they reach the tier: at least 1,000 SOL means at least 1,000 SOL.</li>
+          <li>The subject signed for this vault, so the tier is bound to it.</li>
+          <li>It is still true now: a spend revokes it on chain.</li>
+        </ol>
+      </div>
+      <div>
+        <h3 class="lh">It does not prove</h3>
+        <ol class="nl neg">
+          <li>How much you hold in total, or anything about the rest of your Ring.</li>
+          <li>That the money was never borrowed. Revocation catches the return, not the loan.</li>
+          <li>Anything about the past. It starts at the slot it was certified.</li>
+          <li>Anonymity. A wallet subject names the wallet; choose a badge to name nobody.</li>
+        </ol>
+        <p><a class="link-arrow" href="/docs/trust">Read the trust points first</a></p>
+      </div>
+    </div>
+  </div>
+  <figure class="p2-spec" aria-label="What a certificate holds, field by field">
+    <div class="spec-head"><span>Certificate</span><span>fields on chain</span></div>
+    <dl>
+      <div><dt>Subject</dt><dd>wallet · X handle · badge</dd></div>
+      <div><dt>Asset</dt><dd>SOL or USDC</dd></div>
+      <div class="big"><dt>Tier</dt><dd><i class="ge">≥</i>1,000 <small>SOL</small></dd></div>
+      <div><dt>Amount</dt><dd class="none">not stored</dd></div>
+      <div><dt>Notes behind it</dt><dd>a count and their nullifier hashes</dd></div>
+      <div><dt>Certified at</dt><dd>the slot it landed in</dd></div>
+      <div><dt>Status</dt><dd><span class="status live">Live</span></dd></div>
+    </dl>
+  </figure>
+</section>
+
+<!-- 03 · how it works -->
+<section class="poster p3" data-title="Four steps" aria-labelledby="p3-h">
+  <div class="bl" aria-hidden="true"></div>
+  <div class="p3-art" aria-hidden="true"><div class="p3-seal" data-seal="left"></div></div>
+  <div class="pg pin">
+    <p class="pmeta"><b>03</b><span>How it works</span></p>
+    <h2 class="p3-h" id="p3-h">Four steps, one signature you can read.</h2>
+    <ol class="p3-steps">
+      <li data-step="0"><span class="n">01</span><h3 class="w">Shield</h3><p>Move SOL or USDC into your own POF vault, a separate Privacy Ring made from one wallet signature. The money stays yours and stays shielded.</p></li>
+      <li data-step="1"><span class="n">02</span><h3 class="w">Choose</h3><p>Pick a tier, from at least 1 SOL to at least 10,000, and a subject: this wallet, an X handle, or a fresh badge that names nobody.</p></li>
+      <li data-step="2"><span class="n">03</span><h3 class="w">Prove</h3><p>Your browser picks the fewest notes that reach the tier. The Verifier checks they exist and are unspent, keeps nothing, and signs. The chain stores the certificate.</p></li>
+      <li data-step="3"><span class="n">04</span><h3 class="w">Stay live</h3><p>The keeper watches the notes behind every certificate. Spend one and the certificate is revoked on chain, with the slot, for everyone at once.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 04 · revocation -->
+<section class="poster p4 ink" data-title="Revocation" aria-labelledby="p4-h">
+  <div class="bl" aria-hidden="true"></div>
+  <div class="p4-art" aria-hidden="true"><div class="p4-seal" data-seal="break"></div></div>
+  <div class="pg pin p4pad">
+    <p class="pmeta"><b>04</b><span>Revocation</span></p>
+    <h2 class="ph p4-h" id="p4-h"><span class="ln"><span class="w">Move the money,</span></span><span class="ln"><span class="w">the certificate</span></span><span class="ln"><span class="w"><em>breaks.</em></span></span></h2>
+    <div class="p4-copy">
+      <p class="lead">The keeper watches the notes behind every certificate. Spend one and the certificate is revoked on chain, with the slot, for everyone at once.</p>
+      <p>When a disclosed note is spent, the keeper proves it on chain and the card turns over. Nobody can edit a card, including us.</p>
+      <p><a class="link-arrow" href="/docs/revocation">How revocation works</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- 05 · use it -->
+<section class="poster p5" data-title="Use it" aria-labelledby="p5-h">
+  <div class="bl" aria-hidden="true"></div>
+  <div class="p5-art" aria-hidden="true"><div class="p5-seal" data-seal="corner"></div></div>
+  <div class="pg pin">
+    <p class="pmeta"><b>05</b><span>Use it</span></p>
+    <h2 class="ph p5-h" id="p5-h"><span class="ln"><span class="w">Gate anything</span></span><span class="ln"><span class="w">with a</span></span><span class="ln"><span class="w"><em>certificate.</em></span></span></h2>
+    <ol class="p5-list">
+      <li><span>Rooms on chain</span><a href="/rooms">/rooms</a></li>
+      <li><span>A Telegram gate</span><a href="/developers">bots</a></li>
+      <li><span>Discord roles</span><a href="/developers">bots</a></li>
+      <li><span>An API</span><a href="/developers#http-api">/v1</a></li>
+      <li><span>An SDK</span><a href="/developers#the-sdk">@pof/sdk</a></li>
+      <li><span>An MCP server for agents</span><a href="/developers">mcp</a></li>
+      <li><span>One CPI call for your own program</span><a href="/developers">cpi</a></li>
+    </ol>
+    <div class="p5-code">
+      <div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>import { PofClient } from "@pof/sdk";
+
+const pof = new PofClient({ rpc: "https://api.mainnet-beta.solana.com" });
+const r = await pof.checkProofOfFunds({ subject: "@anon", asset: "SOL", minTier: 4 });
+// r.ok: a live certificate of at least 1,000 SOL, read from chain</code></pre></div>
+      <div class="code" data-lang="rust"><span class="code-lang">rust</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>let view = pof::cpi::require_certificate(ctx, subject_hash, 0, 3)?.get();
+require_keys_eq!(view.controller, user.key());
+// passes only while the certificate is live and at least 100 SOL</code></pre></div>
+    </div>
+    <div class="p5-act"><a class="btn" href="/developers">Developers</a><a class="btn ghost" href="/rooms">Rooms</a><a class="btn ghost" href="/log">The transparency log</a></div>
+  </div>
+</section>
+
+<!-- 06 · the wall -->
+<section class="poster p6" id="wall" data-title="The wall" aria-labelledby="p6-h">
+  <div class="bl" aria-hidden="true"></div>
+  <div class="pg pin">
+    <p class="pmeta"><b>06</b><span>The wall</span></p>
+    <h2 class="ph p6-h" id="p6-h"><span class="ln"><span class="w">Every certificate, <em>live.</em></span></span></h2>
+    <div class="p6-bar">
+      <p class="p6-lead">Read from the chain. When a disclosed note is spent, the keeper proves it on chain and the card turns over. Nobody can edit a card, including us.</p>
+      <div class="seg" role="group" aria-label="Show">
+        <button type="button" data-filter="any" aria-pressed="true">All</button>
+        <button type="button" data-filter="live" aria-pressed="false">Live</button>
+        <button type="button" data-filter="revoked" aria-pressed="false">Revoked</button>
+      </div>
+    </div>
+    <dl class="p6-count" aria-label="Counters, read from the chain">
+      <div><dt>Live certificates</dt><dd data-c="live">0</dd></div>
+      <div><dt>SOL certified, at least</dt><dd data-c="sol">0</dd></div>
+      <div><dt>USDC certified, at least</dt><dd data-c="usdc">0</dd></div>
+      <div><dt>Revoked: funds moved</dt><dd data-c="spent">0</dd></div>
+      <div><dt>Revoked by holder</dt><dd data-c="holder">0</dd></div>
+      <div><dt>Log entries</dt><dd data-c="log">0</dd></div>
+    </dl>
+    <div class="wall p6-wall" data-wall aria-live="polite"></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">515f4232e10ccbe4aca21bb90884d828972443fc6584f434ab0d167a000d6935</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>
