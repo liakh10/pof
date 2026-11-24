@@ -129,6 +129,12 @@ reference id and a stack with RPC keys scrubbed.
 - If every keeper and the holder are offline, a spent certificate stays live until it expires (at most `validity_slots`).
 - If Helius ever closes nullifier PDAs before a keeper acts, revocation needs the nullifier-tree membership path, which
   the program accepts and the keeper builds from the indexer (`rings.ts nullifierMembership`).
+- **One note behind a signed and a zk certificate (known limitation, ZK-06).** The Verifier refuses a note that backs a live
+  zk certificate (it reads the note's `["znote", tag]` lock before signing). The other direction is not covered: a signed
+  certificate stores salted nullifier hashes, which the zk path cannot match, so it cannot see that a note already backs a
+  signed certificate. Today this cannot be used, because zk certification is off on chain until a public trusted-setup
+  ceremony. Closing it needs a change to the §3 attestation bytes (signed certificates would create the same note locks),
+  which stays frozen for launch and is planned with the zk launch.
 
 ## What phase 2 removes
 
