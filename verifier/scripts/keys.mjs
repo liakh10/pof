@@ -1,8 +1,13 @@
-/* The Verifier's and the relayer's keys, made for this project only.
+/* The Verifier's, the relayer's, the keeper's and the credit keys, made for this project only.
      node scripts/keys.mjs            make the missing ones in ~/.config/pof/ (dir 700, files 600); print public keys only
-     node scripts/keys.mjs --vercel   also push them to the linked Vercel project's env (production + preview), values via stdin
+     node scripts/keys.mjs --pin      also write the public credit key and house ring into lib/credit-pins.json (audit CR-01)
+     node scripts/keys.mjs --vercel   also replace POF_VERIFIER_KEY, POF_RELAYER_KEY, POF_SEAL_KEY and POF_CREDIT_KEY in the
+                                      linked Vercel project (production + preview): `vercel env rm` then `vercel env add`, the
+                                      value through stdin only (VERCEL_BIN overrides the binary, for the test)
    Files: verifier.json and relayer.json (Solana keypair JSON: 64 numbers), seal.hex (32 bytes: the keeper's AES key and the
-   note-lock / quote HMAC root), keeper.x25519 (our keeper's escrow key; its public half goes into keepers.json). An existing file is never overwritten; rotating the verifier is set_verifier on chain. */
+   note-lock / quote / rate-limit HMAC root), keeper.x25519 (our keeper's escrow key; its public half goes into keepers.json),
+   credits-rsa.json (RSA-3072 with its CRT parts; a key without them is moved to credits-rsa.retired-<kid>.json).
+   An existing file is never overwritten; rotating the verifier is set_verifier on chain. */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -78,4 +83,18 @@ if (process.argv.includes('--pin')) {
     console.log(`pinned ${net}: credit key ${c.kid}, house ring ${r.pub}, fingerprint ${fp}`);
   }
   fs.writeFileSync(pinFile, JSON.stringify(prev, null, 2) + '\n');
+}
+
+// push the secrets into the linked Vercel project's env, values through stdin only (never on the command line or the screen);
+// an existing variable is removed first, so a rerun replaces it
+if (process.argv.includes('--vercel')) {
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
+  const bin = process.env.VERCEL_BIN || 'vercel';
+  for (const [name, value] of [['POF_VERIFIER_KEY', v.json], ['POF_RELAYER_KEY', r.json], ['POF_SEAL_KEY', s.value], ['POF_CREDIT_KEY', c.json]]) {
+    for (const target of ['production', 'preview']) {
+      spawnSync(bin, ['env', 'rm', name, target, '--yes'], { cwd: root, stdio: ['ignore', 'ignore', 'ignore'] });
+      const p = spawnSync(bin, ['env', 'add', name, target], { cwd: root, input: value, stdio: ['pipe', 'ignore', 'pipe'] });
+      console.log(`${name} → ${target}: ${p.status === 0 ? 'set' : 'failed: ' + String(p.stderr).replace(/[A-Za-z0-9+/=]{40,}/g, '***').slice(0, 160)}`);
+    }
+  }
 }
