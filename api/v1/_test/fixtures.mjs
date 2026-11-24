@@ -64,3 +64,36 @@ export async function makeLog(n = 7) {
   };
   return { base, fetch: fetchImpl, sth, leaves, verifierKey, privateKey };
 }
+
+/** Serve a MemoryRpc as a real JSON-RPC endpoint (and a log under /api/attest/log), for child processes and HTTP tests. */
+import http from "node:http";
+export async function startChainServer(rpc, log) {
+  const b64 = (u8) => Buffer.from(u8).toString("base64");
+  const acc = (a) => (a ? { data: [b64(a.data), "base64"], executable: false, lamports: a.lamports, owner: a.owner, rentEpoch: 0, space: a.data.length } : null);
+  const server = http.createServer(async (req, res) => {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    if (req.url.startsWith("/api/attest/log") && log) {
+      const r = await log.fetch("https://pof.test" + req.url);
+      res.writeHead(r.status, { "content-type": "application/json" });
+      return res.end(await r.text());
+    }
+    const { id, method, params } = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+    let result;
+    const ctx = { slot: rpc.slot };
+    if (method === "getSlot") result = await rpc.getSlot();
+    else if (method === "getAccountInfo") result = { context: ctx, value: acc(await rpc.getAccount(params[0])) };
+    else if (method === "getMultipleAccounts") result = { context: ctx, value: (await rpc.getAccounts(params[0])).map(acc) };
+    else if (method === "getProgramAccounts")
+      result = (await rpc.getProgramAccounts(params[0], params[1]?.filters ?? [])).map((a) => ({ pubkey: a.address, account: acc(a) }));
+    else {
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32601, message: "Method not found" } }));
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ jsonrpc: "2.0", id, result }));
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  return { url, logUrl: `${url}/api/attest/log`, close: () => new Promise((r) => server.close(r)) };
+}

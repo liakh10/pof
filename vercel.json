@@ -1,0 +1,12 @@
+{
+  "cleanUrls": true,
+  "functions": {
+    "api/v1/index.js": { "maxDuration": 30, "includeFiles": "{sdk/dist/**,sdk/package.json,api/openapi.json}" },
+    "api/mcp.js": { "maxDuration": 30, "includeFiles": "{mcp/core.js,mcp/tools.js,api/v1/_core.js,api/v1/_lib.js,api/openapi.json,sdk/dist/**,sdk/package.json}" }
+  },
+  "rewrites": [
+    { "source": "/v1", "destination": "/api/v1?path=" },
+    { "source": "/v1/:path*", "destination": "/api/v1?path=:path*" },
+    { "source": "/mcp", "destination": "/api/mcp" }
+  ]
+}

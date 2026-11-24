@@ -1,0 +1,16 @@
+{
+  "name": "@pof/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proof of Funds MCP server: agents ask whether a wallet, @handle or badge holds a live certificate. Stdio and Streamable HTTP. No runtime dependencies.",
+  "type": "module",
+  "bin": { "pof-mcp": "./stdio.js" },
+  "scripts": {
+    "start": "node stdio.js",
+    "test": "node --test test/"
+  },
+  "engines": { "node": ">=20" },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2"
+  }
+}
