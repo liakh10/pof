@@ -298,3 +298,20 @@ test("upstream reads are capped across instances: a fresh shared run is reused, 
   assert.equal(c.stale, true);
   S.clearCache();
 });
+
+test("single flight: 200 concurrent requests on a cold cache cost one run of upstream reads", async () => {
+  const solo = await world();
+  S.clearCache();
+  await S.cachedRun(solo.d);
+  const oneRun = solo.calls.length;
+  S.clearCache();
+
+  const w = await world({ store: new S.MemoryStatusStore() });
+  S.clearCache();
+  const runs = await Promise.all(Array.from({ length: 200 }, () => S.cachedRun(w.d)));
+  assert.ok(runs.every((r) => r === runs[0]), "every caller gets the same run");
+  assert.ok(w.calls.length <= oneRun, `200 callers made ${w.calls.length} upstream calls, one run makes ${oneRun}`);
+  const after = await S.cachedRun(w.d);
+  assert.equal(after, runs[0], "the finished run is then served from the memo");
+  S.clearCache();
+});

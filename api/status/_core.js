@@ -486,8 +486,16 @@ export function originOf(req) {
  *  `perMinute` runs start in any one-minute window (counted in Blob). Past the cap the last stored run is served, marked
  *  stale. Without a store only the first two apply. */
 let memo = null;
-export async function cachedRun(d, { ms = 15_000, sharedMs = 30_000, perMinute = 6 } = {}) {
-  if (memo && memo.until > d.now() && memo.origin === d.origin) return memo.run;
+/** Single flight per instance: concurrent callers share one in-flight run (and its Blob reads), not one run each. */
+let inflight = null;
+export function cachedRun(d, opts = {}) {
+  if (memo && memo.until > d.now() && memo.origin === d.origin) return Promise.resolve(memo.run);
+  if (inflight && inflight.origin === d.origin) return inflight.p;
+  const p = freshRun(d, opts).finally(() => { if (inflight?.p === p) inflight = null; });
+  inflight = { p, origin: d.origin };
+  return p;
+}
+async function freshRun(d, { ms = 15_000, sharedMs = 30_000, perMinute = 6 } = {}) {
   const keep = (run) => { memo = { run, until: d.now() + ms, origin: d.origin }; return run; };
   if (!d.store) return keep(await runChecks(d));
   const last = await d.store.getJson("status/live.json").catch(() => null);
@@ -504,4 +512,5 @@ export async function cachedRun(d, { ms = 15_000, sharedMs = 30_000, perMinute =
 }
 export function clearCache() {
   memo = null;
+  inflight = null;
 }
