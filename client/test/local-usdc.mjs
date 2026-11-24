@@ -136,9 +136,14 @@ test('local: USDC shield, sync, tiers with 6 decimals, attestation; mixed assets
       await X.deriveVault();
       await assert.rejects(X.credits.prepare({ count: 5 }), e => e.code === 'CREDIT_KEY_MISMATCH');
     }
-    const N = await createPofClient({ network: 'devnet', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest` });
+    // the devnet pin in this build is the production relayer's key: this test relayer's key is refused against it
+    const D = await createPofClient({ network: 'devnet', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest` });
+    await D.deriveVault();
+    await assert.rejects(D.credits.prepare({ count: 5 }), e => e.code === 'CREDIT_KEY_MISMATCH');
+    // a network with no pin (local without lab pins) cannot buy credits at all
+    const N = await createPofClient({ network: 'local', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, clonedTree: cloned, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest` });
     await N.deriveVault();
-    await assert.rejects(N.credits.prepare({ count: 5 }), e => e.code === 'NO_CREDIT_PIN');   // no pin for devnet in this build
+    await assert.rejects(N.credits.prepare({ count: 5 }), e => e.code === 'NO_CREDIT_PIN');
     const R = await createPofClient({ network: 'local', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, minAgeSlots: 0, clonedTree: cloned, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest`, creditPins: pins });
     assert.match(await R.credits.fingerprint(), /^([0-9a-f]{4} ){7}[0-9a-f]{4}$/);
     const rvault = await R.deriveVault();
