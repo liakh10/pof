@@ -61,8 +61,21 @@ test('POF-26 verifier: a leaked bound link id does not let a stranger certify th
   const c = makeCtx();
   const victimCtl = ring(), stranger = ring(); c.rings.register(stranger);
   const link = c.verifier.linkToken('victim', now() + 600, victimCtl.owner);
-  const p = pkg(c, stranger, [c.rings.note(stranger, 1n * SOL)], { kind: 1, value: 'victim', proof: link, controller: victimCtl.owner });
-  assert.notEqual(await code(c.verifier.attest(p)), 'OK', 'signed @victim backed by a stranger\'s funds');
+  // the stranger does not hold the victim's controller key. Round 3 correction: the helper's `signers` map signs for every
+  // ring() key the tests made, victimCtl included, so this test must say `controllerSigner: null` (no signature), and a
+  // wrong key must fail the same way
+  const note = c.rings.note(stranger, 1n * SOL);
+  const none = pkg(c, stranger, [note], { kind: 1, value: 'victim', proof: link, controller: victimCtl.owner, controllerSigner: null });
+  assert.equal(await code(c.verifier.attest(none)), 'BAD_CONTROLLER_PROOF', 'signed @victim backed by a stranger\'s funds, no controller signature');
+  const wrong = pkg(c, stranger, [note], { kind: 1, value: 'victim', proof: link, controller: victimCtl.owner, controllerSigner: stranger.wallet });
+  assert.equal(await code(c.verifier.attest(wrong)), 'BAD_CONTROLLER_PROOF', 'a controller signature by another key was accepted');
+});
+
+test('control: the controller\'s own signature still certifies the handle', async () => {
+  const c = makeCtx();
+  const ctl = ring(), r = ring(); c.rings.register(r);
+  const link = c.verifier.linkToken('anon', now() + 600, ctl.owner);
+  assert.equal(await code(c.verifier.attest(pkg(c, r, [c.rings.note(r, 1n * SOL)], { kind: 1, value: 'anon', proof: link, controller: ctl.owner, controllerSigner: ctl.wallet }))), 'OK');
 });
 
 test('POF-08 re-test: a failed certify gives the payment back, a successful one uses it once', async () => {
@@ -90,4 +103,22 @@ test('POF-09 re-test: five wrong checks by a griefer do not lock the holder\'s o
   for (let i = 0; i < 6; i++) await code(linker.check('victim', '1234567', theirs.secret));
   post = { text: mine.post, author: { screen_name: 'victim' }, created_timestamp: now() };
   assert.equal(await code(linker.check('victim', '1234567', mine.secret)), 'OK');
+});
+
+/* POF-30 (Medium, round 3): the relayer's payment mark is hex(attestation).slice(0, 64), the first 32 bytes, which are
+   "POF1" and the program id: the same for EVERY attestation. Since 302a98f a payment whose mark equals the request's is
+   reused ("an earlier try of the same attestation"), so while one relay is in flight any other attestation can ride the
+   same payment. */
+test('POF-30 relayer: one payment pays for one certificate, even when two different attestations race', async () => {
+  const c = makeCtx();
+  const mk = async (h) => { const r = ring(); c.rings.register(r); const ctl = ring();
+    return c.verifier.attest(pkg(c, r, [c.rings.note(r, 3n * SOL)], { kind: 1, value: h, proof: c.verifier.linkToken(h, now() + 600, ctl.owner), relay: true, controller: ctl.owner, controllerSigner: ctl.wallet })); };
+  const A = await mk('alice'), Bx = await mk('bob');
+  const q = await c.relayer.quote();
+  c.chain.inbox.push({ signature: 'onlyPayment', slot: c.rings.slotNow, lamports: BigInt(q.lamports) });
+  const real = c.chain.certify.bind(c.chain);
+  c.chain.certify = async (x) => { await new Promise(r => setTimeout(r, 80)); return real(x); }; // a send and its confirmation take time
+  const body = (o) => ({ attestation: o.attestation, signature: o.signature, logIndex: o.logIndex, quote: q.quote, hashes: o.hashes });
+  const r = await Promise.allSettled([c.relayer.certify(body(A)), c.relayer.certify(body(Bx))]);
+  assert.equal(r.filter(x => x.status === 'fulfilled').length, 1, 'one payment relayed two certificates');
 });

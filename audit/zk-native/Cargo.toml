@@ -1,0 +1,16 @@
+# Audit proof (ZK-03): the on-chain Groth16 verifier as committed (zk/onchain/src/groth16.rs + vk.rs, included read-only by
+# path) accepts an all-zero proof for any public inputs while vk.rs is the placeholder. Run:
+#   CARGO_TARGET_DIR=<scratch> cargo test --manifest-path audit/zk-native/Cargo.toml
+[package]
+name = "pof-audit-zk-native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+solana-bn254 = "3.2.1"
+
+[workspace]

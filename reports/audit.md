@@ -1,6 +1,6 @@
 # Proof of Funds: internal security review
 
-Status: **round 2** (2026-11-25). The four High findings of round 1 are fixed and re-tested. New findings from round 2 are in §4b. This report is updated as fixes land; every row of the findings table carries its status.
+Status: **round 3** (2026-11-25). Round 1's four High findings are fixed and re-tested. Round 2's re-review is in §4b. Round 3 reviewed the phase 2 zero-knowledge circuit and `certify_zk` (§4c), the log witness and the last verifier fixes. Round 3 found **one Critical and three High in the zk path**, which is not deployed and is switched off (`ZkConfig.enabled`). This report is updated as fixes land; every row of the findings table carries its status.
 Reviewer: the POF `audit` agent. It did not write any of the code reviewed here and edits none of it; fixes are made by the owners of each part.
 
 ## 1. Scope
@@ -28,9 +28,20 @@ Repository head at the end of round 1: `cf763b5` (the audit's own proof tests).
 
 Repository head at the end of round 2: `5906c78`.
 
+**Round 3** reviewed the following commits.
+
+| part | commits |
+|---|---|
+| zk circuit, JS prover, ceremony scripts, `certify_zk` patch | `62937c7` (`zk/circuits/pof.circom`, `zk/js/zk.js`, `zk/onchain/*`, `zk/scripts/*`, `docs-src/zk.md`) |
+| log witness and certificate monitor | `39e02d9`, `6780b93` (`witness/*`) |
+| verifier fixes: keeper escrow, renew, POF-26, POF-28 | `035f6a6`, `302a98f` |
+| program fixes: POF-07, POF-17, POF-22 | `73d71dd` |
+
+Circuit tests compute the witness with the committed wasm (`$POF_ZK_OUT/build/pof_js/pof.wasm`); circom's `===` checks are asserts in the witness generator. The on-chain Groth16 verifier was tested natively through solana-bn254 (arkworks). The validator suite of `certify_zk` was **not** run by the reviewer, and the proving key was still being generated, so no full proof was made.
+
 **Not covered in this round** (stated so that nobody reads silence as a pass):
-- the `zk/` folder: still not committed at the end of round 2, so not reviewed. `api/status/` was reviewed in round 2;
-- `witness/` (CONTRACT §8): skimmed in round 2 only (key file mode 600, keys checked against Config), not audited;
+- `zk/bench`, `zk/dist/snarkjs.min.js` (vendored) and the browser prover's worker. Only the circuit, `zk/js/zk.js` as the input builder, and the on-chain patch were reviewed in round 3;
+- the trusted setup: `zk/scripts/ceremony.sh` is a development ceremony on one machine and says so. A mainnet ceremony has not happened, so it could not be reviewed;
 - the public site, `/docs` and the film (not built yet);
 - `launch.mjs`, `preflight`, `wind-down.mjs`, `program/ops.mjs` and the deploy and key scripts;
 - the soundness of Helius Privacy Rings itself (its Groth16 circuits, the prover TEE, the forester, the indexer). POF treats these as trusted. Section 6 lists the assumptions.
@@ -55,6 +66,15 @@ Repository head at the end of round 2: `5906c78`.
 | Low | 7 | 3 open (POF-16, POF-19, POF-20 residual); POF-17 fix uncommitted | 2 (POF-26, POF-28) |
 | Informational | 4 | 2 open (POF-23, POF-25); POF-22 partly fixed in the uncommitted diff | 1 (POF-29) |
 
+**Round 3.** zk path: 1 Critical (ZK-01), 3 High (ZK-02, ZK-03, ZK-04), 3 Medium (ZK-05, ZK-06, ZK-08), 2 Low (ZK-07, ZK-09), 1 Info (ZK-10). Witness: 1 Medium (W-01), 2 Low (W-02, W-03). Verifier: 1 new Medium (POF-30).
+Round 1 and 2 rows still open after round 3: POF-11, POF-12, POF-14, POF-16, POF-19, POF-23, POF-25 and POF-27 open; POF-01 and POF-20 partly fixed.
+
+Proof tests at round 3:
+- `audit/test/` (round 1 and 2): 18 of 19 pass; the failure is POF-30.
+- `audit/zk/`: 3 of 3 fail (ZK-01, ZK-02, ZK-04).
+- `audit/zk-native` (Rust): 1 of 1 fails (ZK-03).
+- Round 3 correction: the verifier agent said round 2's POF-26 test failed because of the test, not the code. That was checked and is correct. The test helper signs `controllerProof` for every key the tests create, the victim's controller included, so the "attacker" held the victim's key. The test now passes `controllerSigner: null`, and also a wrong key, and expects exactly `BAD_CONTROLLER_PROOF`. A positive control was added.
+
 Proof tests at `5906c78`:
 - `audit/test/verifier-services.test.mjs`: 9 of 9 pass (was 0 of 9).
 - `audit/test/round2.test.mjs`: 7 of 8 pass. The open one is POF-26.
@@ -68,13 +88,13 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 
 | id | severity | title | where | status |
 |---|---|---|---|---|
-| POF-01 | Medium | Spend-revocation is custodial in practice | design: CONTRACT §5, `verifier/src/keeper.ts` | partly mitigated: stated as a trust point in the litepaper; shorter validity and a multi-keeper escrow are pending |
+| POF-01 | Medium | Spend-revocation is custodial in practice | design: CONTRACT §5, `verifier/src/keeper.ts` | partly fixed `035f6a6`: kits sealed to every registered keeper (public escrow, `witness-keeper.mjs`) and validity cut to 216,000 slots (about a day). `keepers.json` lists only POF's own key, so in practice revocation still has one operator |
 | POF-02 | **High** | The ring owner never consents; nk + openings certify any subject | `verifier/src/verify.ts:128-136` | **fixed** `d84df76` + `0387b66` (ring.proof over the v2 message); re-tested |
 | POF-03 | **High** | X-handle code redeemable by whoever reads the post first | `verifier/src/linker.ts:29-50`, `verify.ts:82-89` | **fixed** `d84df76` (start secret, link id bound to the controller), `39e02d9` (bots check the controller signature); re-tested; see POF-26 |
 | POF-04 | **High** | Note-lock race: one note behind several live certificates | `verifier/src/locks.ts:26-34` | **fixed** `d84df76` (create-if-absent generations); re-tested; see POF-28 |
 | POF-05 | **High** | Keeper deletes the kit of a later attestation; spent certificate stays live | `verifier/src/keeper.ts:42-47` | **fixed** `d84df76`; re-tested |
-| POF-06 | Medium | Dead kits kept 30 days; the keeper scan can be flooded past its 60 s limit | `verifier/src/keeper.ts:44`, `vercel.json` | **fixed** `d84df76` (dropped after max_attest_age); residual: the scan has no time budget or cursor |
-| POF-07 | Medium | Remaking a certificate pays the prior payer every lamport in the PDA | `program/programs/pof/src/lib.rs:621-629` | fix in the working tree (surplus to the treasury, prior payer gets the rent-exempt minimum), reviewed, **not committed** |
+| POF-06 | Medium | Dead kits kept 30 days; the keeper scan can be flooded past its 60 s limit | `verifier/src/keeper.ts:44`, `vercel.json` | **fixed** `d84df76` + `302a98f` (scan time budget with a resume cursor) |
+| POF-07 | Medium | Remaking a certificate pays the prior payer every lamport in the PDA | `program/programs/pof/src/lib.rs:621-629` | **fixed** `73d71dd` for `certify`; **re-introduced** in `certify_zk` (ZK-05) |
 | POF-08 | Medium | The relayer burns a payment when it refuses for cap or balance | `verifier/src/relayer.ts:64-79` | **fixed** `d84df76`; re-tested; see POF-28 |
 | POF-09 | Medium | Anyone can cancel or lock out another person's pending X code | `verifier/src/linker.ts:20-26,37,42` | **fixed** `d84df76` (a record per start, tries per code); re-tested |
 | POF-10 | Medium | The client seals kits (badge secret, amounts) under a key derived from nk, which the Verifier sees | `client/pof-client.js:68,85,266` | **fixed** `d9bec9f` (kitKey from the vault seed; old kits re-sealed) |
@@ -84,19 +104,33 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 | POF-14 | Medium | Paid upstreams (Helius indexer and prover, RPC) behind open, unauthenticated endpoints | `client/server/spr-proxy.js`, `mcp/core.js:61`, `api/mcp.js` | partly fixed: MCP batch, size and IP caps `39e02d9`; `api/spr` per-instance window only `084ea11`; `/api/status` uncached query strings (round 2) |
 | POF-15 | Low | Bot sweep re-checks only the first 500 grants and members | `bots/sweep.js:17,37` | **fixed** `39e02d9` (cursor), diff read |
 | POF-16 | Low | Relayer: an attestation can be replayed for 30 days, and payments are found in the last 60 signatures only | `verifier/src/relayer.ts:57`, `verifier/src/program.ts` `incoming` | open |
-| POF-17 | Low | The verifier rotation delay can be cut to 9,000 slots without delay | `lib.rs:530-536,565-576` | fix in the working tree (a lowered delay is held for the old delay), reviewed, **not committed** |
+| POF-17 | Low | The verifier rotation delay can be cut to 9,000 slots without delay | `lib.rs:530-536,565-576` | **fixed** `73d71dd` |
 | POF-18 | Low | `log_index` is not signed; the certificate stores what the submitter says | `lib.rs:599,652` | **fixed** `39e02d9` (SDK matches the certificate to its leaf by signed bytes), diff read |
 | POF-19 | Low | Non-inclusion accepted against any of the last 100 nullifier roots | `verifier/src/rings.ts:117,181-189` | open |
 | POF-20 | Low | Service URLs derived from the Host header when env is unset | `api/bots.js:19,34`, `api/v1/index.js:10`, `api/v1/_lib.js:160-163` | mostly fixed `39e02d9` (`POF_LOG_URL` required in production; bots no longer call the link URL); residual: `/api/status` uses the Host header unless `POF_STATUS_ORIGIN` is set |
 | POF-21 | Low | Discord `/pof-setup` lets a Manage Roles user hand out roles above their own | `bots/discord.js:88-95` | **fixed** `39e02d9` (role position check) |
-| POF-22 | Info | `renew` is unreachable, and accepts an expired certificate | `lib.rs:680-713`; no Verifier path | partly fixed in the uncommitted diff (`renew` refuses past expiry); still unreachable |
+| POF-22 | Info | `renew` is unreachable, and accepts an expired certificate | `lib.rs:680-713`; no Verifier path | **fixed** `035f6a6` (renew with the holder's salts) + `73d71dd` (renew refuses past expiry) |
 | POF-23 | Info | Revocation latency is the keeper's cron period, not "seconds" | `RINGS.md` §3, keeper cron | open (the litepaper now points to the keeper's last run on /status) |
 | POF-24 | Info | Creator-chosen room names flow into MCP answers and Discord messages | `mcp/tools.js:201,208`, `bots/*` | **fixed** `39e02d9` (MCP quotes names as untrusted text) |
 | POF-25 | Info | The signed `tree_root` is the current head, not the root the notes were found at | `verifier/src/verify.ts:199` | open |
-| POF-26 | Low | X subjects: nobody proves control of the controller key, so a leaked bound link id certifies the handle with a stranger's funds | `verifier/src/verify.ts` (kind 1 branch), CONTRACT §4 v2 | open, test |
-| POF-27 | Medium | A random vault seed (non-deterministic wallets) rests in plain text in localStorage | `client/pof-client.js` `deriveVault` (`pof:vaultseed:v2:<wallet>`) | open |
-| POF-28 | Low | Lock generations are walked one Blob read at a time; a payment is released after a certify that may have landed | `verifier/src/locks.ts` `newest`, `verifier/src/relayer.ts` catch | open |
-| POF-29 | Info | The uncommitted Config layout change (held_delay, held_until) must ship with `pof_gate`, the IDLs and the SDK together | `lib.rs` Config, `pof_gate` `read_pof_config` | open |
+| POF-26 | Low | X subjects: nobody proves control of the controller key, so a leaked bound link id certifies the handle with a stranger's funds | `verifier/src/verify.ts` (kind 1 branch), CONTRACT §4 v2 | **fixed** `302a98f` (controllerProof); re-tested, see the round 3 correction in §3 |
+| POF-27 | Medium | A random vault seed (non-deterministic wallets) rests in plain text in localStorage | `client/pof-client.js` `deriveVault` (`pof:vaultseed:v2:<wallet>`) | open (not in the round 3 fixes) |
+| POF-28 | Low | Lock generations are walked one Blob read at a time; a payment is released after a certify that may have landed | `verifier/src/locks.ts` `newest`, `verifier/src/relayer.ts` catch | **fixed** `302a98f` (lock tombstones with a head hint; refund only a certify that surely did not land), but see POF-30 |
+| POF-29 | Info | The uncommitted Config layout change (held_delay, held_until) must ship with `pof_gate`, the IDLs and the SDK together | `lib.rs` Config, `pof_gate` `read_pof_config` | **fixed** `73d71dd` + `6ee8fa6` (IDLs and SDK 0.2.0 refreshed) |
+| POF-30 | Medium | Relayer: the payment mark is the same for every attestation, so racing requests share one payment | `verifier/src/relayer.ts` (`mark = hex(att).slice(0, 64)`) | open, test |
+| ZK-01 | **Critical** | `certify_zk` accepts any of the 100 nullifier roots, so a note spent long ago proves "unspent" at an older root | `zk/onchain/src/zk.rs` `check_roots` (`(0..NULL_ROOTS).any`) | open, test |
+| ZK-02 | **High** | A zk certificate is live in the same instruction; queued (unfolded) spends pass, so a same-transaction gate admits spent funds | `zk.rs` `handle_certify_zk`; design (`docs-src/zk.md` "Why the escrow") | open, test |
+| ZK-03 | **High** | The committed verifying key is a zero placeholder: an all-zero proof verifies for any statement | `zk/onchain/src/vk.rs`, `groth16.rs` | open, test (Rust) |
+| ZK-04 | **High** | The zk path proves knowledge of nk and openings, not spend authority (POF-02 is back for phase 2) | `zk/circuits/pof.circom` (`ownerId` free), `zk.rs` | open, test |
+| ZK-05 | Medium | `certify_zk` still pays the prior payer every lamport in the PDA (POF-07 regression) | `zk.rs` `handle_certify_zk`, prior payer branch | open |
+| ZK-06 | Medium | One note can back a Verifier-signed certificate and a zk certificate at the same time | `verifier/src/locks.ts` vs `zk.rs` `["znote", tag]` | open |
+| ZK-07 | Low | A note lock PDA pre-funded with 1 lamport can never be created again (`create_account` refuses), so that note cannot be zk-certified | `zk.rs` lock creation | open |
+| ZK-08 | Medium | Privacy: unsalted tags link every zk certificate of a note and the later spend, after holder revoke or expiry too | `pof.circom` `tag`, `zk.rs` | open (trade-off: it also makes revocation permissionless) |
+| ZK-09 | Low | `set_zk` changes the escrow key and the switch at once, with no delay and no curve check | `zk.rs` `handle_set_zk` | open |
+| ZK-10 | Info | Completeness and setup: nf above the largest folded value; development ceremony on one machine | `pof.circom` `below`, `zk/scripts/ceremony.sh` | open |
+| W-01 | Medium | The certificate monitor skips any certificate whose unsigned `log_index` is past the log head, so an unlogged attestation hides by passing `u64::MAX` | `witness/witness.js` `monitor` | open |
+| W-02 | Low | Heads signed by any past verifier key are cosigned | `witness/witness.js` `allowedKeys` | open |
+| W-03 | Low | No gossip between witnesses, and the project runs its own: a split view shown to different witnesses goes unseen | design, CONTRACT §8 | open |
 
 ### POF-01 · Medium · Spend-revocation is custodial in practice
 `revoke_spent` is permissionless on chain, but it needs a note's secret `salt` and its `nullifier`. Only two parties hold them:
@@ -365,6 +399,100 @@ When a wallet does not sign deterministically, `deriveVault` makes a random vaul
 ### POF-29 · Info · A Config layout change ships as a set
 The uncommitted program diff adds `held_delay` and `held_until` to `Config`. `pof_gate` deserializes `pof::Config` from the crate (`read_pof_config`), and the SDK and API decode it from the IDL. Rebuild `pof_gate`, re-export both IDLs, and run `sdk` `sync-idl` in the same change. Re-run the local-validator suite (`sdk` integration, `program/test`) before deploy.
 
+## 4c. Round 3: the zero-knowledge path (phase 2) and the witness
+
+### The circuit itself
+The constraint system was read line by line for under-constrained signals. Nothing in it lets a witness lie about what it states:
+- **Assignments.** There is no `<--` anywhere; every assignment is `<==`. Each `===` checks either a public input or a gated equality.
+- **Index bits.** Merkle index bits come from `Num2Bits(32)` and `Num2Bits(40)`, so they are boolean. The selector `left = cur + b·(sib - cur)` is correct.
+- **Ranges.** Each amount is `Num2Bits(64)`, so the sum of four is below 2^66; `minAmount` is `Num2Bits(64)`; `GreaterEqThan(66)` therefore cannot wrap.
+- **Disabled slots.** `enabled` is boolean, the used slots come first, and each slot contributes `enabled · amount`. A disabled slot adds 0, and its `tag` and `ct` must be 0. No padding inflates the sum.
+- **Non-inclusion comparison.** It uses `Num2Bits_strict` halves, so a value cannot alias `x + p`. `LessThan(127)` gets inputs below 2^127.
+- **Bindings.** `ownerId`, `dataHash`, `ringTerm` and `blinding` are free, but each is bound by the commitment's membership in the state tree. One `nk` and one `ownerId` serve every slot.
+- **The same note twice** gives the same nullifier and the same tag. The program requires strictly ascending tags, so it refuses that.
+- **Poseidon.** Arity and parameters match the Rings hasher; the team's `parity.test.mjs` checks this against the SDK and against mainnet leaves.
+- **Escrow.** `R = r·B8` and `S = r·K`, with K pinned by the program. `ct = nf + Poseidon(ESC, S, slot)`, so whoever holds k always opens the escrow.
+- **Public inputs** are rebuilt by the program in the circuit's order (0 to 8, then the tags, then the cts). `ctx` is `sha256` with its top 3 bits cleared, so it is below r. It binds program, kind, subject, asset, tier, controller, payer and nonce, so a proof cannot be replayed for another subject or payer. The controller signs the transaction.
+- **The verifier** requires canonical inputs (below r) and leaves point validation to the syscalls.
+
+The findings are where the circuit meets the chain.
+
+### ZK-01 · Critical · Any of the 100 nullifier roots
+`check_roots` (`zk.rs:164-176`) accepts `null_root` if it is **any** of the 100 nullifier roots the tree account keeps. The indexed nullifier tree only grows. At a root from before a nullifier was folded in, that nullifier is absent, and the circuit proves exactly that.
+
+Mainnet has folded about 11 batches, and all of them sit inside the 100-root window. So today **any note ever spent** in Rings can be proven unspent: a prover keeps (or rebuilds) a non-inclusion path at an old root. The docs advise proving against an older root to show note age. That is right for the *state* root only, never for the nullifier root.
+
+The keeper would still revoke such a certificate (its escrowed nullifier has a PDA). That brings us back to ZK-02: anything that gates in the same transaction is exploited. After the revoke, the note lock is released, and the same spent note can be certified again with a new nonce, without end.
+- **Proof:** `audit/zk/circuit-audit.test.mjs` ZK-01. A spent note yields a valid witness at the older root, and `check_roots` accepts it.
+- **Fix:** accept only the **newest** nullifier root (the one at cursor - 1, offset 17,224). A forester batch between proving and landing makes the transaction fail, and the client re-proves. Batches are rare (about 5,000 nullifiers).
+
+### ZK-02 · High · Queued spends, and live in the same instruction
+Even at the newest root, a nullifier that is spent but still in the Rings input queue (its PDA exists, not folded yet; batches of 4,999, so days at today's traffic) is absent from the tree. The design leaves this to the keeper, which decrypts the escrow and revokes. But `certify_zk` sets `status = LIVE` at once.
+
+A program that calls `certify_zk` and then `require_certificate` (or `pof_gate::join`, or the OTC example) **in the same transaction** therefore acts on funds that were already spent, before any keeper can look.
+- **Proof:** ZK-02 test (it reads the instruction: live in the same instruction).
+- **Fix:** a zk certificate becomes live only `settle_slots` after `certified_slot` (for example 150), and the keeper or anyone with the nullifier can revoke it during that window. `require_certificate` must refuse a certificate in its settle window. Also publish the keeper's latency.
+
+### ZK-03 · High · Placeholder verifying key verifies everything
+`zk/onchain/src/vk.rs` is all zeros ("PLACEHOLDER until scripts/vk-rs.mjs runs"). For the alt_bn128 syscalls, (0,0) is the point at infinity. Every pairing then equals 1, so a 256-byte proof of zeros verifies **any** public inputs. `apply.py` copies this file into the program as it is.
+
+A build made before `vk-rs.mjs` runs, and deployed with `set_zk(enabled = true)`, lets anyone mint any certificate. `vk_hash = 0` is recorded, but nothing refuses it.
+- **Proof:** `audit/zk-native` (`cargo test`) verifies a zero proof against the committed key.
+- **Fix:**
+  - A `const` assertion (or a `build.rs`) that fails compilation when `VK_HASH` is zero or any VK point is the identity.
+  - `set_zk` refuses to enable while `vk_hash` is zero.
+  - `verify` refuses an A or C at infinity.
+
+### ZK-04 · High · Spend authority is not part of the statement
+The witness needs `nk`, the openings and the paths. `ownerId` is the public hash of the ring owner's public key. No secret of the owner is required, and the ring owner never signs (the controller does). This is POF-02 again, in phase 2.
+
+A whale that hands over `nk` and its openings lends a certificate while keeping the money. For deposit notes, the openings are public chain data once `nk` is known.
+- **Proof:** ZK-04 test (a witness from `ownerId` and `nk` alone).
+- **Fix options:**
+  - (a) Prove knowledge of a secret that the owner's spend key derives (for example the vault seed, committed as a registered POF key). Cheap in-circuit, but it needs a registration.
+  - (b) Require an Ed25519 signature by the owner over `ctx`. That reveals the owner, so it is only acceptable where linkability is accepted.
+  - (c) Document that phase 2 proves control of `nk` and the openings, not ownership, and price it into what consumers rely on.
+
+### ZK-05 · Medium · POF-07 again, in `certify_zk`
+`handle_certify_zk` remakes an existing certificate with `let rent = cert.to_account_info().lamports()`. That is the code `73d71dd` fixed in `certify`, and it is still the old version here. A donation to the certificate PDA makes the new payer fund the prior payer. **Fix:** share one remake helper between `certify` and `certify_zk`.
+
+### ZK-06 · Medium · Double counting across the two paths
+The Verifier's lock is `HMAC(seal key, nf)` in Blob; the zk lock is the PDA `["znote", Poseidon(TAG, nf)]` on chain. Neither sees the other, so the same note can back one signed certificate and one zk certificate at once.
+**Fix:**
+- The Verifier computes the tag from `nf` and refuses a note whose `znote` lock is live.
+- `certify` (the signed path) creates `znote` locks too. The attestation would then carry the tags: a CONTRACT §3 v2 field.
+
+### ZK-07 · Low · Lock PDA pre-funding
+A lock is created with `system_program::create_account`, which fails if the address already holds lamports. Once a note's tag is public (its first certificate) and the lock has been released, anyone can send 1 lamport to `["znote", tag]`. That note can then never be zk-certified again.
+**Fix:** transfer, `allocate` and `assign` (what Anchor's `init` does) when the account has lamports.
+
+### ZK-08 · Medium · Unsalted tags link certificates and spends
+`tag = Poseidon(TAG, nf)` is deterministic per note. Two consequences:
+- Every zk certificate made from the same note carries the same tag, so a wallet certificate and a badge certificate from one note are linked.
+- When the note is spent, ever, anyone who sees the nullifier links it to every certificate that carried that tag. "Revoke by holder, then move" no longer hides it.
+
+The upside is real: anyone watching new nullifier PDAs can call `revoke_spent`, so zk revocation is permissionless and does not depend on a keeper (POF-01). Decide and document. If unlinkability matters more, add a per-certificate salt inside the circuit (`tag = Poseidon(TAG, nf, salt)`, salt escrowed), and keep note uniqueness with a second, nonce-free lock value.
+
+### ZK-09 · Low · `set_zk` without delay
+The admin can swap the escrow key K, or switch `certify_zk` on and off, at once. There is no on-curve or subgroup check for K, and existing certificates stay encrypted to the old key (the keeper must keep every k).
+**Fix:** put K changes behind the rotation delay, check that K is on the curve, and keep a history of K.
+
+### ZK-10 · Info · Completeness and setup
+- The circuit needs `nf < next` strictly. If Rings marks the end of the list with `next = 0` (as the verifier's JS assumes), a note whose nullifier is above the largest folded value cannot be proven. Check this against the real tree layout.
+- The setup is a development ceremony on one machine (stated in `ceremony.sh`). Whoever ran it can forge proofs, so it must never be enabled on mainnet.
+
+### The witness (fuller pass)
+`witness/witness.js` does the following correctly: it checks the head's key against Config, refuses a shrinking or equivocating log, checks RFC 9162 consistency from its last head, checks against the on-chain anchor, cosigns under its own key and domain, and keeps its key file at mode 600.
+- **W-01 · Medium.** The certificate monitor (the POF-18 safeguard: every certificate must have its signed leaf in the log) skips any certificate whose `logIndex >= treeSize`, because it is "not in the log yet". `log_index` is not signed and is chosen by the submitter. An attestation the Verifier signed but never logged, which is exactly what the monitor exists to catch, is therefore submitted with `log_index = u64::MAX` and is never checked. zk certificates use `u64::MAX` legitimately.
+  **Fix:** for a certificate whose `verifier` is not `ZK_CONFIG`, alarm when its index is not in the log after a grace period, or find its leaf by its signed bytes instead of by the index.
+- **W-02 · Low.** `allowedKeys` takes every key from the `VerifierSet` history, so a retired (possibly leaked) key can still sign a new head that the witness cosigns. **Fix:** accept only the key active at the head's anchor slot, plus a proposed key once its slot has come.
+- **W-03 · Low.** One witness compares only with its own history. If the log shows different heads to different witnesses, no single witness sees it, and the project's own witness cron is not independent. **Fix:** witnesses publish and cross-check each other's cosigned heads (the CT gossip pattern), and /docs says that POF's own witness is not an independent party.
+
+### POF-30 · Medium · One payment, several relays (verifier, round 3)
+`302a98f` lets a payment be reused when its stored mark equals the request's: "an earlier try of the same attestation". The mark is `hex(att).slice(0, 64)`, the first 32 bytes of the attestation, which are `POF1` and the program id, the same for every attestation. While one relay is in flight (send plus confirmation take seconds), a second request with another attestation and the same quote takes the same payment.
+- **Proof:** `round2.test.mjs` POF-30 (two attestations, one payment, both relayed).
+- **Fix:** mark with `sha256(attestation)`, and compare the full value.
+
 ## 5. What held up
 These were checked specifically and found sound at the reviewed commits:
 - `ext::signed_before` reads the instruction at `current - 1`, requires exactly one signature, and requires all three instruction indexes to be `u16::MAX` (data inside the Ed25519 instruction itself). The pubkey and message are read from the offsets the precompile verified.
@@ -387,4 +515,5 @@ These were checked specifically and found sound at the reviewed commits:
 
 ## 7. Changes
 - 2026-11-25 · audit · round 1: 25 findings, 9 failing proof tests (`cf763b5`). High findings posted on `_x/pof/BOARD.md` and sent to the lead.
+- 2026-11-25 · audit · round 3: zk path (1 Critical, 3 High, 3 Medium, 2 Low, 1 Info), witness (1 Medium, 2 Low), POF-30. The round 2 POF-26 test was corrected (controllerSigner: null; the verifier's claim was right). Round 1 and 2 statuses updated.
 - 2026-11-25 · audit · round 2: all 4 High fixed and re-tested (9/9 plus round 2 controls). Statuses updated; 4 new findings (POF-26 to POF-29); POF-07 and POF-17 fixes reviewed in the working tree, not yet committed.
