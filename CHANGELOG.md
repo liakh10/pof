@@ -16,6 +16,7 @@ the first release of each will move its section under a version heading with its
 | bots | 0.1.0 | `bots/` |
 | witness and cli | 0.1.0 | `witness/`, `cli/` |
 | contract | §1 to §8 | `CONTRACT.md`, `RINGS.md` |
+| embed (`<pof-badge>`) | 0.1.0 | `embed/` |
 | zk (phase 2) | in development | `zk/` |
 
 ## program
@@ -31,6 +32,12 @@ the first release of each will move its section under a version heading with its
 - `pof_gate`: Rooms (`create_room`, `set_room`, `join` through `require_certificate`, permissionless `evict`, `leave`,
   `close_room`, `release_room`). No fees, no admin. (`54aa589`)
 - IDLs in `program/idl/`, consumed by the SDK, the Verifier and the API. (`54aa589`)
+- `launch.mjs`, `wind-down.mjs`, `ops.mjs`; the suite, wind-down, rehearsal and own-CA tests. (`73d71dd`)
+#### Changed
+- Config gains `held_delay` and `held_until`; IDLs refreshed. (`73d71dd`)
+#### Security
+- POF-07: remaking a certificate pays the prior payer the rent only; a donated surplus goes to the Treasury. POF-17: a
+  lowered rotation delay waits out the old one. POF-22: `renew` refuses an expired certificate. (`73d71dd`)
 
 ## verifier
 
@@ -102,6 +109,9 @@ the first release of each will move its section under a version heading with its
 - `/api/status`: RPC, program, Rings tree root age, indexer against on-chain roots, Verifier key and bundle, relayer band,
   keeper, log head signature and consistency; uptime history in Blob; the sample cron parked. (`c51636c`)
 #### Security
+- POF-14 (status): one cacheable URL (a query string redirects), at most one run per instance every 15 s, a shared run in
+  Blob reused for 30 s, at most 6 runs a minute. POF-20 (status): the Verifier origin from `POF_STATUS_ORIGIN` or Vercel's
+  own URLs, never the Host header. (`55b8394`, `fb1e902`)
 - POF-20: service URLs no longer derived from the Host header when the environment is unset. (`39e02d9`)
 
 ## mcp
@@ -121,6 +131,13 @@ the first release of each will move its section under a version heading with its
 #### Security
 - POF-03 (bot side): X subjects link only with a signature by the certificate's on-chain controller. POF-15: the sweep
   runs in turns with a cursor. POF-21: Discord role hierarchy respected. (`39e02d9`)
+
+## embed
+
+### [Unreleased] 0.1.0
+#### Added
+- `<pof-badge>`: a web component that shows a subject's certificate live (REVOKED with its slot), with an iframe
+  fallback. (`c25f503`)
 
 ## witness and cli
 
@@ -146,11 +163,14 @@ the first release of each will move its section under a version heading with its
 ### [Unreleased]
 #### Added
 - `/developers` content and the devx test report (`ec99afb`); the Rings client test report (`d449f65`).
-- The internal security review, round 1: 25 findings, failing proofs in `audit/test/` (`9407010`, `cf763b5`).
+- The internal security review, round 1: 25 findings, failing proofs in `audit/test/` (`9407010`, `cf763b5`); round 2
+  re-review: the High findings fixed and re-tested, POF-26 to POF-29 new (`78234b3`).
 - The protocol paper in `docs-src/` and the litepaper (`c0fd4df`, `0218cba`); `README.md`, `SECURITY.md`, `LICENSE`
   (Apache-2.0), this changelog.
 
 ## zk
 
-In development (`zk/`): the phase 2 Groth16 circuit, its setup and the browser prover. Not deployed; it will get its own
-version when it ships.
+In development (`zk/`, `62937c7`): the phase 2 Groth16 circuit (circom 2, 4 notes, the Rings Poseidon), witness and
+escrow code, parity tests against the Rings SDK and mainnet leaves, a development setup, the browser prover and the
+`certify_zk` patch for `pof`, documented in `docs-src/zk.md`. Not deployed: `certify_zk` stays off until a public
+ceremony has run. It will get its own version when it ships.
