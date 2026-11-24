@@ -481,13 +481,26 @@ export function originOf(req) {
   return req.headers.host ? `${proto}://${req.headers.host}` : "";
 }
 
-/** One run per warm instance every few seconds at most: a burst of page views costs one set of reads. */
+/** Upstream reads are bounded three ways (audit POF-14): the edge caches the one URL; each warm instance runs the checks
+ *  at most once per `ms`; and across instances a run stored in Blob younger than `sharedMs` is served as is, and at most
+ *  `perMinute` runs start in any one-minute window (counted in Blob). Past the cap the last stored run is served, marked
+ *  stale. Without a store only the first two apply. */
 let memo = null;
-export async function cachedRun(d, ms = 15_000) {
+export async function cachedRun(d, { ms = 15_000, sharedMs = 30_000, perMinute = 6 } = {}) {
   if (memo && memo.until > d.now() && memo.origin === d.origin) return memo.run;
+  const keep = (run) => { memo = { run, until: d.now() + ms, origin: d.origin }; return run; };
+  if (!d.store) return keep(await runChecks(d));
+  const last = await d.store.getJson("status/live.json").catch(() => null);
+  if (last?.run && d.now() - last.at < sharedMs) return keep(last.run);
+  const w = Math.floor(d.now() / 60_000);
+  const key = `status/runs/${w % 60}.json`;
+  const c = await d.store.getJson(key).catch(() => null);
+  const n = c && c.w === w ? c.n : 0;
+  if (n >= perMinute && last?.run) return keep({ ...last.run, stale: true });
+  await d.store.putJson(key, { w, n: n + 1 }).catch(() => {});
   const run = await runChecks(d);
-  memo = { run, until: d.now() + ms, origin: d.origin };
-  return run;
+  await d.store.putJson("status/live.json", { at: d.now(), run }).catch(() => {});
+  return keep(run);
 }
 export function clearCache() {
   memo = null;

@@ -274,3 +274,27 @@ test("GET /api/status with a query string redirects without running a check (POF
   assert.equal(res.headers.location, "/api/status");
   assert.equal(fetched, false);
 });
+
+test("upstream reads are capped across instances: a fresh shared run is reused, past the cap the last run is served stale", async () => {
+  const store = new S.MemoryStatusStore();
+  const w = await world({ store });
+  let t = 1_000_000_000;
+  w.d.now = () => t;
+  S.clearCache();
+  const a = await S.cachedRun(w.d);
+  const n1 = w.calls.length;
+  S.clearCache(); // another instance
+  const b = await S.cachedRun(w.d);
+  assert.equal(w.calls.length, n1, "a shared run younger than 30 s costs no upstream read");
+  assert.equal(b.checkedAt, a.checkedAt);
+  // force the cap: same minute window, shared run expired
+  t = Math.floor(1_000_000_000 / 60_000) * 60_000 + 59_000;
+  await store.putJson(`status/runs/${Math.floor(t / 60_000) % 60}.json`, { w: Math.floor(t / 60_000), n: 6 });
+  await store.putJson("status/live.json", { at: t - 40_000, run: a });
+  S.clearCache();
+  const before = w.calls.length;
+  const c = await S.cachedRun(w.d);
+  assert.equal(w.calls.length, before, "past the cap no check runs");
+  assert.equal(c.stale, true);
+  S.clearCache();
+});
