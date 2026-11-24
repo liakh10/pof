@@ -142,13 +142,15 @@ export function normalHandle(v) {
   if (!/^[a-z0-9_]{1,15}$/.test(h)) throw Error('an X handle is 1 to 15 letters, digits or underscores');
   return h;
 }
-/* byte for byte the Verifier's subjectMessage (verifier/src/contract.ts) */
-export function subjectMessage({ programId, kind, value, ring, asset, tier, payer, slot }) {
+/* CONTRACT §4 v2 (audit POF-02): the message the ring owner signs (ring.proof) and, for a wallet or badge, the subject key
+   signs too (subject.proof). Byte for byte the Verifier's disclosureMessage (verifier/src/contract.ts). */
+export function disclosureMessage({ programId, kind, value, ring, controller, asset, tier, payer, slot }) {
   return utf8([
-    'Proof of Funds: subject proof',
+    'Proof of Funds: disclosure v2',
     `program: ${programId}`,
-    `subject: ${['wallet', 'x', 'badge'][kind]} ${value}`,
+    `subject: ${['wallet', 'x', 'badge'][kind]} ${kind === 1 ? normalHandle(value) : value}`,
     `ring: ${ring}`,
+    `controller: ${controller}`,
     `asset: ${ASSETS[asset]?.name} tier: ${tier}`,
     `payer: ${payer}`,
     `slot: ${String(slot)}`,
@@ -165,7 +167,7 @@ export function disclosurePackage({ subject, asset, tier, ring, notes, payer, re
     v: 1,
     subject: { kind: subject.kind, value: subject.value, proof: subject.proof, ...(subject.slot !== undefined ? { slot: String(subject.slot) } : {}) },
     asset, tier,
-    ring: { owner: ring.owner, nk: hex(ring.nk) },
+    ring: { owner: ring.owner, nk: hex(ring.nk), ...(ring.proof ? { proof: ring.proof } : {}) },
     notes: notes.map(n => {
       if (n.tree !== tree) throw Error('all notes of one certificate come from one tree');
       return {

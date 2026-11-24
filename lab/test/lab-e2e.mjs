@@ -43,6 +43,9 @@ try {
   const att = ((await logText()).match(/attestation ([0-9a-f]{480})/) || [])[1] || '';
   ok(att.length === 480 && att.startsWith('504f4631'), 'the Verifier signed a 240-byte POF1 attestation for the wallet subject', att.slice(0, 40) + ' len ' + att.length);
   await page.selectOption('#kind', '2'); await page.click('#certify');
+  await page.waitForFunction(() => /RELAY_NEEDED|PAYER_LINKS_WALLET/.test(document.getElementById('log').textContent), null, { timeout: 30_000 });
+  ok(true, 'a badge certificate is not paid from the wallet by default (audit POF-12)');
+  await page.check('#walletpay'); await page.click('#certify');
   await page.waitForFunction(() => (document.getElementById('log').textContent.match(/attested ·/g) || []).length >= 2, null, { timeout: 60_000 }).catch(() => {});
   const secondLog = await logText();
   ok(/attested ·[\s\S]*attested ·/.test(secondLog) || /NOTE_LOCKED|already backs|LOCKED/i.test(secondLog), 'a badge subject is attested too (or refused because the note already backs a live certificate)', secondLog.split('\n').slice(0, 2).join(' | '));

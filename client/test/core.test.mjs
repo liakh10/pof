@@ -48,9 +48,12 @@ test('pickNotes: fewest notes first, then least excess', () => {
   assert.equal(C.pickNotes(many, 400), null);                                                // 8 notes give at most 364
   assert.equal(C.pickNotes(Array.from({ length: 9 }, (_, i) => n(10, 'x' + i)), 90), null); // 9 notes needed, 8 allowed
 });
-test('subject message is the Verifier\'s, byte for byte', () => {
-  const m = new TextDecoder().decode(C.subjectMessage({ programId: 'P', kind: 0, value: 'W', ring: 'R', asset: 1, tier: 2, payer: 'Y', slot: 9n }));
-  assert.equal(m, 'Proof of Funds: subject proof\nprogram: P\nsubject: wallet W\nring: R\nasset: USDC tier: 2\npayer: Y\nslot: 9');
+test('the disclosure message is the Verifier\'s, byte for byte', async () => {
+  const args = { programId: 'P', kind: 1, value: '@Some_Handle', ring: 'R', controller: 'K', asset: 1, tier: 2, payer: 'Y', slot: 9n };
+  const mine = C.disclosureMessage(args);
+  assert.equal(new TextDecoder().decode(mine), 'Proof of Funds: disclosure v2\nprogram: P\nsubject: x some_handle\nring: R\ncontroller: K\nasset: USDC tier: 2\npayer: Y\nslot: 9');
+  const V = await import('../../verifier/dist/pof-verifier.mjs');
+  if (V.disclosureMessage) assert.equal(C.hex(mine), C.hex(V.disclosureMessage(args)));
 });
 test('units', () => {
   assert.equal(C.parseUnits('1.5', 9), 1_500_000_000n); assert.equal(C.formatUnits(1_500_000_000n, 9), '1.5');

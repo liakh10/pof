@@ -69,6 +69,7 @@ http.createServer(async (req, res) => {
       const r = await sprProxy(new Request(url.href, { method: req.method, headers: { 'content-type': 'application/json' }, body: req.method === 'POST' ? body : undefined }), { keys });
       return send(r.status, await r.text());
     }
+    if (url.pathname === '/api/attest' && req.method === 'GET') { const v = await localVerifier(); return send(200, JSON.stringify({ verifierKey: v.key, program: PROGRAM, relayer: null, minAgeSlots: Number(v.cfg.minAgeSlots), note: 'the lab Verifier: local clone only, no relayer' })); }
     if (url.pathname === '/api/attest' && req.method === 'POST') {
       try { const v = await localVerifier(); return send(200, JSON.stringify(await v.attest(JSON.parse(body)))); }
       catch (e) { return send(e.status || 400, JSON.stringify({ error: { code: e.code || 'ERROR', message: String(e.message || e), details: e.details } })); }
