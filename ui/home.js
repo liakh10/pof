@@ -97,12 +97,9 @@ for (const b of $$('[data-filter]')) b.addEventListener('click', () => {
 if (film) {
   const plays = $$('[data-film-play]'), mute = $('[data-film-mute]'), cap = $('[data-film-cap]'), label = $('[data-film-label]');
   const prog = $('[data-film-progress]');
-  fetch(FILM.src, { method: 'HEAD' }).then(r => {
-    if (!r.ok) return;
-    plays.forEach(p => (p.hidden = false));
-    $('[data-film-cta]').hidden = false;
-    $('[data-film-len]').textContent = FILM.length;
-  }).catch(() => {});
+  plays.forEach(p => (p.hidden = false));
+  $('[data-film-cta]').hidden = false;
+  $('[data-film-len]').textContent = FILM.length;
   let v = null;
   const make = () => {
     v = Object.assign(document.createElement('video'), { src: FILM.src, playsInline: true, preload: 'auto' });
