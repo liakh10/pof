@@ -23,6 +23,12 @@ const desc = {
   'revoke_spent (membership, 16 levels)': 'salted hash + 41 Poseidon hashes (16 given, 24 empty levels) against 100 roots',
   'revoke_spent (membership, 20 levels)': 'the same with 20 levels given',
   'require_certificate': 'the CPI gate, called directly',
+  'open_path (20 levels)': 'staged proof, tx 1: the revoker\'s buffer made with the first 20 siblings',
+  'stage_path (20 levels)': 'staged proof, tx 2: the other 20 siblings',
+  'revoke_spent_staged (40 levels)': 'staged proof, tx 3: all 40 levels hashed (41 Poseidon) to a root the tree holds now; buffer closed',
+  'revoke_signed': 'the controller\'s 156-byte POF-REVOKE1 signature from the instructions sysvar',
+  'revoke_verifier_key': 'admin: a leaked or retired Verifier key revoked at once',
+  'void_by_key': 'anyone: a certificate by a revoked key voided',
   'join (CPI)': 'pof_gate join: CPI into require_certificate, member written',
   'evict': 'direct read of the certificate, member closed',
 };
@@ -86,7 +92,10 @@ ${list(oc)}
   - the look-alike PDAs do not count;
   - an absent PDA never reads as unspent;
   - for the membership path, a wrong next value, a wrong leaf index, a wrong sibling or a short path are refused;
-  - a double revoke is refused.
+  - a double revoke is refused;
+  - the staged path: refused when another revoker writes the buffer, when a level is left out, when a level is tampered with,
+    when the salt is wrong, and when a buffer staged for one certificate is used for another; the buffer closes with its rent back;
+  - a nullifier PDA passed as the tree is refused: only Rings tree 0 counts.
 - **Gates and Rooms:**
   - \`require_certificate\` refuses a forged account, a wrong subject, a revoked or expired certificate, and a low tier;
   - Rooms refuse a join by a non-controller, a lower tier, another asset, or a shut room;
@@ -99,6 +108,11 @@ ${list(oc)}
   - lamports donated into a certificate go to the treasury, not to the old payer (audit POF-07);
   - a lowered rotation delay does not shorten the next rotation (audit POF-17);
   - \`renew\` refuses an expired certificate (audit POF-22).
+- **Verifier keys (fuzz):** a revoked key signs nothing more. Its certificates then fail \`require_certificate\` and Rooms, their
+  members can be evicted, and anyone can void them. A certificate signed by the current key stays live.
+- **Admin inputs (fuzz):**
+  - \`anchor_log\` refuses a size of 2^64 − 1, and any step over 10,000,000 entries;
+  - \`set_roles\` refuses a token account given as the mint.
 
 ## Compute units (max measured, the whole transaction's instructions included)
 | instruction | CU | what it does |
@@ -114,9 +128,12 @@ ${sizes.map(([n, b]) => `| ${n} | ${b ? b.toLocaleString('en-US') : '?'} | ${b ?
 - **No real spend on the clone.** A spend needs a Groth16 proof from the Helius prover, which cannot serve a local validator.
   - The spent state is written as the bytes a spend leaves, path (a).
   - It is also proven from a real mainnet spend, path (b).
-- **40-level membership paths need a v1 transaction.** A full path is 1,280 bytes and does not fit a legacy or v0 transaction.
-  - Paths of up to about 20 given levels fit a v0 transaction. While the nullifier tree holds under 65,536 entries, 16 levels are enough.
-  - Unit tests check the full 40 levels.
+- **The one-transaction membership proof with a full 40-level path is not run here.** That path is 1,280 bytes. It needs a v1
+  transaction, which mainnet accepts (Rings deposits already use it) but the local Agave 4.1 validator does not run.
+  - The one-transaction proof is tested with up to 20 levels. While the nullifier tree holds under 65,536 entries, 16 are enough.
+  - Past that size, which mainnet will reach soon, the **staged proof** carries all 40 levels in ordinary transactions:
+    \`open_path\` with 20 levels, \`stage_path\` with 20 more, then \`revoke_spent_staged\`.
+  - The staged proof is tested here at full depth with the real mainnet path.
 - **The Verifier's own checks are not tested here.** That means commitments, tree inclusion, unspent nullifiers and note age. They are
   tested in \`verifier/test\`. On chain, the program trusts the Verifier's signature for them. This is the first trust point in /docs.
 `;

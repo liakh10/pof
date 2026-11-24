@@ -2,6 +2,7 @@
    waiting on anyone; a second run says nothing to do:
      1. close_begin: no certify or renew from now on (revocations still work)
      2. every certificate account expired at once (expire is open to anyone during the wind-down): each rent back to its payer
+     2b. every staged revoke path left behind closed (rent back to its revoker)
      3. every Room member evicted (their certificates are gone): each rent back to whoever paid it
      4. every Room released: each rent back to its creator
      5. withdraw_fees: the treasury's fees to the dev wallet
@@ -48,9 +49,11 @@ if (cfg) {
   if (certs.length) console.log(`  ${certs.length} certificate account(s) to close`);
   for (const c of certs) await run([q.P.ix('expire', {}, { caller: dev, certificate: c.address, payer: new PublicKey(c.payer) })], `expire ${c.address.toBase58().slice(0, 8)}… (${['live', 'revoked spent', 'revoked by holder'][c.status] || c.status}, tier ${c.tier}): rent back to ${c.payer.slice(0, 8)}…`);
 }
+/* 2b: staged revoke paths left behind (each rent back to its revoker) */
+if (cfg) for (const b of await list(q.PID, q.P, 'PathBuffer')) await run([q.P.ix('close_path', {}, { caller: dev, buffer: b.address, revoker: new PublicKey(b.revoker) })], `close a staged revoke path ${b.address.toBase58().slice(0, 8)}…: rent back to ${b.revoker.slice(0, 8)}…`);
 /* 3, 4 */
 const members = await list(q.GATE, q.G, 'Member');
-for (const m of members) await run([q.G.ix('evict', {}, { caller: dev, room: new PublicKey(m.room), member: m.address, payer: new PublicKey(m.payer), certificate: new PublicKey(m.certificate) })], `evict member ${m.address.toBase58().slice(0, 8)}…: rent back to ${m.payer.slice(0, 8)}…`);
+for (const m of members) await run([q.G.ix('evict', {}, { caller: dev, room: new PublicKey(m.room), member: m.address, payer: new PublicKey(m.payer), certificate: new PublicKey(m.certificate), pof_config: q.K.config })], `evict member ${m.address.toBase58().slice(0, 8)}…: rent back to ${m.payer.slice(0, 8)}…`);
 const rooms = await list(q.GATE, q.G, 'Room');
 for (const r of rooms) await run([q.G.ix('release_room', {}, { caller: dev, room: r.address, creator: new PublicKey(r.creator), pof_config: q.K.config })], `release room ${r.address.toBase58().slice(0, 8)}…: rent back to its creator ${r.creator.slice(0, 8)}…`);
 /* 5, 6 */

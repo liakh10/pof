@@ -132,7 +132,7 @@ pub mod pof_gate {
         let a = ctx.accounts;
         require!(a.room.open, GateError::RoomShut);
         let view = pof::cpi::require_certificate(
-            CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info() }),
+            CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info(), config: a.pof_config.to_account_info() }),
             subject_hash,
             a.room.asset,
             a.room.min_tier,
@@ -163,9 +163,12 @@ pub mod pof_gate {
         let slot = Clock::get()?.slot;
         let m = &a.member;
         let r = &mut a.room;
-        let still = match pof::read_certificate(&a.certificate, &m.subject_hash, r.asset) {
-            Ok(cert) => pof::gate(&cert, r.asset, r.min_tier, slot).is_ok() && cert.controller == m.controller,
-            Err(_) => {
+        // POF wound down (config closed): no certificate is good any more
+        let config = read_pof_config(&a.pof_config)?;
+        let still = match (config, pof::read_certificate(&a.certificate, &m.subject_hash, r.asset)) {
+            (Some(c), Ok(cert)) => pof::gate(&cert, &c, r.asset, r.min_tier, slot).is_ok() && cert.controller == m.controller,
+            (None, _) => false,
+            (Some(_), Err(_)) => {
                 // only "no certificate here any more" may evict; a wrong account must not
                 let (want, _) = Pubkey::find_program_address(&[pof::CERT_SEED, &m.subject_hash, &[r.asset]], &pof::ID);
                 require_keys_eq!(a.certificate.key(), want, GateError::BadCertificate);
@@ -239,6 +242,8 @@ pub struct Join<'info> {
     pub member: Box<Account<'info, Member>>,
     /// CHECK: the POF certificate of (subject_hash, room.asset); POF checks it in the CPI
     pub certificate: UncheckedAccount<'info>,
+    /// CHECK: POF's config PDA (POF checks it in the CPI: revoked Verifier keys)
+    pub pof_config: UncheckedAccount<'info>,
     pub pof_program: Program<'info, pof::program::Pof>,
     pub system_program: Program<'info, System>,
 }
@@ -256,6 +261,8 @@ pub struct Evict<'info> {
     /// CHECK: the member's certificate PDA (read directly; may be closed)
     #[account(address = member.certificate @ GateError::BadCertificate)]
     pub certificate: UncheckedAccount<'info>,
+    /// CHECK: POF's config PDA (read: revoked Verifier keys; closed after the wind-down)
+    pub pof_config: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]

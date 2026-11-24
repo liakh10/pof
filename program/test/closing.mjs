@@ -25,6 +25,7 @@ const owe = (who, l) => owed.set(who, (owed.get(who) || 0n) + l);
 for (const c of certs) owe(c.payer, c.lamports);
 for (const m of members) owe(m.payer, m.lamports);
 for (const r of rooms) owe(r.creator, r.lamports);
+for (const b of decodeAll(pofAccs, q.P, 'PathBuffer')) owe(b.revoker, b.lamports);
 const before = new Map();
 for (const w of owed.keys()) before.set(w, BigInt(await conn.getBalance(new PublicKey(w), 'confirmed')));
 const ti = await k.info(q.K.treasury), ci = await k.info(q.K.config);

@@ -47,6 +47,7 @@ pub const PROGRAM_DATA: Pubkey = pubkey!("ETKHHhmbAD2AJbeDd961pDaet2Gnnv1DFg8x49
 pub const CONFIG_SEED: &[u8] = b"config";
 pub const TREASURY_SEED: &[u8] = b"treasury";
 pub const CERT_SEED: &[u8] = b"cert";
+pub const PATH_SEED: &[u8] = b"path";
 
 pub const MAX_ASSETS: usize = 4;
 pub const MAX_TIERS: usize = 5;
@@ -58,6 +59,11 @@ pub const STATUS_LIVE: u8 = 0;
 pub const STATUS_REVOKED_SPENT: u8 = 1;
 pub const STATUS_REVOKED_HOLDER: u8 = 2;
 pub const STATUS_EXPIRED: u8 = 3;
+/// Voided: signed by a Verifier key the admin has since revoked (`revoke_verifier_key`, then anyone's `void_by_key`).
+pub const STATUS_VOIDED: u8 = 4;
+pub const MAX_REVOKED_KEYS: usize = 4;
+/// anchor_log may grow the anchored log by at most this many entries at once.
+pub const MAX_LOG_STEP: u64 = 10_000_000;
 
 pub const ATTESTATION_LEN: usize = 240;
 pub const DOMAIN_CERT: &[u8; 4] = b"POF1";
@@ -188,11 +194,17 @@ pub struct Config {
     /// A lowered rotation delay takes effect only after the old one has run: until held_until, set_verifier waits at least held_delay.
     pub held_delay: u64,
     pub held_until: u64,
+    /// Verifier keys revoked by the admin (leaked or retired): they sign nothing more, and every certificate they signed is dead
+    /// for require_certificate and Rooms at once, and can be voided by anyone.
+    pub revoked_keys: [Pubkey; MAX_REVOKED_KEYS],
     pub bump: u8,
     pub treasury_bump: u8,
 }
 
 impl Config {
+    pub fn is_revoked_key(&self, key: &Pubkey) -> bool {
+        *key != Pubkey::default() && self.revoked_keys.iter().any(|k| k == key)
+    }
     /// The key that signs now: the proposed one once its slot has come, else the current one.
     pub fn active_verifier(&self, slot: u64) -> Pubkey {
         if self.next_verifier != Pubkey::default() && slot >= self.next_verifier_slot {
@@ -223,6 +235,8 @@ pub struct Treasury {
     /// certify/renew paid by the relayer; by a $ROOT holder (no fee in both).
     pub relayed: u64,
     pub exempt: u64,
+    /// Certificates voided because their Verifier key was revoked.
+    pub voided: u64,
     /// The transparency log's latest signed head anchored on chain: its size, its root hash, the slot.
     pub log_size: u64,
     pub log_head: [u8; 32],
@@ -280,6 +294,23 @@ impl Certificate {
             self.status
         }
     }
+}
+
+/// A membership path staged in parts (`stage_path`) for `revoke_spent_staged`, so the full 40-level path never has to fit one
+/// transaction. PDA ["path", revoker, certificate]: only that revoker writes it, only for that certificate and that nullifier;
+/// `revoke_spent_staged` hashes it to a nullifier root the tree holds at that moment and closes it (rent back to the revoker).
+#[account(zero_copy)]
+pub struct PathBuffer {
+    pub revoker: Pubkey,
+    pub certificate: Pubkey,
+    pub nullifier: [u8; 32],
+    pub next_value: [u8; 32],
+    pub leaf_index: u64,
+    pub path: [[u8; 32]; ext::NULL_TREE_HEIGHT],
+    /// Siblings written so far from the leaf up (levels above are empty subtrees when consumed).
+    pub levels: u8,
+    pub bump: u8,
+    pub _pad: [u8; 6],
 }
 
 /// What `require_certificate` returns (also its return data).
@@ -385,6 +416,7 @@ fn add(a: u64, b: u64) -> Result<u64> {
 fn check_signed(ix: &AccountInfo, c: &Config, slot: u64, want: &[u8]) -> Result<Pubkey> {
     let key = c.active_verifier(slot);
     require!(key != Pubkey::default(), PofError::NoVerifier);
+    require!(!c.is_revoked_key(&key), PofError::KeyRevoked);
     let (signer, msg) = ext::signed_before(ix)?;
     require_keys_eq!(signer, key, PofError::WrongVerifier);
     require!(msg.as_slice() == want, PofError::AttestationMismatch);
@@ -473,10 +505,11 @@ pub fn read_certificate(info: &AccountInfo, subject_hash: &[u8; 32], asset: u8) 
     Certificate::try_deserialize(&mut d).map_err(|_| error!(PofError::BadCertificate))
 }
 
-/// The gate every consumer applies: live, unexpired, this asset, at least `min_tier`.
-pub fn gate(cert: &Certificate, asset: u8, min_tier: u8, slot: u64) -> Result<CertView> {
+/// The gate every consumer applies: live, unexpired, signed by a key that is not revoked, this asset, at least `min_tier`.
+pub fn gate(cert: &Certificate, config: &Config, asset: u8, min_tier: u8, slot: u64) -> Result<CertView> {
     require!(cert.asset == asset, PofError::AssetMismatch);
     require!(cert.status == STATUS_LIVE, PofError::NotLive);
+    require!(!config.is_revoked_key(&cert.verifier), PofError::KeyRevoked);
     require!(slot <= cert.expiry_slot, PofError::CertificateExpired);
     require!(cert.tier >= min_tier, PofError::TierTooLow);
     Ok(CertView { subject_kind: cert.subject_kind, tier: cert.tier, expiry_slot: cert.expiry_slot, controller: cert.controller })
@@ -546,7 +579,7 @@ pub mod pof {
         }
         if let Some(m) = &ctx.accounts.root_mint {
             require!(c.root_mint == Pubkey::default(), PofError::RootSet);
-            require!(ext::is_token_program(m.owner) && m.data_len() >= 82, PofError::BadMint);
+            require!(ext::is_mint(m), PofError::BadMint);
             c.root_mint = m.key();
             c.root_token_program = *m.owner;
         }
@@ -777,6 +810,58 @@ pub mod pof {
         revoke_with_pair(&a.config, &mut a.treasury, &mut a.certificate, index, salt, nullifier, slot, a.caller.key(), path)
     }
 
+    /// Open the revoker's buffer for this certificate (the revoker pays its rent) with the nullifier, its next value, its leaf
+    /// index and the first siblings (from the leaf up); `stage_path` adds the rest. Two transactions carry the full 40 levels.
+    pub fn open_path(ctx: Context<OpenPath>, nullifier: [u8; 32], next_value: [u8; 32], leaf_index: u64, siblings: Vec<[u8; 32]>) -> Result<()> {
+        let a = ctx.accounts;
+        require!(a.certificate.status == STATUS_LIVE, PofError::NotLive);
+        require!(siblings.len() <= ext::NULL_TREE_HEIGHT, PofError::BadIndex);
+        let mut b = a.buffer.load_init()?;
+        b.revoker = a.revoker.key();
+        b.certificate = a.certificate.key();
+        b.nullifier = nullifier;
+        b.next_value = next_value;
+        b.leaf_index = leaf_index;
+        b.path[..siblings.len()].copy_from_slice(&siblings);
+        b.levels = siblings.len() as u8;
+        b.bump = ctx.bumps.buffer;
+        Ok(())
+    }
+
+    /// Write `siblings` at levels offset.. of the revoker's open buffer (no gap above what is written; a level may be rewritten).
+    pub fn stage_path(ctx: Context<StagePath>, offset: u8, siblings: Vec<[u8; 32]>) -> Result<()> {
+        let mut b = ctx.accounts.buffer.load_mut()?;
+        let end = offset as usize + siblings.len();
+        require!(end <= ext::NULL_TREE_HEIGHT && !siblings.is_empty() && offset <= b.levels, PofError::BadIndex);
+        b.path[offset as usize..end].copy_from_slice(&siblings);
+        b.levels = b.levels.max(end as u8);
+        Ok(())
+    }
+
+    /// The staged proof: the revoker's buffer for this certificate holds a membership path of its nullifier; the program hashes
+    /// all 40 levels to the root and checks it is one of the 100 nullifier roots the tree account holds NOW, checks the salted
+    /// hash of the disclosed note, revokes, and closes the buffer (rent back to the revoker).
+    pub fn revoke_spent_staged(ctx: Context<RevokeSpentStaged>, index: u8, salt: [u8; 32]) -> Result<()> {
+        let slot = Clock::get()?.slot;
+        let a = ctx.accounts;
+        let nullifier = {
+            let b = a.buffer.load()?;
+            require_keys_eq!(b.certificate, a.certificate.key(), PofError::BadCertificate);
+            let spent = ext::spent_in_nullifier_tree(&a.tree, &b.nullifier, &b.next_value, b.leaf_index, &b.path[..b.levels as usize])?;
+            require!(spent, PofError::NotSpent);
+            b.nullifier
+        };
+        revoke_with_pair(&a.config, &mut a.treasury, &mut a.certificate, index, salt, nullifier, slot, a.revoker.key(), 1)
+    }
+
+    /// The revoker drops its staged buffer (rent back); during the wind-down anyone may.
+    pub fn close_path(ctx: Context<ClosePath>) -> Result<()> {
+        let revoker = ctx.accounts.buffer.load()?.revoker;
+        require_keys_eq!(revoker, ctx.accounts.revoker.key(), PofError::NotPayer);
+        require!(ctx.accounts.caller.key() == revoker || ctx.accounts.config.closing, PofError::NotPayer);
+        Ok(())
+    }
+
     /// The certificate's controller withdraws it, at any moment.
     pub fn revoke_by_holder(ctx: Context<RevokeByHolder>) -> Result<()> {
         let slot = Clock::get()?.slot;
@@ -830,7 +915,7 @@ pub mod pof {
         let a = ctx.accounts;
         check_signed(&a.instructions, &a.config, slot, &log_bytes(&crate::ID, size, &head))?;
         let t = &mut a.treasury;
-        require!(size > t.log_size, PofError::LogNotGrowing);
+        require!(size > t.log_size && size - t.log_size <= MAX_LOG_STEP, PofError::LogNotGrowing);
         t.log_size = size;
         t.log_head = head;
         t.log_slot = slot;
@@ -842,7 +927,35 @@ pub mod pof {
     /// least `min_tier`; returns its kind, tier, expiry and controller.
     pub fn require_certificate(ctx: Context<RequireCertificate>, subject_hash: [u8; 32], asset: u8, min_tier: u8) -> Result<CertView> {
         let cert = read_certificate(&ctx.accounts.certificate, &subject_hash, asset)?;
-        gate(&cert, asset, min_tier, Clock::get()?.slot)
+        gate(&cert, &ctx.accounts.config, asset, min_tier, Clock::get()?.slot)
+    }
+
+    /// The admin revokes a Verifier key at once (a leak, or a key retired after rotation): it signs nothing more, and every
+    /// certificate it signed fails require_certificate and Rooms from now on; `void_by_key` marks each of them. At most 4 keys.
+    pub fn revoke_verifier_key(ctx: Context<AdminOnly>, key: Pubkey) -> Result<()> {
+        require_keys_neq!(key, Pubkey::default(), PofError::BadParams);
+        let c = &mut ctx.accounts.config;
+        if !c.is_revoked_key(&key) {
+            let free = c.revoked_keys.iter().position(|k| *k == Pubkey::default()).ok_or(error!(PofError::BadParams))?;
+            c.revoked_keys[free] = key;
+        }
+        emit!(VerifierKeyRevoked { key, slot: Clock::get()?.slot });
+        Ok(())
+    }
+
+    /// Anyone: a live certificate signed by a revoked Verifier key becomes voided (status 4).
+    pub fn void_by_key(ctx: Context<VoidByKey>) -> Result<()> {
+        let slot = Clock::get()?.slot;
+        let a = ctx.accounts;
+        let cert = &mut a.certificate;
+        require!(cert.status == STATUS_LIVE, PofError::NotLive);
+        require!(a.config.is_revoked_key(&cert.verifier), PofError::KeyNotRevoked);
+        unlive(&a.config, &mut a.treasury, cert);
+        cert.status = STATUS_VOIDED;
+        cert.revoked_slot = slot;
+        a.treasury.voided += 1;
+        emit!(Revoked { subject_hash: cert.subject_hash, asset: cert.asset, tier: cert.tier, status: STATUS_VOIDED, slot, by: a.caller.key(), index: u8::MAX, salt: [0; 32], nullifier: [0; 32], path: 5 });
+        Ok(())
     }
 
     /// The treasury's fees to the dev wallet (0: all of them); its rent stays.
@@ -971,6 +1084,52 @@ pub struct RevokeSpent<'info> {
 }
 
 #[derive(Accounts)]
+pub struct OpenPath<'info> {
+    #[account(mut)]
+    pub revoker: Signer<'info>,
+    #[account(seeds = [CERT_SEED, certificate.subject_hash.as_ref(), &[certificate.asset]], bump = certificate.bump)]
+    pub certificate: Box<Account<'info, Certificate>>,
+    #[account(init, payer = revoker, space = 8 + std::mem::size_of::<PathBuffer>(), seeds = [PATH_SEED, revoker.key().as_ref(), certificate.key().as_ref()], bump)]
+    pub buffer: AccountLoader<'info, PathBuffer>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct StagePath<'info> {
+    pub revoker: Signer<'info>,
+    #[account(mut, has_one = revoker @ PofError::NotPayer)]
+    pub buffer: AccountLoader<'info, PathBuffer>,
+}
+
+#[derive(Accounts)]
+pub struct RevokeSpentStaged<'info> {
+    #[account(mut)]
+    pub revoker: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, seeds = [TREASURY_SEED], bump = treasury.bump)]
+    pub treasury: Box<Account<'info, Treasury>>,
+    #[account(mut, seeds = [CERT_SEED, certificate.subject_hash.as_ref(), &[certificate.asset]], bump = certificate.bump)]
+    pub certificate: Box<Account<'info, Certificate>>,
+    /// CHECK: the Rings state tree whose nullifier roots the path must reach (owner checked)
+    pub tree: UncheckedAccount<'info>,
+    #[account(mut, close = revoker, seeds = [PATH_SEED, revoker.key().as_ref(), certificate.key().as_ref()], bump)]
+    pub buffer: AccountLoader<'info, PathBuffer>,
+}
+
+#[derive(Accounts)]
+pub struct ClosePath<'info> {
+    pub caller: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, close = revoker)]
+    pub buffer: AccountLoader<'info, PathBuffer>,
+    /// CHECK: the buffer's revoker (checked against the buffer in close_path), who gets the rent back
+    #[account(mut)]
+    pub revoker: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
 pub struct RevokeByHolder<'info> {
     pub controller: Signer<'info>,
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
@@ -1025,6 +1184,19 @@ pub struct AnchorLog<'info> {
 pub struct RequireCertificate<'info> {
     /// CHECK: the certificate PDA of (subject_hash, asset) (derived, owner and layout checked in read_certificate)
     pub certificate: UncheckedAccount<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Box<Account<'info, Config>>,
+}
+
+#[derive(Accounts)]
+pub struct VoidByKey<'info> {
+    pub caller: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, seeds = [TREASURY_SEED], bump = treasury.bump)]
+    pub treasury: Box<Account<'info, Treasury>>,
+    #[account(mut, seeds = [CERT_SEED, certificate.subject_hash.as_ref(), &[certificate.asset]], bump = certificate.bump)]
+    pub certificate: Box<Account<'info, Certificate>>,
 }
 
 #[derive(Accounts)]
@@ -1102,7 +1274,8 @@ pub struct Renewed {
     pub fee: u64,
     pub renewals: u32,
 }
-/// path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder (controller signs the transaction), 4 by the controller's signed revoke.
+/// path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder (controller signs the transaction), 4 by the controller's
+/// signed revoke, 5 voided (its Verifier key revoked).
 #[event]
 pub struct Revoked {
     pub subject_hash: [u8; 32],
@@ -1124,6 +1297,11 @@ pub struct Expired {
     pub status: u8,
     pub slot: u64,
     pub payer: Pubkey,
+}
+#[event]
+pub struct VerifierKeyRevoked {
+    pub key: Pubkey,
+    pub slot: u64,
 }
 #[event]
 pub struct LogAnchored {
@@ -1206,6 +1384,7 @@ mod tests {
             launch_slot: 0,
             held_delay: 0,
             held_until: 0,
+            revoked_keys: [Pubkey::default(); MAX_REVOKED_KEYS],
             bump: 0,
             treasury_bump: 0,
         };

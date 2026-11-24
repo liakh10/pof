@@ -16,6 +16,8 @@ pub const ED25519_ID: Pubkey = pubkey!("Ed25519SigVerify111111111111111111111111
 /// The Solana Privacy Program (Helius Privacy Rings), mainnet.
 pub const SPP_ID: Pubkey = pubkey!("ring1GaLCuJnkUMVkX2JeZLTTX17wKsV4fZmPVzXANW");
 pub const NULLIFIER_SEED: &[u8] = b"nullifier";
+/// Rings tree 0, PDA ["tree", u16 LE 0] of the Privacy Program: the only tree (pof/RINGS.md §1). Every spent proof names it.
+pub const RINGS_TREE: Pubkey = pubkey!("777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor");
 
 pub fn sha256(parts: &[&[u8]]) -> [u8; 32] {
     solana_sha256_hasher::hashv(parts).to_bytes()
@@ -149,6 +151,17 @@ pub fn ata(owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[owner.as_ref(), token_program.as_ref(), mint.as_ref()], &ATA_ID).0
 }
 
+/// An initialized MINT of SPL Token or Token-2022 (not a token account): 82 bytes, or a Token-2022 mint with extensions
+/// (account type byte 1 at offset 165).
+pub fn is_mint(m: &AccountInfo) -> bool {
+    if !is_token_program(m.owner) {
+        return false;
+    }
+    let Ok(d) = m.try_borrow_data() else { return false };
+    let shape = d.len() == 82 || (*m.owner == TOKEN_2022_ID && d.len() > 165 && d[165] == 1);
+    shape && d[45] == 1
+}
+
 /// (mint, owner, amount) of an initialized token account of SPL Token or Token-2022, else None.
 pub fn token_view(account: &AccountInfo) -> Option<(Pubkey, Pubkey, u64)> {
     if !is_token_program(account.owner) {
@@ -193,6 +206,7 @@ pub const NULL_TREE_HEIGHT: usize = 40;
 /// (a) The nullifier PDA of (`tree`, `nullifier`) exists and is the Privacy Program's. True means spent; false means only "not
 /// shown by this proof" (the caller refuses with NotSpent and never treats it as unspent).
 pub fn spent_on_rings(tree: &AccountInfo, nullifier_account: &AccountInfo, nullifier: &[u8; 32]) -> Result<bool> {
+    require_keys_eq!(tree.key(), RINGS_TREE, PofError::BadRingsAccounts);
     require_keys_eq!(*tree.owner, SPP_ID, PofError::BadRingsAccounts);
     let (pda, _) = Pubkey::find_program_address(&[NULLIFIER_SEED, tree.key.as_ref(), nullifier], &SPP_ID);
     require_keys_eq!(nullifier_account.key(), pda, PofError::BadRingsAccounts);
@@ -273,6 +287,7 @@ pub fn membership_root(value: &[u8; 32], next: &[u8; 32], leaf_index: u64, path:
 /// (b) `nullifier` is a leaf of `tree`'s folded nullifier tree: its path hashes to one of the 100 nullifier roots the tree
 /// account holds now. True means spent; false only "not shown".
 pub fn spent_in_nullifier_tree(tree: &AccountInfo, nullifier: &[u8; 32], next: &[u8; 32], leaf_index: u64, path: &[[u8; 32]]) -> Result<bool> {
+    require_keys_eq!(tree.key(), RINGS_TREE, PofError::BadRingsAccounts);
     require_keys_eq!(*tree.owner, SPP_ID, PofError::BadRingsAccounts);
     let root = membership_root(nullifier, next, leaf_index, path)?;
     let d = tree.try_borrow_data()?;

@@ -224,6 +224,9 @@
         },
         {
           "name": "certificate"
+        },
+        {
+          "name": "pof_config"
         }
       ],
       "args": []
@@ -309,6 +312,9 @@
         },
         {
           "name": "certificate"
+        },
+        {
+          "name": "pof_config"
         },
         {
           "name": "pof_program",

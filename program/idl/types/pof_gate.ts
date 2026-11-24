@@ -230,6 +230,9 @@ export type PofGate = {
         },
         {
           "name": "certificate"
+        },
+        {
+          "name": "pofConfig"
         }
       ],
       "args": []
@@ -315,6 +318,9 @@ export type PofGate = {
         },
         {
           "name": "certificate"
+        },
+        {
+          "name": "pofConfig"
         },
         {
           "name": "pofProgram",

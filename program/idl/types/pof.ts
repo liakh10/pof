@@ -346,6 +346,55 @@ export type Pof = {
       "args": []
     },
     {
+      "name": "closePath",
+      "docs": [
+        "The revoker drops its staged buffer (rent back); during the wind-down anyone may."
+      ],
+      "discriminator": [
+        228,
+        246,
+        66,
+        195,
+        202,
+        252,
+        223,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buffer",
+          "writable": true
+        },
+        {
+          "name": "revoker",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "expire",
       "docs": [
         "Anyone, past the expiry slot (or at any moment during the wind-down): the account closes, its rent back to its payer."
@@ -502,6 +551,97 @@ export type Pof = {
       ]
     },
     {
+      "name": "openPath",
+      "docs": [
+        "Open the revoker's buffer for this certificate (the revoker pays its rent) with the nullifier, its next value, its leaf",
+        "index and the first siblings (from the leaf up); `stage_path` adds the rest. Two transactions carry the full 40 levels."
+      ],
+      "discriminator": [
+        239,
+        145,
+        149,
+        165,
+        39,
+        35,
+        63,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "revoker",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "certificate"
+        },
+        {
+          "name": "buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revoker"
+              },
+              {
+                "kind": "account",
+                "path": "certificate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nullifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nextValue",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "leafIndex",
+          "type": "u64"
+        },
+        {
+          "name": "siblings",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "renew",
       "docs": [
         "A fresh attestation on the same notes (same salted hashes), subject, asset and controller: new root, slots and tier."
@@ -607,6 +747,24 @@ export type Pof = {
       "accounts": [
         {
           "name": "certificate"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -883,6 +1041,168 @@ export type Pof = {
               }
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "revokeSpentStaged",
+      "docs": [
+        "The staged proof: the revoker's buffer for this certificate holds a membership path of its nullifier; the program hashes",
+        "all 40 levels to the root and checks it is one of the 100 nullifier roots the tree account holds NOW, checks the salted",
+        "hash of the disclosed note, revokes, and closes the buffer (rent back to the revoker)."
+      ],
+      "discriminator": [
+        255,
+        103,
+        254,
+        43,
+        147,
+        107,
+        237,
+        146
+      ],
+      "accounts": [
+        {
+          "name": "revoker",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "certificate",
+          "writable": true
+        },
+        {
+          "name": "tree"
+        },
+        {
+          "name": "buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revoker"
+              },
+              {
+                "kind": "account",
+                "path": "certificate"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        },
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "revokeVerifierKey",
+      "docs": [
+        "The admin revokes a Verifier key at once (a leak, or a key retired after rotation): it signs nothing more, and every",
+        "certificate it signed fails require_certificate and Rooms from now on; `void_by_key` marks each of them. At most 4 keys."
+      ],
+      "discriminator": [
+        38,
+        162,
+        12,
+        240,
+        52,
+        250,
+        34,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "key",
+          "type": "pubkey"
         }
       ]
     },
@@ -1213,6 +1533,118 @@ export type Pof = {
       ]
     },
     {
+      "name": "stagePath",
+      "docs": [
+        "Write `siblings` at levels offset.. of the revoker's open buffer (no gap above what is written; a level may be rewritten)."
+      ],
+      "discriminator": [
+        68,
+        97,
+        146,
+        218,
+        201,
+        81,
+        33,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "revoker",
+          "signer": true,
+          "relations": [
+            "buffer"
+          ]
+        },
+        {
+          "name": "buffer",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "offset",
+          "type": "u8"
+        },
+        {
+          "name": "siblings",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "voidByKey",
+      "docs": [
+        "Anyone: a live certificate signed by a revoked Verifier key becomes voided (status 4)."
+      ],
+      "discriminator": [
+        74,
+        62,
+        124,
+        112,
+        58,
+        63,
+        147,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "certificate",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "withdrawFees",
       "docs": [
         "The treasury's fees to the dev wallet (0: all of them); its rent stays."
@@ -1315,6 +1747,19 @@ export type Pof = {
         250,
         204,
         130
+      ]
+    },
+    {
+      "name": "pathBuffer",
+      "discriminator": [
+        15,
+        240,
+        22,
+        62,
+        212,
+        197,
+        226,
+        181
       ]
     },
     {
@@ -1460,6 +1905,19 @@ export type Pof = {
         184,
         0,
         65
+      ]
+    },
+    {
+      "name": "verifierKeyRevoked",
+      "discriminator": [
+        227,
+        104,
+        7,
+        71,
+        203,
+        98,
+        107,
+        98
       ]
     },
     {
@@ -1709,6 +2167,16 @@ export type Pof = {
     },
     {
       "code": 6046,
+      "name": "keyRevoked",
+      "msg": "the Verifier key that signed this has been revoked"
+    },
+    {
+      "code": 6047,
+      "name": "keyNotRevoked",
+      "msg": "the certificate's Verifier key is not revoked"
+    },
+    {
+      "code": 6048,
       "name": "overflow",
       "msg": "arithmetic overflow"
     }
@@ -2218,6 +2686,19 @@ export type Pof = {
             "type": "u64"
           },
           {
+            "name": "revokedKeys",
+            "docs": [
+              "Verifier keys revoked by the admin (leaked or retired): they sign nothing more, and every certificate they signed is dead",
+              "for require_certificate and Rooms at once, and can be voided by anyone."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                4
+              ]
+            }
+          },
+          {
             "name": "bump",
             "type": "u8"
           },
@@ -2425,6 +2906,87 @@ export type Pof = {
       }
     },
     {
+      "name": "pathBuffer",
+      "docs": [
+        "A membership path staged in parts (`stage_path`) for `revoke_spent_staged`, so the full 40-level path never has to fit one",
+        "transaction. PDA [\"path\", revoker, certificate]: only that revoker writes it, only for that certificate and that nullifier;",
+        "`revoke_spent_staged` hashes it to a nullifier root the tree holds at that moment and closes it (rent back to the revoker)."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "revoker",
+            "type": "pubkey"
+          },
+          {
+            "name": "certificate",
+            "type": "pubkey"
+          },
+          {
+            "name": "nullifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nextValue",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "leafIndex",
+            "type": "u64"
+          },
+          {
+            "name": "path",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                40
+              ]
+            }
+          },
+          {
+            "name": "levels",
+            "docs": [
+              "Siblings written so far from the leaf up (levels above are empty subtrees when consumed)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "pad",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "pausedSet",
       "type": {
         "kind": "struct",
@@ -2488,7 +3050,8 @@ export type Pof = {
     {
       "name": "revoked",
       "docs": [
-        "path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder (controller signs the transaction), 4 by the controller's signed revoke."
+        "path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder (controller signs the transaction), 4 by the controller's",
+        "signed revoke, 5 voided (its Verifier key revoked)."
       ],
       "type": {
         "kind": "struct",
@@ -2625,6 +3188,13 @@ export type Pof = {
             "type": "u64"
           },
           {
+            "name": "voided",
+            "docs": [
+              "Certificates voided because their Verifier key was revoked."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "logSize",
             "docs": [
               "The transparency log's latest signed head anchored on chain: its size, its root hash, the slot."
@@ -2647,6 +3217,22 @@ export type Pof = {
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verifierKeyRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "key",
+            "type": "pubkey"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
           }
         ]
       }

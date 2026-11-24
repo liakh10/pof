@@ -46,7 +46,9 @@ export const PofErrorCode = {
   LogNotGrowing: 6043,
   TreasuryShort: 6044,
   NoRotationDue: 6045,
-  Overflow: 6046
+  KeyRevoked: 6046,
+  KeyNotRevoked: 6047,
+  Overflow: 6048
 };
 
 export type PofErrorName = keyof typeof PofErrorCode;

@@ -226,6 +226,8 @@ await check('revoke_spent (a): the nullifier PDA a real spend leaves; wrong salt
   // someone else's spent PDA passed for this nullifier; a tree that is not the Rings program's
   await refuses(rv(i, spentNote.salt, SPENT[0], q.nullifierPda(TREE, SPENT[1])), 'rings');
   await refuses(rv(i, spentNote.salt, SPENT[0], q.nullifierPda(TREE, SPENT[0]), q.K.config), 'rings');
+  // fuzz: an account the Privacy Program owns that is not tree 0 (a nullifier PDA) passed as the tree
+  await refuses(rv(i, spentNote.salt, SPENT[0], q.nullifierPda(TREE, SPENT[0]), q.nullifierPda(TREE, SPENT[1])), 'rings');
   ok(!(await k.cert(a.subject_hash)).status, 'still live');
   const sig = await rv(i, spentNote.salt, SPENT[0], q.nullifierPda(TREE, SPENT[0]));
   unit('revoke_spent (PDA)');
@@ -277,6 +279,45 @@ await check('revoke_spent (b): a real mainnet nullifier, its PDA absent here, pr
   await send([q.P.ix('revoke_spent', { index: 0, salt: n2.list[0].salt, nullifier: nf, membership: { ...m, path: MF.path.slice(0, 20).map(h => Buffer.from(h, 'hex')) } }, { caller: outsider.publicKey, certificate: q.certPda(b.subject_hash, 0), tree: TREE })], [outsider], 400_000);
   unit('revoke_spent (membership, 20 levels)');
   eq((await k.cert(b.subject_hash)).status, 1);
+});
+
+await check('revoke_spent_staged: the FULL 40-level mainnet path staged in two transactions into the revoker\'s buffer (no v1 transaction needed), hashed to a root the tree holds now; a tampered level, a wrong salt, another revoker, another certificate refused; the buffer closes with its rent back', async () => {
+  const nf = Buffer.from(MF.nullifier, 'hex');
+  const full = MF.path.map(h => Buffer.from(h, 'hex'));
+  eq(full.length, 40, 'a full-depth path');
+  const mk = async () => { const n = k.notes(1, [nf]); const h = Keypair.generate(); await fund([h], 3); const a = await k.attestation({ kind: 0, controller: h.publicKey, null_hashes: n.hashes, tier: 1 }); await doCertify(h, a); return { a, salt: n.list[0].salt, cp: q.certPda(a.subject_hash, 0) }; };
+  const A = await mk(), B = await mk();
+  const rev = Keypair.generate(); await fund([rev], 2);
+  const buf = (who, cp) => q.pda([Buffer.from('path'), who.toBuffer(), cp.toBuffer()]);
+  const open = (who, cp, siblings) => send([q.P.ix('open_path', { nullifier: nf, next_value: Buffer.from(MF.next, 'hex'), leaf_index: BigInt(MF.leafIndex), siblings }, { revoker: who.publicKey, certificate: cp, buffer: buf(who.publicKey, cp) })], [who], 200_000);
+  const stage = (who, cp, offset, siblings, owner = who) => send([q.P.ix('stage_path', { offset, siblings }, { revoker: who.publicKey, buffer: buf(owner.publicKey, cp) })], [who], 200_000);
+  const revoke = (who, cp, salt, bufCp = cp) => send([q.P.ix('revoke_spent_staged', { index: 0, salt }, { revoker: who.publicKey, certificate: cp, tree: TREE, buffer: buf(who.publicKey, bufCp) })], [who], 400_000);
+  const b0 = await lam(rev.publicKey);
+  await open(rev, A.cp, full.slice(0, 20)); unit('open_path (20 levels)');
+  await refuses(stage(outsider, A.cp, 20, full.slice(20), rev), 'payer');   // only its revoker writes the buffer
+  await refuses(stage(rev, A.cp, 25, full.slice(25)), 'index');   // no gap
+  await stage(rev, A.cp, 20, full.slice(20)); unit('stage_path (20 levels)');
+  const bb = await k.decode('PathBuffer', buf(rev.publicKey, A.cp));
+  eq(bb.levels, 40); eq(bb.certificate, A.cp.toBase58()); eq(bb.nullifier.toString('hex'), MF.nullifier);
+  // a tampered upper level: refused (the path must reach a root the tree holds now)
+  const bad = Buffer.from(full[30]); bad[31] ^= 1;
+  await stage(rev, A.cp, 30, [bad]);
+  await refuses(revoke(rev, A.cp, A.salt), 'not shown as spent');
+  await stage(rev, A.cp, 30, [full[30]]);
+  await refuses(revoke(rev, A.cp, rand(32)), 'do not hash');
+  await refuses(revoke(outsider, A.cp, A.salt));   // another revoker has no buffer for it
+  await refuses(revoke(rev, B.cp, B.salt, A.cp), 'seeds');   // a buffer staged for A cannot revoke B
+  await revoke(rev, A.cp, A.salt); unit('revoke_spent_staged (40 levels)');
+  eq((await k.cert(A.a.subject_hash)).status, 1);
+  ok(!(await k.exists(buf(rev.publicKey, A.cp))), 'buffer closed');
+  eq(b0 - (await lam(rev.publicKey)), 5n * 5000n, 'the buffer rent came back (the revoker paid only the fees of its five transactions)');
+  // close_path: only its revoker (outside the wind-down)
+  await open(rev, B.cp, full.slice(0, 5));
+  await refuses(send([q.P.ix('close_path', {}, { caller: outsider.publicKey, buffer: buf(rev.publicKey, B.cp), revoker: rev.publicKey })], [outsider], 100_000), 'payer');
+  await send([q.P.ix('close_path', {}, { caller: rev.publicKey, buffer: buf(rev.publicKey, B.cp), revoker: rev.publicKey })], [rev], 100_000);
+  ok(!(await k.exists(buf(rev.publicKey, B.cp))), 'dropped');
+  await open(rev, B.cp, full.slice(0, 3));   // left behind: the wind-down must close it
+  live.staged = { cp: B.cp };
 });
 
 /* ------------------------------------------------------------------ revoke_by_holder, re-certify, replay */
@@ -400,6 +441,8 @@ await check('set_roles: the root mint once; a payer holding 1,000,000 $ROOT pays
   const mint = await k.plainMint(admin, [[whale.publicKey, 1_000_000n * 1_000_000n], [bob.publicKey, 999_999n * 1_000_000n]]);
   await refuses(send([q.P.ix('set_roles', { dev: null, relayer: null }, { admin: outsider.publicKey, root_mint: mint })], [outsider], 100_000), 'admin');
   await refuses(send([q.P.ix('set_roles', { dev: null, relayer: null }, { admin: admin.publicKey, root_mint: q.K.config })], [admin], 100_000), 'mint');
+  // fuzz: a TOKEN ACCOUNT of the right program is not a mint (set_roles is one-way)
+  await refuses(send([q.P.ix('set_roles', { dev: null, relayer: null }, { admin: admin.publicKey, root_mint: q.ata(whale.publicKey, mint, spl.TOKEN_PROGRAM_ID) })], [admin], 100_000), 'mint');
   await send([q.P.ix('set_roles', { dev: null, relayer: null }, { admin: admin.publicKey, root_mint: mint })], [admin], 100_000);
   unit('set_roles');
   k.root.mint = mint;
@@ -480,6 +523,8 @@ await check('anchor_log: the §7 signed tree head by the active Verifier key; it
   eq(t.log_size, 10n); eq(t.log_head.toString('hex'), root.toString('hex'));
   await refuses(al(VV, 10n, rand(32)), 'grow');
   await refuses(al(VV, 9n, rand(32)), 'grow');
+  await refuses(al(VV, (1n << 64n) - 1n, rand(32)), 'grow');   // fuzz: one huge anchor would block the log for good
+  await refuses(al(VV, 10n + 10_000_001n, rand(32)), 'grow');
   await al(VV, 11n, rand(32));
 });
 await check('withdraw_fees: admin only, to the dev wallet only, never into the treasury\'s rent', async () => {
@@ -525,7 +570,7 @@ await check('pof_gate create_room / set_room: tiers checked against POF\'s table
   eq(r.min_tier, 2); ok(r.open); eq(r.name.toString().replace(/\0+$/, ''), 'whales');
   await refuses(send([q.G.ix('set_room', { min_tier: 1, open: true, name: nm('x') }, { creator: outsider.publicKey, room: roomOf(carol.publicKey, 1n), pof_config: q.K.config })], [outsider], 100_000), 'creator');
 });
-const join = (ctl, payer, room, h, asset = 0) => send([q.G.ix('join', { subject_hash: h }, { controller: ctl.publicKey, payer: payer.publicKey, room, member: q.memberPda(room, h), certificate: q.certPda(h, asset) })], ctl === payer ? [ctl] : [payer, ctl], 300_000);
+const join = (ctl, payer, room, h, asset = 0) => send([q.G.ix('join', { subject_hash: h }, { controller: ctl.publicKey, payer: payer.publicKey, room, member: q.memberPda(room, h), certificate: q.certPda(h, asset), pof_config: q.K.config })], ctl === payer ? [ctl] : [payer, ctl], 300_000);
 await check('join: through the require_certificate CPI; a lower tier, another asset, a non-controller, a revoked one and a shut room refused', async () => {
   const room = roomOf(carol.publicKey, 1n);
   await join(alice, alice, room, live.alice.a.subject_hash);
@@ -553,12 +598,12 @@ await check('join: through the require_certificate CPI; a lower tier, another as
   live.p = { a: pa, kp: p };
   await join(p, p, room, pa.subject_hash);
 });
-const evictM = async (room, h, asset = 0) => { const m = await k.decode('Member', q.memberPda(room, h), true); return send([q.G.ix('evict', {}, { caller: outsider.publicKey, room, member: q.memberPda(room, h), payer: m.payer, certificate: m.certificate })], [outsider], 200_000); };
+const evictM = async (room, h, asset = 0) => { const m = await k.decode('Member', q.memberPda(room, h), true); return send([q.G.ix('evict', {}, { caller: outsider.publicKey, room, member: q.memberPda(room, h), payer: m.payer, certificate: m.certificate, pof_config: q.K.config })], [outsider], 200_000); };
 await check('evict: refused while the certificate is good; after a revoke anyone evicts, the rent back to the member\'s payer; a forged certificate account refused', async () => {
   const room = roomOf(carol.publicKey, 1n), h = live.p.a.subject_hash;
   await refuses(evictM(room, h), 'still live');
-  await refuses(send([q.G.ix('evict', {}, { caller: outsider.publicKey, room, member: q.memberPda(room, h), payer: live.p.kp.publicKey, certificate: q.certPda(live.alice.a.subject_hash, 0) })], [outsider], 200_000), 'certificate');
-  await refuses(send([q.G.ix('evict', {}, { caller: outsider.publicKey, room, member: q.memberPda(room, h), payer: outsider.publicKey, certificate: q.certPda(h, 0) })], [outsider], 200_000));
+  await refuses(send([q.G.ix('evict', {}, { caller: outsider.publicKey, room, member: q.memberPda(room, h), payer: live.p.kp.publicKey, certificate: q.certPda(live.alice.a.subject_hash, 0), pof_config: q.K.config })], [outsider], 200_000), 'certificate');
+  await refuses(send([q.G.ix('evict', {}, { caller: outsider.publicKey, room, member: q.memberPda(room, h), payer: outsider.publicKey, certificate: q.certPda(h, 0), pof_config: q.K.config })], [outsider], 200_000));
   await send([q.P.ix('revoke_by_holder', {}, { controller: live.p.kp.publicKey, certificate: q.certPda(h, 0) })], [live.p.kp], 100_000);
   const rent = BigInt((await k.info(q.memberPda(room, h))).lamports), b0 = await lam(live.p.kp.publicKey);
   const sig = await evictM(room, h);
@@ -595,6 +640,30 @@ await check('leave: only the member\'s controller; close_room refused while memb
   unit('close_room');
   ok(!(await k.exists(room)), 'closed');
   await refuses(send([q.G.ix('release_room', {}, { caller: outsider.publicKey, room: roomOf(carol.publicKey, 1n), creator: carol.publicKey, pof_config: q.K.config })], [outsider], 100_000), 'winding down');
+});
+
+await check('revoke_verifier_key (fuzz): the admin revokes the old key at once; certificates it signed fail require_certificate and Rooms, anyone voids them and evicts their members; a certificate by the current key is untouched', async () => {
+  const room = roomOf(carol.publicKey, 1n), h = live.whale.subject_hash;   // signed by V before the rotation, a member of the room
+  eq((await k.cert(h)).verifier, V.publicKey.toBase58());
+  await refuses(send([q.P.ix('revoke_verifier_key', { key: V.publicKey }, { admin: outsider.publicKey })], [outsider], 100_000), 'admin');
+  await refuses(evictM(room, h), 'still live');
+  await send([q.P.ix('revoke_verifier_key', { key: V.publicKey }, { admin: admin.publicKey })], [admin], 100_000);
+  unit('revoke_verifier_key');
+  ok((await k.config()).revoked_keys.includes(V.publicKey.toBase58()), 'recorded');
+  await refuses(send([q.P.ix('require_certificate', { subject_hash: h, asset: 0, min_tier: 1 }, { certificate: q.certPda(h, 0) })], [outsider], 100_000), 'revoked');
+  await evictM(room, h);
+  ok(!(await k.exists(q.memberPda(room, h))), 'its member evicted');
+  const t0 = await k.treasury();
+  await send([q.P.ix('void_by_key', {}, { caller: outsider.publicKey, certificate: q.certPda(h, 0) })], [outsider], 100_000);
+  unit('void_by_key');
+  eq((await k.cert(h)).status, 4); const t = await k.treasury(); eq(t.voided, t0.voided + 1n); eq(t.live, t0.live - 1n);
+  await refuses(send([q.P.ix('void_by_key', {}, { caller: outsider.publicKey, certificate: q.certPda(h, 0) })], [outsider], 100_000), 'not live');
+  // a certificate signed by the current key stays live, and can still join (it stays in the room for the wind-down test)
+  const byV2 = Keypair.generate(); await fund([byV2], 2);
+  const a2 = await k.attestation({ kind: 0, controller: byV2.publicKey, tier: 3 }); await certifyNow(byV2, a2);
+  await join(byV2, byV2, room, a2.subject_hash);
+  await refuses(send([q.P.ix('void_by_key', {}, { caller: outsider.publicKey, certificate: q.certPda(a2.subject_hash, 0) })], [outsider], 100_000), 'not revoked');
+  await send([q.P.ix('require_certificate', { subject_hash: a2.subject_hash, asset: 0, min_tier: 1 }, { certificate: q.certPda(a2.subject_hash, 0) })], [outsider], 100_000);
 });
 
 /* ------------------------------------------------------------------ counters */

@@ -107,14 +107,14 @@ try {
   ok((await lam(q.K.treasury)) === t2 && (await k.cert(x.subject_hash)).payer === relayer.publicKey.toBase58(), 'the relayer certifies an X handle: no on-chain fee, the handle\'s own controller key');
   const room = q.roomPda(creator.publicKey, 1n), nm = Buffer.alloc(32); Buffer.from('100+ SOL').copy(nm);
   await send([q.G.ix('create_room', { id: 1n, asset: 0, min_tier: 3, name: nm }, { creator: creator.publicKey, room, pof_config: q.K.config })], [creator], 200_000, tables);
-  await send([q.G.ix('join', { subject_hash: a.subject_hash }, { controller: alice.publicKey, payer: alice.publicKey, room, member: q.memberPda(room, a.subject_hash), certificate: q.certPda(a.subject_hash, 0) })], [alice], 300_000, tables);
+  await send([q.G.ix('join', { subject_hash: a.subject_hash }, { controller: alice.publicKey, payer: alice.publicKey, room, member: q.memberPda(room, a.subject_hash), certificate: q.certPda(a.subject_hash, 0), pof_config: q.K.config })], [alice], 300_000, tables);
   let low = '';
-  try { await send([q.G.ix('join', { subject_hash: x.subject_hash }, { controller: ctlX.publicKey, payer: ctlX.publicKey, room, member: q.memberPda(room, x.subject_hash), certificate: q.certPda(x.subject_hash, 0) })], [ctlX], 300_000, tables); } catch (e) { low = e.why || ''; }
+  try { await send([q.G.ix('join', { subject_hash: x.subject_hash }, { controller: ctlX.publicKey, payer: ctlX.publicKey, room, member: q.memberPda(room, x.subject_hash), certificate: q.certPda(x.subject_hash, 0), pof_config: q.K.config })], [ctlX], 300_000, tables); } catch (e) { low = e.why || ''; }
   ok((await k.decode('Room', room, true)).members === 1 && /below/.test(low), 'a Room for ≥ 100 SOL: the tier-3 wallet joins through the CPI, the tier-2 handle is refused', low);
   const spentNote = n.list.find(z => z.nf.equals(SPENT[0]));
   await send([q.P.ix('revoke_spent', { index: n.indexOf(SPENT[0]), salt: spentNote.salt, nullifier: SPENT[0], membership: null }, { caller: other.publicKey, certificate: q.certPda(a.subject_hash, 0), tree: q.K.TREE, nullifier_account: q.nullifierPda(q.K.TREE, SPENT[0]) })], [other], 200_000, tables);
   ok((await k.cert(a.subject_hash)).status === 1, 'one disclosed note is spent: a stranger revokes the certificate with its salt and nullifier');
-  await send([q.G.ix('evict', {}, { caller: other.publicKey, room, member: q.memberPda(room, a.subject_hash), payer: alice.publicKey, certificate: q.certPda(a.subject_hash, 0) })], [other], 200_000, tables);
+  await send([q.G.ix('evict', {}, { caller: other.publicKey, room, member: q.memberPda(room, a.subject_hash), payer: alice.publicKey, certificate: q.certPda(a.subject_hash, 0), pof_config: q.K.config })], [other], 200_000, tables);
   ok((await k.decode('Room', room, true)).members === 0, 'and evicts it from the Room');
   const t = await k.treasury();
   ok(t.certified === 3n && t.live === 2n && t.revoked_spent === 1n && t.relayed === 1n && t.exempt === 1n, 'the counters: 3 certified, 2 live, 1 revoked spent, 1 relayed, 1 holder exempt');

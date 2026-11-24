@@ -151,6 +151,12 @@ subject message is gone), the X link takes a secret and binds the controller (`P
   (b) `membership = { leaf_index u64, next_value [32], path [[32]] }`: leaf `Poseidon(nullifier, next_value)` at
   `leaf_index`, siblings from the leaf up (at most 40; levels left out are empty subtrees, so 16 levels while the tree has
   under 65,536 nullifiers), hashes to one of the 100 nullifier roots at offset 17,232 of the tree account. About 35k CU.
+  (b') staged, for the full 40-level path without a v1 transaction: `open_path(nullifier, next_value, leaf_index, siblings)`
+  makes the revoker's buffer PDA `["path", revoker, certificate]` (zero-copy, 1,432 bytes, the revoker pays the rent),
+  `stage_path(offset, siblings)` adds levels (only that revoker; no gap), and `revoke_spent_staged(index, salt)` hashes all 40
+  levels to one of the tree's 100 nullifier roots AT THAT MOMENT, checks the salted hash, revokes and closes the buffer (rent
+  back). `close_path` drops it (its revoker; anyone during the wind-down). Two transactions of 20 levels carry a full path.
+  Every spent proof names Rings tree 0 (`777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor`) and nothing else.
   A Verifier-signed "spent" statement is not needed and not accepted.
 - The keeper holds `(salt, nullifier)` encrypted at rest; the holder holds a copy. After a revoke, salt and nullifier are public
   (on the certificate: `revealed_index`, `revealed_salt`, `revealed_nullifier`, and in the `Revoked` event).
@@ -171,24 +177,32 @@ path and falls back to path (b) when the PDA is gone; one note backs one live ce
 - Program ids: `pof` = `pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`, `pof_gate` = `gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU`.
   IDLs: `program/idl/pof.json`, `program/idl/pof_gate.json` (Anchor; account and event layouts come from them).
 - `Certificate` PDA `["cert", subject_hash, [asset]]` (8-byte Anchor discriminator, then): subject_kind u8, subject_hash
-  [32], asset u8, tier u8, status u8 (0 live, 1 revoked spent, 2 revoked by holder; readers show 3 expired when a live byte
-  is past expiry_slot; `expire` then closes the account), certified_slot, issued_slot, expiry_slot, revoked_slot (u64),
+  [32], asset u8, tier u8, status u8 (0 live, 1 revoked spent, 2 revoked by holder, 4 voided: its Verifier key was revoked;
+  readers show 3 expired when a live byte is past expiry_slot; `expire` then closes the account; a live byte whose `verifier`
+  is in Config.revoked_keys reads as voided before anyone calls `void_by_key`), certified_slot, issued_slot, expiry_slot, revoked_slot (u64),
   tree_root [32], root_slot u64, note_count u8, null_hashes [[32]; 8], nullset_hash [32], payer, controller, verifier
   (pubkeys), nonce [16], log_index u64, renewals u32, revealed_index u8 (255 none), revealed_salt [32], revealed_nullifier
   [32], bump u8.
 - `Config` PDA `["config"]`: admin, dev, relayer, verifier, next_verifier, next_verifier_slot, root_mint,
   root_token_program, params { fee_lamports, holder_min, validity_slots, max_attest_age, max_root_lag, rotation_delay },
-  assets [4] { enabled, mint, decimals, mins [5] } (0 SOL, 1 USDC), paused, closing, launch_slot. The active verifier key is
+  assets [4] { enabled, mint, decimals, mins [5] } (0 SOL, 1 USDC), paused, closing, launch_slot, held_delay, held_until,
+  revoked_keys [4] (`revoke_verifier_key`, admin, at once; such a key signs nothing more). The active verifier key is
   `next_verifier` once `slot >= next_verifier_slot` (and not default), else `verifier`.
 - Treasury PDA `["treasury"]` (holds the fees; the public counters): fees_in, fees_out, certified, renewed, revoked_spent,
   revoked_holder, expired, live, live_min [4] (sum of tier minimums of live certificates by asset, base units), open,
-  relayed, exempt, log_size, log_head [32], log_slot.
+  relayed, exempt, voided, log_size, log_head [32], log_slot. `anchor_log` grows the anchored size by at most 10,000,000.
 - `pof_gate` Room `["room", creator, id u64 LE]`: creator, id, asset, min_tier, open, name [32], members u32, joined,
   evicted, created_slot. Member `["member", room, subject_hash]`: room, subject_hash, subject_kind, certificate,
   controller, payer, joined_slot.
-- CPI: `pof::require_certificate(subject_hash, asset, min_tier)` with the one account `certificate` returns `CertView {
+- CPI: `pof::require_certificate(subject_hash, asset, min_tier)` with the accounts `certificate`, `config` (POF's Config PDA) returns `CertView {
   subject_kind, tier, expiry_slot, controller }` (return data) or fails (NotLive, CertificateExpired, TierTooLow,
-  AssetMismatch, BadCertificate). Rust consumers can read without CPI: `pof::read_certificate` + `pof::gate` (crate feature `cpi`).
+  AssetMismatch, BadCertificate, KeyRevoked). Rust consumers can read without CPI: `pof::read_certificate` + `pof::gate(cert,
+  config, asset, min_tier, slot)` (crate feature `cpi`). `pof_gate` `join` and `evict` take `pof_config` too.
+- `PathBuffer` PDA `["path", revoker, certificate]` (zero-copy): revoker, certificate, nullifier [32], next_value [32],
+  leaf_index u64, path [[32]; 40], levels u8, bump u8, padding [6].
+
+2026-11-25 (program, fuzz seed 1 + staged path): revoked Verifier keys (Config.revoked_keys, status 4 voided, void_by_key,
+require_certificate takes config), the staged membership path, tree 0 pinned, anchor_log step bound, set_roles takes a mint only.
 - HTTP (devx; the full schema is `api/openapi.json`, served at `/v1/openapi.json`). Read-only, CORS `*`, CDN-cached
   (`s-maxage` 5 to 15 s). Errors are `{ error: { code, message } }` with 400 / 404 / 502 / 503.
   - `GET /v1/certificates/:subject` (subject = `@handle`, `x:h`, `wallet:<b58>`, `badge:<b58>`, a bare key tried as wallet

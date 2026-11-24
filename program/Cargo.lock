@@ -1131,6 +1131,7 @@ name = "pof"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "bytemuck",
  "solana-poseidon",
  "solana-sha256-hasher",
 ]

@@ -94,6 +94,10 @@ pub enum PofError {
     TreasuryShort,
     #[msg("no verifier key is waiting, or its delay has not passed")]
     NoRotationDue,
+    #[msg("the Verifier key that signed this has been revoked")]
+    KeyRevoked,
+    #[msg("the certificate's Verifier key is not revoked")]
+    KeyNotRevoked,
     #[msg("arithmetic overflow")]
     Overflow,
 }
