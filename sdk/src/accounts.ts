@@ -205,6 +205,11 @@ export interface PofConfig {
   paused: boolean;
   closing: boolean;
   launchSlot: number;
+  /** a lowered rotation delay takes effect only after the old one ran: until heldUntil, a new verifier waits heldDelay */
+  heldDelay: number;
+  heldUntil: number;
+  /** the delay a verifier proposed at `slot` would wait */
+  rotationDelayAt(slot: number): number;
   raw: Record<string, any>;
 }
 
@@ -228,6 +233,12 @@ export function decodeConfig(data: Uint8Array): PofConfig {
       id, enabled: !!a.enabled, mint: String(a.mint), decimals: Number(a.decimals), mins: (a.mins ?? []).map((m: any) => String(m)),
     })),
     paused: !!r.paused, closing: !!r.closing, launchSlot: num(r.launch_slot) ?? 0,
+    heldDelay: num(r.held_delay) ?? 0,
+    heldUntil: num(r.held_until) ?? 0,
+    rotationDelayAt(slot: number) {
+      const base = num(p.rotation_delay) ?? 0;
+      return slot < (num(r.held_until) ?? 0) ? Math.max(base, num(r.held_delay) ?? 0) : base;
+    },
     raw: r,
   };
 }

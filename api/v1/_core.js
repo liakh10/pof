@@ -144,6 +144,10 @@ export async function handleV1(req) {
         validitySlots: c.validitySlots,
         maxAttestAge: c.maxAttestAge,
         maxRootLag: c.maxRootLag,
+        rotationDelay: c.rotationDelay,
+        rotationDelayNow: c.rotationDelayAt(c.slot),
+        heldDelay: c.heldDelay,
+        heldUntil: c.heldUntil || null,
         paused: c.paused,
         assets: c.assets.filter((a) => a.enabled).map((a) => ({
           id: a.id, symbol: sdk.ASSETS[a.id]?.symbol ?? null, mint: a.mint, decimals: a.decimals,

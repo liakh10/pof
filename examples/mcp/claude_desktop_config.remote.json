@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "proof-of-funds": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://YOUR-POF-SITE/mcp"]
+    }
+  }
+}

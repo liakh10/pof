@@ -1,0 +1,28 @@
+[package]
+name = "otc_desk"
+version = "0.1.0"
+description = "Example: an OTC desk that only takes orders from traders holding a live Proof of Funds certificate of at least 100 SOL"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "otc_desk"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "pof/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { version = "1.2.0" }
+# outside this repository: pof = { git = "https://github.com/liakh10/pof", features = ["cpi"] }
+pof = { path = "../../../../program/programs/pof", features = ["cpi"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

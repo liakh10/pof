@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "proof-of-funds": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/pof/mcp/stdio.js"],
+      "env": { "SOLANA_RPC": "https://YOUR-RPC-URL" }
+    }
+  }
+}

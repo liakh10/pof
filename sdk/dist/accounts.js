@@ -130,6 +130,12 @@ export function decodeConfig(data) {
             id, enabled: !!a.enabled, mint: String(a.mint), decimals: Number(a.decimals), mins: (a.mins ?? []).map((m) => String(m)),
         })),
         paused: !!r.paused, closing: !!r.closing, launchSlot: num(r.launch_slot) ?? 0,
+        heldDelay: num(r.held_delay) ?? 0,
+        heldUntil: num(r.held_until) ?? 0,
+        rotationDelayAt(slot) {
+            const base = num(p.rotation_delay) ?? 0;
+            return slot < (num(r.held_until) ?? 0) ? Math.max(base, num(r.held_delay) ?? 0) : base;
+        },
         raw: r,
     };
 }

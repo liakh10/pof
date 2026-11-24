@@ -9,19 +9,22 @@ run=${POF_DEVX_RUN:-${TMPDIR:-/tmp}/pof-devx}
 mkdir -p $run
 n=$(pgrep -x solana-test-validator | wc -l | tr -d ' ')
 if (( n >= 3 )); then echo "$n validators already run on this machine (limit 3): not starting"; exit 2; fi
-rpc_port=51899
-if lsof -nP -iTCP:$rpc_port -sTCP:LISTEN >/dev/null 2>&1; then echo "port $rpc_port is busy"; exit 1; fi
+rpc_port=46899
+for p in $rpc_port $((rpc_port+1)) 47900; do if lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1; then echo "port $p is busy"; exit 1; fi; done
 [[ -f $run/authority.json ]] || solana-keygen new --no-bip39-passphrase -s -o $run/authority.json >/dev/null
+extra=()
+# POF_EXTRA_PROGRAMS="<id>=<path to .so> ...": more programs to load (the examples use it)
+for pair in ${=POF_EXTRA_PROGRAMS}; do extra+=(--bpf-program ${pair%%=*} ${pair#*=}); done
 pof_id=$(solana-keygen pubkey $root/program/target/deploy/pof-keypair.json)
 gate_id=$(solana-keygen pubkey $root/program/target/deploy/pof_gate-keypair.json)
 solana-test-validator --reset --quiet --ledger $run/ledger --limit-ledger-size 10000000 \
-  --rpc-port $rpc_port --faucet-port 52900 --gossip-port 51000 --dynamic-port-range 51100-51300 --ticks-per-slot 16 \
+  --rpc-port $rpc_port --faucet-port 47900 --gossip-port 46000 --dynamic-port-range 46100-46300 --ticks-per-slot 16 \
   --upgradeable-program $pof_id $root/program/target/deploy/pof.so $run/authority.json \
-  --upgradeable-program $gate_id $root/program/target/deploy/pof_gate.so $run/authority.json &
+  --upgradeable-program $gate_id $root/program/target/deploy/pof_gate.so $run/authority.json $extra &
 vpid=$!
 trap 'kill $vpid 2>/dev/null; wait $vpid 2>/dev/null; rm -rf $run/ledger' EXIT
 for i in {1..60}; do
   curl -s -X POST -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' http://127.0.0.1:$rpc_port | grep -q ok && break
   sleep 1
 done
-POF_LOCAL_RPC=http://127.0.0.1:$rpc_port POF_AUTHORITY=$run/authority.json node --test --test-timeout=300000 $root/sdk/test/integration/
+POF_LOCAL_RPC=http://127.0.0.1:$rpc_port POF_AUTHORITY=$run/authority.json node --test --test-timeout=300000 ${POF_TESTS:-$root/sdk/test/integration/}

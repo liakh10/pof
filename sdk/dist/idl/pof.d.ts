@@ -1135,6 +1135,13 @@ export declare const POF_IDL: {
                 readonly name: "launch_slot";
                 readonly type: "u64";
             }, {
+                readonly name: "held_delay";
+                readonly docs: readonly ["A lowered rotation delay takes effect only after the old one has run: until held_until, set_verifier waits at least held_delay."];
+                readonly type: "u64";
+            }, {
+                readonly name: "held_until";
+                readonly type: "u64";
+            }, {
                 readonly name: "bump";
                 readonly type: "u8";
             }, {

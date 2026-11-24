@@ -16,7 +16,7 @@ Verifier's transparency log, and builds the accounts for gating your own program
 The package is not on npm. Install the release tarball from the repository:
 
 ```sh
-npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.1.0.tgz
+npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz
 ```
 
 ## Check a subject in three lines
@@ -148,24 +148,43 @@ const tx = new web3.Transaction().add(toWeb3Instruction(ix, web3));
 
 ## Verify the transparency log (CONTRACT §7)
 
-Every attestation the Verifier signs is a leaf of an append-only RFC 9162 Merkle log. Check an entry yourself:
+Every attestation the Verifier signs is a leaf of an append-only RFC 9162 Merkle log. Check an entry yourself. The
+verifier keys you trust must come **from the chain** (the Config and its `VerifierSet` history), never from the log:
+`verifyLogEntry` and `auditLog` fail without them.
 
 ```ts
-import { verifyLogEntry } from "@pof/sdk";
+import { PofClient, LogReader, verifyLogEntry, matchCertificateLeaf } from "@pof/sdk";
 
-const base = "https://<site>/api/attest/log";
-const head = await (await fetch(`${base}?head`)).json();
-const entry = await (await fetch(`${base}?entry=${i}`)).json();
-const proof = await (await fetch(`${base}?proof=${i}&size=${head.treeSize}`)).json();
+const pof = new PofClient({ rpc });
+const trustedKeys = (await pof.verifierKeys({ history: true })).all;   // Config + every key a VerifierSet event named
 
-const v = await verifyLogEntry({ leaf: entry.leaf, index: i, proof, head, programId: "pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" });
-// v.ok, and v.checks: { leafParses, attestationSigned, included, headSigned, programMatches }
+const log = new LogReader("https://<site>/api/attest/log");
+const head = await log.head();
+const entry = await log.entry(i);
+const proof = await log.proof(i, head.treeSize);
+
+const v = await verifyLogEntry({ leaf: entry.leaf, index: i, proof, head, programId: pof.programId, trustedKeys });
+// v.ok, and v.checks: { leafParses, attestationSigned, keyTrusted, included, headSigned, programMatches }
 // v.leaf.attestation: the parsed 240 bytes (subject hash, asset, tier, slots, payer, controller); never an amount
+
+// a certificate's log_index is the submitter's word: tie the certificate to the leaf by its signed bytes
+const cert = await pof.getCertificate(subject, "SOL");
+matchCertificateLeaf(cert, v.leaf); // { matches, mismatched: [] }
 ```
 
-The head is anchored on chain by `anchor_log`: `(await pof.getTreasury()).log` gives the anchored size and root, and
-`verifyConsistency` proves a newer head extends it. Also exported: `leafHash`, `merkleRoot`, `inclusionPath`,
-`verifyInclusion`, `verifyConsistency`, `treeHeadMessage`, `verifyTreeHead`, `parseLeaf`, `parseAttestation`.
+Audit the whole log in one call: download every entry, recompute the root, check every signature and the head
+anchored on chain in the Treasury:
+
+```ts
+import { auditLog } from "@pof/sdk";
+const t = await pof.getTreasury();
+const r = await auditLog({ reader: log, programId: pof.programId, trustedKeys, anchor: t?.log });
+// r.ok, r.checks: { headSigned, rootRecomputed, entriesSigned, entriesBad, anchorMatches, programMatches }
+```
+
+Also exported: `leafHash`, `merkleRoot`, `inclusionPath`, `verifyInclusion`, `consistencyProof`, `verifyConsistency`,
+`treeHeadMessage`, `verifyTreeHead`, `parseLeaf`, `parseAttestation`, and the witness cosignature pair
+`cosignMessage` / `verifyCosignature` (CONTRACT §8).
 
 ## Test your own gate
 

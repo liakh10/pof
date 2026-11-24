@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "proof-of-funds": {
+      "type": "http",
+      "url": "https://YOUR-POF-SITE/mcp"
+    }
+  }
+}

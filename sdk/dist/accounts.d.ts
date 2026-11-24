@@ -99,6 +99,11 @@ export interface PofConfig {
     paused: boolean;
     closing: boolean;
     launchSlot: number;
+    /** a lowered rotation delay takes effect only after the old one ran: until heldUntil, a new verifier waits heldDelay */
+    heldDelay: number;
+    heldUntil: number;
+    /** the delay a verifier proposed at `slot` would wait */
+    rotationDelayAt(slot: number): number;
     raw: Record<string, any>;
 }
 export declare function decodeConfig(data: Uint8Array): PofConfig;

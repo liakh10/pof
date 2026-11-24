@@ -1,6 +1,6 @@
 {
   "name": "@pof/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Proof of Funds SDK: read certificates straight from Solana, hash subjects, verify transparency-log proofs, build CPI accounts for require_certificate and pof_gate.",
   "type": "module",
   "license": "Apache-2.0",

@@ -166,6 +166,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
       const cfg = await client().getConfig();
       if (!cfg) return say("no pof Config on this cluster", { error: "not_found" }), 1;
       say([`verifier ${cfg.activeVerifier}${cfg.nextVerifier ? `  (next ${cfg.nextVerifier} from slot ${cfg.nextVerifierSlot})` : ""}`, `fee ${cfg.feeLamports} lamports  validity ${cfg.validitySlots} slots  paused ${cfg.paused}`,
+        `a verifier proposed now waits ${cfg.rotationDelayAt(cfg.slot)} slots${cfg.heldUntil > cfg.slot ? ` (a lowered delay is held until slot ${cfg.heldUntil})` : ""}`,
         ...cfg.assets.filter((a) => a.enabled).map((a) => `asset ${a.id} ${sdk.ASSETS[a.id]?.symbol ?? "?"}  mins ${a.mins.join(" ")}`)].join("\n"), { ...cfg, raw: undefined });
       return 0;
     }

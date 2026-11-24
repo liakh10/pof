@@ -2126,6 +2126,17 @@ export const POF_IDL = {
             "type": "u64"
           },
           {
+            "name": "held_delay",
+            "docs": [
+              "A lowered rotation delay takes effect only after the old one has run: until held_until, set_verifier waits at least held_delay."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "held_until",
+            "type": "u64"
+          },
+          {
             "name": "bump",
             "type": "u8"
           },

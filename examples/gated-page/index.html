@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Members only · a Proof of Funds gate</title>
+<!--
+  A static page that shows its content only to a wallet holding a live Proof of Funds certificate of at least 100 SOL.
+  No server, no API: @pof/sdk reads the chain through the RPC below.
+
+  Honest limit: a static page hides content in the browser, so anyone who reads the source can see it. For content that
+  matters, run the same check on your server (see "On a server" at the bottom) and send the content only after it passes.
+-->
+<script type="importmap">
+  { "imports": { "@pof/sdk": "https://cdn.jsdelivr.net/gh/liakh10/pof@main/sdk/dist/index.js" } }
+</script>
+<style>
+  :root { --bg:#f6f5f1; --fg:#15161a; --mute:#5d6068; --line:#d9d7cf; --ok:#0f6b3a; --bad:#9b1c1c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111214; --fg:#ecebe6; --mute:#9a9ca3; --line:#2b2d31; --ok:#4fc184; --bad:#f07a7a; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 36rem; margin: 0 auto; padding: 3rem 1rem; }
+  button { min-height: 44px; padding: .6rem 1rem; border-radius: 8px; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); font: inherit; cursor: pointer; margin: .25rem .4rem .25rem 0; }
+  #status { color: var(--mute); min-height: 1.5rem; }
+  .ok { color: var(--ok) !important; } .bad { color: var(--bad) !important; }
+  #content { border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; margin-top: 1.5rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Members only</h1>
+  <p>This page opens for wallets with a live Proof of Funds certificate of at least <b id="need">100 SOL</b>. Your wallet signs a
+  message to show it is yours; nothing is sent on chain.</p>
+  <div id="wallets"></div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <section id="content" hidden>
+    <h2>Welcome in</h2>
+    <p>The desk opens at the next block. Quotes are firm for ten slots.</p>
+  </section>
+</main>
+<script type="module">
+  import { PofClient, walletSubject, tierLabel, ed25519Verify, decodeBase58 } from "@pof/sdk";
+
+  // ---- settings ----
+  const RPC = window.POF_RPC || "https://api.mainnet-beta.solana.com"; // use your own RPC in production
+  const ASSET = "SOL";
+  const MIN_TIER = 3; // at least 100 SOL
+  // -------------------
+
+  const pof = new PofClient({ rpc: RPC });
+  const $ = (id) => document.getElementById(id);
+  const say = (t, cls = "") => { $("status").className = cls; $("status").textContent = t; };
+  $("need").textContent = tierLabel(0, MIN_TIER).replace("≥ ", "");
+
+  const REASONS = {
+    no_certificate: "This wallet has no certificate yet.",
+    below_tier: "This wallet's certificate is below the tier this page needs.",
+    revoked_spent: "This wallet's certificate was revoked: the certified funds moved.",
+    revoked_by_holder: "This wallet's certificate was revoked by its holder.",
+    expired: "This wallet's certificate expired. Renew it to come in.",
+  };
+
+  const wallets = [["Phantom", window.phantom?.solana], ["Solflare", window.solflare], ["Backpack", window.backpack?.solana], ["Wallet", window.solana]]
+    .filter(([, p], i, all) => p && typeof p.signMessage === "function" && all.findIndex(([, q]) => q === p) === i);
+  if (!wallets.length) say("No Solana wallet found in this browser.");
+  for (const [name, provider] of wallets) {
+    const b = document.createElement("button");
+    b.textContent = `Connect ${name}`;
+    b.onclick = () => enter(provider).catch((e) => say(e?.message || "The wallet did not sign.", "bad"));
+    $("wallets").append(b);
+  }
+
+  async function enter(provider) {
+    const res = await provider.connect();
+    const key = (res?.publicKey ?? provider.publicKey).toString();
+    // 1. the wallet proves it holds the key (a fresh message, so an old signature cannot be replayed)
+    const message = `Enter "Members only" as ${key}. Nonce ${crypto.randomUUID()}`;
+    const signed = await provider.signMessage(new TextEncoder().encode(message), "utf8");
+    const sig = new Uint8Array(signed?.signature ?? signed);
+    if (!(await ed25519Verify(decodeBase58(key), new TextEncoder().encode(message), sig))) return say("That signature does not match the wallet.", "bad");
+    // 2. the chain says whether that wallet holds a live certificate meeting the tier
+    say("Checking the certificate on chain…");
+    const r = await pof.checkProofOfFunds({ subject: walletSubject(key), asset: ASSET, minTier: MIN_TIER });
+    if (!r.ok) return say(`${REASONS[r.reason] ?? r.reason} (slot ${r.slot})`, "bad");
+    say(`Certificate ${r.certificate.tierLabel}, live as of slot ${r.slot}.`, "ok");
+    $("content").hidden = false;
+  }
+
+  /* On a server (Node), the same gate before you send anything:
+       import { PofClient, walletSubject, ed25519Verify, decodeBase58 } from "@pof/sdk";
+       const pof = new PofClient({ rpc: process.env.SOLANA_RPC });
+       // verify the signed message (bind it to a nonce you issued), then:
+       const r = await pof.checkProofOfFunds({ subject: walletSubject(key), asset: "SOL", minTier: 3 });
+       if (!r.ok) return res.status(403).json({ reason: r.reason });
+  */
+</script>
+</body>
+</html>

@@ -201,9 +201,13 @@ test("anchor_log: the head the SDK computes is anchored on chain, and its signat
   const head = { treeSize: hashes.length, rootHash: sdk.toHex(root), signature: sig.toString("hex"), verifierKey: verifier.publicKey.toBase58() };
   for (let i = 0; i < logLeaves.length; i++) {
     const path = (await sdk.inclusionPath(i, hashes)).map(sdk.toHex);
-    const v = await sdk.verifyLogEntry({ leaf: logLeaves[i], index: i, proof: { treeSize: hashes.length, rootHash: head.rootHash, path }, head, programId: sdk.POF_PROGRAM_ID });
+    const v = await sdk.verifyLogEntry({ leaf: logLeaves[i], index: i, proof: { treeSize: hashes.length, rootHash: head.rootHash, path }, head, programId: sdk.POF_PROGRAM_ID, trustedKeys: (await client.verifierKeys({ history: true })).all });
     assert.equal(v.ok, true, JSON.stringify(v.checks));
   }
+  // the keys come from chain: the Config and the VerifierSet event that init_config emitted
+  const k = await client.verifierKeys({ history: true });
+  assert.deepEqual(k.all, [verifier.publicKey.toBase58()]);
+  assert.equal(k.fromHistory, true);
 });
 
 test("the /v1 API, the MCP tools and the bots' gate read the same local chain", { skip }, async () => {
