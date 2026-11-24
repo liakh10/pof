@@ -6,7 +6,7 @@
    Quotes are sealed into the quote id itself (HMAC), so nothing is stored until a payment is used. */
 import crypto from 'node:crypto';
 import { PofError, fromB58, hex, unhex } from './codec.js';
-import { ATTESTATION_LEN, decodeAttestation, nullsetHash, sortHashes } from './contract.js';
+import { ATTESTATION_LEN, decodeAttestation, nullsetHash, revokeBytes, revokeBytesV2, sortHashes } from './contract.js';
 import { verifySig } from './keys.js';
 import { getJson, putJson, type Store } from './store.js';
 import type { PofChain } from './chain.js';
@@ -111,17 +111,32 @@ export class Relayer {
 
 
   /** a relayed revoke_by_holder for X and badge certificates: the controller signs the CONTRACT revoke bytes, the relayer
-   *  pays the network fee, so no wallet of the holder appears */
-  async revoke(input: { subjectHash: unknown; asset: unknown; signature: unknown }) {
+   *  pays the network fee, so no wallet of the holder appears. The signature is checked here before anything is sent, and a
+   *  v2 signature carries the last slot it may be used at (RV-01). */
+  async revoke(input: { subjectHash: unknown; asset: unknown; signature: unknown; validUntil?: unknown }) {
     const sh = unhex(input.subjectHash, 32, 'subjectHash');
     const asset = Number(input.asset);
     const sig = typeof input.signature === 'string' && /^[0-9a-f]{128}$/.test(input.signature) ? unhex(input.signature, 64) : fromB58(input.signature, 64, 'signature');
     if (!this.chain.revokeSigned) throw new PofError('PROGRAM_NOT_READY', 'the program does not take a signed revoke yet; revoke from the controller key directly', 503);
+    const cert = await this.chain.certificate(sh, asset);
+    if (!cert) throw new PofError('NOT_FOUND', 'no certificate for that subject and asset', 404);
+    if (cert.status !== 0) throw new PofError('NOT_LIVE', 'that certificate is not live');
+    if (!cert.controller || !cert.nullsetHash || cert.issuedSlot === undefined) throw new PofError('CHAIN_OFF', 'the certificate could not be read in full', 503);
+    const v2 = (this.chain.revokeVersion ?? 1) >= 2;
+    let validUntil: bigint | undefined;
+    if (v2) {
+      if (input.validUntil == null || !/^\d{1,20}$/.test(String(input.validUntil))) throw new PofError('BAD_VALID_UNTIL', 'validUntil (the last slot this signature may be used at) is part of the signed revoke');
+      validUntil = BigInt(String(input.validUntil));
+      if ((await this.chain.slot()) > validUntil) throw new PofError('REVOKE_EXPIRED', 'that signed revoke expired: sign a new one');
+    }
+    const msg = v2 ? revokeBytesV2(this.cfg.programId, fromB58(cert.address), sh, asset, unhex(cert.nullsetHash, 32), cert.issuedSlot, validUntil!)
+                   : revokeBytes(this.cfg.programId, fromB58(cert.address), sh, asset, unhex(cert.nullsetHash, 32), cert.issuedSlot);
+    if (!verifySig(sig, msg, fromB58(cert.controller))) throw new PofError('BAD_REVOKE_SIGNATURE', 'that is not the controller\'s signature over this certificate\'s revoke bytes');
     const spend = await this.spend();
     if (spend.reduce((s, [, l]) => s + BigInt(l), 0n) + 10_000n > this.cfg.dailyCapLamports) throw new PofError('RELAY_CAP', 'the relayer reached its spend cap for the last 24 hours; try later', 429);
-    const r = await this.chain.revokeSigned({ subjectHash: sh, asset, signature: sig });
+    const r = await this.chain.revokeSigned({ subjectHash: sh, asset, signature: sig, ...(v2 ? { validUntil } : {}) });
     spend.push([Math.floor(Date.now() / 1000), String(r.lamports)]);
     await putJson(this.store, 'relay/spend.json', spend);
-    return { signature: r.signature };
+    return { signature: r.signature, note: 'report "revoked" only after reading the certificate on chain' };
   }
 }

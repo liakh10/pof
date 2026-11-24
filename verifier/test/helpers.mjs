@@ -69,7 +69,7 @@ export class FakeChain {
   async certificate(sh, asset) { return this.certs.get(hex(sh) + ':' + asset) || null; }
   async certify(x) {
     const a = V.decodeAttestation(x.attestation);
-    this.certs.set(hex(a.subjectHash) + ':' + a.asset, { address: 'Cert' + hex(a.subjectHash).slice(0, 8), status: 0, tier: a.tier, expirySlot: a.expirySlot, hashes: x.hashes.map(hex), payer: V.toB58(a.payer) });
+    this.certs.set(hex(a.subjectHash) + ':' + a.asset, { address: V.toB58(V.sha256(a.subjectHash, Uint8Array.of(a.asset))), status: 0, tier: a.tier, expirySlot: a.expirySlot, hashes: x.hashes.map(hex), payer: V.toB58(a.payer), controller: V.toB58(a.controller), nullsetHash: hex(a.nullsetHash), issuedSlot: a.issuedSlot });
     this.sent.push({ kind: 'certify', logIndex: x.logIndex }); this.balance -= 2_500_000n; return { signature: 'sigCertify' + this.sent.length, lamports: 2_500_000n };
   }
   async revokeSpent(x) {

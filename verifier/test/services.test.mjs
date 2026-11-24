@@ -254,7 +254,7 @@ test('relay credits (POF-12): a private transfer buys blind-signed credits; a cr
   await rej(credits.claim({ signature: tx, owner: holder.owner, blinded, proof: sigOf(tx, holder.owner, thief.wallet) }), 'BAD_CLAIM_PROOF');
   await rej(credits.claim({ signature: '4'.repeat(88), owner: holder.owner, blinded, proof: sigOf('4'.repeat(88), holder.owner, holder.wallet) }), 'NOT_RECEIVED');
   const got = await credits.claim({ signature: tx, owner: holder.owner, blinded, proof: sigOf(tx, holder.owner, holder.wallet) });
-  await rej(credits.claim({ signature: tx, owner: holder.owner, blinded, proof: sigOf(tx, holder.owner, holder.wallet) }), 'ALREADY_CLAIMED');
+  assert.deepEqual((await credits.claim({ signature: tx, owner: holder.owner, blinded, proof: sigOf(tx, holder.owner, holder.wallet) })).signatures, got.signatures); // a lost answer can be fetched again (CR-02)
   const creds = got.signatures.map((s, i) => ({ kid: key.kid, token: tokens[i], signature: B.unblind(offer.key, s, bl[i].r) }));
   // the relayer never saw a token or an unblinded signature at claim time
   for (const cr of creds) { assert.ok(!blinded.includes(cr.signature)); assert.ok(!got.signatures.includes(cr.signature)); }
@@ -273,16 +273,66 @@ test('relay credits (POF-12): a private transfer buys blind-signed credits; a cr
   assert.equal(await B.verifyCredit(offer.key, tokens[1], creds[1].signature), true);
 });
 
-test('relayed holder revoke: the controller signs the revoke bytes, the relayer sends them', async () => {
-  const c = makeCtx();
-  let got = null;
-  c.chain.revokeSigned = async (x) => { got = x; return { signature: 'sigRevokeSigned', lamports: 5000n }; };
-  const sh = '11'.repeat(32);
-  const r = await c.relayer.revoke({ subjectHash: sh, asset: 0, signature: 'ab'.repeat(64) });
-  assert.equal(r.signature, 'sigRevokeSigned'); assert.equal(hex(got.subjectHash), sh);
+test('relayed holder revoke: checked against the controller before sending; v2 carries a valid-until slot (RV-01)', async () => {
+  const c = makeCtx({ relayFree: true });
+  const r = ring(); c.rings.register(r); const ctl = ring();
+  const out = await c.verifier.attest(pkg(c, r, [c.rings.note(r, 3n * SOL)], { kind: 1, value: 'revoker', proof: c.verifier.linkToken('revoker', Math.floor(Date.now() / 1000) + 600, ctl.owner), relay: true, controller: ctl.owner }));
+  await c.relayer.certify({ attestation: out.attestation, signature: out.signature, logIndex: out.logIndex, hashes: out.hashes });
+  const sh = V.subjectHash(1, 'revoker');
+  const cert = await c.chain.certificate(sh, 0);
+  let sent = 0;
+  c.chain.revokeSigned = async () => { sent++; cert.status = 2; return { signature: 'sigRevokeSigned', lamports: 5000n }; };
+  c.chain.revokeVersion = 1;
+  const v1 = V.revokeBytes(c.programId, V.fromB58(cert.address), sh, 0, Buffer.from(cert.nullsetHash, 'hex'), cert.issuedSlot);
+  assert.equal(v1.length, 148);
+  await rej(c.relayer.revoke({ subjectHash: hex(sh), asset: 0, signature: hex(r.wallet.sign(v1)) }), 'BAD_REVOKE_SIGNATURE');
+  assert.equal(sent, 0, 'a bad signature is never sent');
+  c.chain.revokeVersion = 2;
+  const until = c.rings.slotNow + 100n;
+  const v2 = V.revokeBytesV2(c.programId, V.fromB58(cert.address), sh, 0, Buffer.from(cert.nullsetHash, 'hex'), cert.issuedSlot, until);
+  assert.equal(v2.length, 156);
+  await rej(c.relayer.revoke({ subjectHash: hex(sh), asset: 0, signature: hex(ctl.wallet.sign(v2)) }), 'BAD_VALID_UNTIL');
+  await rej(c.relayer.revoke({ subjectHash: hex(sh), asset: 0, signature: hex(ctl.wallet.sign(v2)), validUntil: String(until + 1n) }), 'BAD_REVOKE_SIGNATURE');
+  const old = V.revokeBytesV2(c.programId, V.fromB58(cert.address), sh, 0, Buffer.from(cert.nullsetHash, 'hex'), cert.issuedSlot, c.rings.slotNow - 1n);
+  await rej(c.relayer.revoke({ subjectHash: hex(sh), asset: 0, signature: hex(ctl.wallet.sign(old)), validUntil: String(c.rings.slotNow - 1n) }), 'REVOKE_EXPIRED');
+  const okr = await c.relayer.revoke({ subjectHash: hex(sh), asset: 0, signature: hex(ctl.wallet.sign(v2)), validUntil: String(until) });
+  assert.equal(okr.signature, 'sigRevokeSigned'); assert.equal(sent, 1);
+  await rej(c.relayer.revoke({ subjectHash: hex(sh), asset: 0, signature: hex(ctl.wallet.sign(v2)), validUntil: String(until) }), 'NOT_LIVE');
   delete c.chain.revokeSigned;
-  await rej(c.relayer.revoke({ subjectHash: sh, asset: 0, signature: 'ab'.repeat(64) }), 'PROGRAM_NOT_READY');
-  assert.equal(V.revokeBytes(new Uint8Array(32), new Uint8Array(32), new Uint8Array(32), 1, new Uint8Array(32), 5n).length, 148);
+  await rej(c.relayer.revoke({ subjectHash: hex(sh), asset: 0, signature: hex(ctl.wallet.sign(v2)) }), 'PROGRAM_NOT_READY');
+});
+
+test('credits: the pinned key is 3,072-bit with e = 65537, a lost claim answer can be fetched again, OpenSSL signs, retired keys still verify', async () => {
+  const B = await import('../lib/blind.mjs');
+  assert.equal(V.pinned.houseRing, 'D5t3qpN6DwmrqjYkvwyDs9iaMRw1i8PkUF7e7DcbhV2V');
+  V.checkPublicKey(V.pinned.current);
+  assert.equal(V.pinned.fingerprint, V.creditPins.networks.mainnet.fingerprint);
+  assert.match(V.pinned.fingerprint, /^([0-9a-f]{4} ){7}[0-9a-f]{4}$/);
+  assert.throws(() => V.checkPublicKey({ n: V.pinned.current.n, e: '03' }), { code: 'BAD_CREDIT_KEY' });
+  const crypto = await import('node:crypto');
+  const mk = (bits) => { const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: bits }); const j = privateKey.export({ format: 'jwk' }); const h = (x) => Buffer.from(x, 'base64url').toString('hex'); return V.creditKeyFromJson(JSON.stringify({ n: h(j.n), e: h(j.e), d: h(j.d), jwk: j })); };
+  const key = mk(3072), old = mk(3072);
+  const c = makeCtx(); const holder = ring(); const tx = V.toB58(new Uint8Array(crypto.randomBytes(64)));
+  // a configured key that is not the pinned one refuses to start
+  assert.throws(() => new V.Credits(c.store, key, null, V.pinned.houseRing, 10_000_000n, [5, 20], V.pinned), { code: 'CREDIT_KEY_NOT_PINNED' });
+  const pin = { houseRing: c.relayerSigner.address, current: { kid: key.kid, n: key.n, e: key.e }, retired: [{ kid: old.kid, n: old.n, e: old.e }] };
+  const credits = new V.Credits(c.store, key, { received: async (s) => (s === tx ? { lamports: 50_000_000n, signers: [holder.owner] } : null) }, c.relayerSigner.address, 10_000_000n, [5, 20], pin);
+  const tokens = Array.from({ length: 5 }, () => crypto.randomBytes(32).toString('hex'));
+  const bl = await Promise.all(tokens.map(t => B.blind(credits.offer().key, t)));
+  const blinded = bl.map(x => x.blinded);
+  const proof = hex(holder.wallet.sign(V.claimMessage({ signature: tx, owner: holder.owner, kid: key.kid, blinded })));
+  const a = await credits.claim({ signature: tx, owner: holder.owner, blinded, proof });
+  const b = await credits.claim({ signature: tx, owner: holder.owner, blinded, proof });
+  assert.deepEqual(a.signatures, b.signatures);
+  // OpenSSL's signature equals the textbook one
+  assert.equal(a.signatures[0], B.signBlinded(key, blinded[0]));
+  const s0 = B.unblind(key, a.signatures[0], bl[0].r);
+  await credits.spend({ kid: key.kid, token: tokens[0], signature: s0 }, 'x'.repeat(64));
+  // a credit from the retired key is still honoured
+  const t = crypto.randomBytes(32).toString('hex'); const ob = await B.blind(old, t);
+  const os = B.unblind(old, B.signBlinded(old, ob.blinded), ob.r);
+  await credits.spend({ kid: old.kid, token: t, signature: os }, 'y'.repeat(64));
+  await rej(credits.spend({ kid: 'nope', token: t, signature: os }, 'z'.repeat(64)), 'OLD_CREDIT_KEY');
 });
 
 test('POF-30: one payment pays one certificate even when two attestations race for it', async () => {

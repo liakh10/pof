@@ -15,7 +15,7 @@ import { HeliusRings, jsonRpc, type RingsSource } from './rings.js';
 import { Verifier } from './verify.js';
 import { Keeper } from './keeper.js';
 import { Relayer } from './relayer.js';
-import { Credits, creditKeyFromJson, sdkHouseRing } from './credits.js';
+import { Credits, creditKeyFromJson, pinFor, sdkHouseRing } from './credits.js';
 import { Linker } from './linker.js';
 import { NoteLocks } from './locks.js';
 import { Escrow } from './escrow.js';
@@ -46,6 +46,7 @@ export interface Ctx {
 }
 
 let ctx: Ctx | null = null;
+let creditsOff: string | null = null;
 let chainFactory: ((c: Omit<Ctx, 'chain' | 'relayer' | 'verifier' | 'keeper' | 'locks' | 'linker' | 'log'>) => Promise<PofChain | null>) | null = null;
 export function setChainFactory(f: typeof chainFactory) { chainFactory = f; ctx = null; }
 export function setContext(c: Ctx | null) { ctx = c; }
@@ -95,7 +96,12 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
     const seed = relayerSigner.secretForWeb3().slice(0, 32);
     const house = sdkHouseRing({ store, seed, solanaRpcUrl: rpcUrls[0], indexerUrl: env.HELIUS_SPR_URL || 'https://mainnet.helius-rpc.com/v1/spr', apiKey: env.HELIUS_API_KEY, rpc });
     const unit = BigInt(env.POF_CREDIT_UNIT_LAMPORTS ?? 10_000_000);
-    relayer.credits = new Credits(store, creditKeyFromJson(ck), house, relayerSigner.address, unit);
+    const pin = pinFor(env.POF_NETWORK || 'mainnet');
+    // a key that is not the pinned one turns credits off (with the reason on /api/relay/credits), never the whole Verifier
+    try {
+      if (!pin) throw new PofError('NO_CREDIT_PIN', `no pinned credit key for ${env.POF_NETWORK || 'mainnet'} (verifier/lib/credit-pins.json)`, 503);
+      relayer.credits = new Credits(store, creditKeyFromJson(ck), house, relayerSigner.address, unit, [5, 20], pin); // pinned key and house ring (CR-01)
+    } catch (e: any) { creditsOff = `${e?.code || 'CREDITS_OFF'}: ${e?.message || e}`; }
   }
   const linker = new Linker(store, (h, exp, ctl) => verifier.linkToken(h, exp, ctl));
   ctx = { env, programId, signer, relayerSigner, store, rings, chain, log, keeper, locks, escrow, verifier, relayer, linker, sealKey };
@@ -106,14 +112,18 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
 const HEADERS = { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type', 'x-content-type-options': 'nosniff' };
 export const json = (body: unknown, status = 200, extra: Record<string, string> = {}) => new Response(JSON.stringify(body, (_, v) => typeof v === 'bigint' ? String(v) : v), { status, headers: { ...HEADERS, 'cache-control': 'no-store', ...extra } });
 
+/** no key, token or node URL ever leaves in an error (audit info: scrub the api-key) */
+export const scrub = (s: string) => String(s).replace(/api[-_]?key=[^&\s"']+/gi, 'api-key=***').replace(/https?:\/\/[^\s"'|)]+/g, '<url>');
+
 export function fail(e: any): Response {
   if (e instanceof PofError || e?.name === 'PofError') {
     const h: Record<string, string> = {};
     if (e.details?.retryAfterSec) h['retry-after'] = String(e.details.retryAfterSec);
-    return json({ error: { code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) } }, e.status, h);
+    const details = e.details ? JSON.parse(scrub(JSON.stringify(e.details, (_, v) => typeof v === 'bigint' ? String(v) : v))) : undefined;
+    return json({ error: { code: e.code, message: scrub(e.message), ...(details ? { details } : {}) } }, e.status, h);
   }
   const id = crypto.randomBytes(4).toString('hex');
-  console.error(`pof internal ${id}:`, String(e?.stack || e).replace(/api-key=[^&\s"]+/g, 'api-key=***').slice(0, 600));
+  console.error(`pof internal ${id}:`, scrub(String(e?.stack || e)).slice(0, 600));
   return json({ error: { code: 'INTERNAL', message: `something broke on our side (ref ${id}); nothing was signed` } }, 500);
 }
 
@@ -141,6 +151,8 @@ export const routes = {
       bundleHash: hex(bundleHash()), minAgeSlots: Number(c.verifier.cfg.minAgeSlots), validitySlots: Number(c.verifier.cfg.validitySlots),
       subjectProofSlots: Number(c.verifier.cfg.subjectProofSlots), assets: Object.fromEntries(Object.entries(ASSETS).map(([k, a]) => [k, { name: a.name, mint: c.verifier.cfg.mints[+k], tiers: a.tiers.map(String) }])),
       keeps: 'no amounts, no openings, no nullifier key; the log holds only the attestation bytes',
+      credits: (() => { const p = pinFor(c.env.POF_NETWORK || 'mainnet'); return p ? { network: c.env.POF_NETWORK || 'mainnet', houseRing: p.houseRing, kid: p.current.kid, fingerprint: p.fingerprint, retired: p.retired.map(k => k.kid) } : null; })(),
+      keepers: (c.escrow?.keepers || []).map(k => k.kid),
     }, 200, { 'cache-control': 'public, max-age=60' });
     if (req.method !== 'POST') throw new PofError('METHOD', 'GET or POST', 405);
     const who = clientOf(req);
@@ -184,7 +196,7 @@ export const routes = {
     const c = await context();
     bucket(`credits:${clientOf(req)}`, 10, 5);
     const cr = c.relayer?.credits;
-    if (!cr) throw new PofError('CREDITS_OFF', 'relay credits are not configured here', 503);
+    if (!cr) throw new PofError('CREDITS_OFF', creditsOff ? `relay credits are off: ${creditsOff}` : 'relay credits are not configured here', 503);
     if (req.method === 'GET') return json(cr.offer(), 200, { 'cache-control': 'public, max-age=60' });
     if (req.method !== 'POST') throw new PofError('METHOD', 'GET or POST', 405);
     return json(await cr.claim(await body(req, 65_536)));

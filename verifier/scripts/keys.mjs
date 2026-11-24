@@ -44,26 +44,38 @@ function x25519Key(name) {
 }
 function rsaKey(name) {
   const f = path.join(dir, name + '.json');
+  // a key from before the full-JWK format (no CRT parts, signing needs them: audit CR-03) is retired, never deleted
+  if (fs.existsSync(f) && !JSON.parse(fs.readFileSync(f, 'utf8')).jwk) {
+    const old = JSON.parse(fs.readFileSync(f, 'utf8'));
+    fs.renameSync(f, path.join(dir, `${name}.retired-${old.kid}.json`));
+  }
   if (!fs.existsSync(f)) {
     const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 3072 });
     const j = privateKey.export({ format: 'jwk' });
     const h = (x) => Buffer.from(x, 'base64url').toString('hex');
     const n = h(j.n);
-    fs.writeFileSync(f, JSON.stringify({ kid: crypto.createHash('sha256').update(n).digest('hex').slice(0, 8), n, e: h(j.e), d: h(j.d) }), { mode: 0o600, flag: 'wx' });
+    fs.writeFileSync(f, JSON.stringify({ kid: crypto.createHash('sha256').update(n).digest('hex').slice(0, 8), n, e: h(j.e), d: h(j.d), jwk: j }), { mode: 0o600, flag: 'wx' });
   }
   fs.chmodSync(f, 0o600);
   const k = JSON.parse(fs.readFileSync(f, 'utf8'));
-  return { file: f, kid: k.kid, json: JSON.stringify(k) };
+  return { file: f, kid: k.kid, json: JSON.stringify(k), pub: { kid: k.kid, n: k.n, e: k.e } };
 }
 const v = keypair('verifier'), r = keypair('relayer'), s = sealKey(), k = x25519Key('keeper'), c = rsaKey('credits-rsa');
 console.log(JSON.stringify({ dir, verifier: v.pub, relayer: r.pub, seal: 'present (not shown)', keeperX25519: k.pub, creditKey: c.kid }, null, 2));
-
-if (process.argv.includes('--vercel')) {
-  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
-  for (const [name, value] of [['POF_VERIFIER_KEY', v.json], ['POF_RELAYER_KEY', r.json], ['POF_SEAL_KEY', s.value], ['POF_CREDIT_KEY', c.json]]) {
-    for (const target of ['production', 'preview']) {
-      const p = spawnSync('vercel', ['env', 'add', name, target, '--force'], { cwd: root, input: value, stdio: ['pipe', 'ignore', 'pipe'] });
-      console.log(`${name} → ${target}: ${p.status === 0 ? 'set' : 'failed: ' + String(p.stderr).replace(/[A-Za-z0-9+/=]{40,}/g, '***').slice(0, 160)}`);
-    }
+// the public credit key and the house ring are pinned in the bundle and in the client (audit CR-01): lib/credit-pins.json,
+// public halves only, one entry per network; a rotation moves the old key to `retired` (still honoured, CR-04)
+if (process.argv.includes('--pin')) {
+  const pinFile = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../lib/credit-pins.json');
+  const prev = fs.existsSync(pinFile) ? JSON.parse(fs.readFileSync(pinFile, 'utf8')) : { v: 1, networks: {} };
+  const nets = (process.env.POF_PIN_NETWORKS || 'mainnet,devnet').split(',');
+  for (const net of nets) {
+    const was = prev.networks[net];
+    const retired = [...((was && was.retired) || [])];
+    if (was && was.kid !== c.kid && !retired.some(x => x.kid === was.kid)) retired.push({ kid: was.kid, n: was.n, e: was.e });
+    const entry = { kid: c.kid, n: c.pub.n.toLowerCase(), e: c.pub.e, houseRing: r.pub, retired };
+    const fp = crypto.createHash('sha256').update(`pof:credit-key:v1\n${entry.kid}\n${entry.n}\n${entry.e}\n${entry.houseRing}`).digest('hex').slice(0, 32).match(/.{4}/g).join(' ');
+    prev.networks[net] = { ...entry, fingerprint: fp };
+    console.log(`pinned ${net}: credit key ${c.kid}, house ring ${r.pub}, fingerprint ${fp}`);
   }
+  fs.writeFileSync(pinFile, JSON.stringify(prev, null, 2) + '\n');
 }

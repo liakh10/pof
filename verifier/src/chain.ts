@@ -2,6 +2,7 @@
    tests use a fake. */
 export interface CertificateView {
   address: string; status: number; tier: number; expirySlot: bigint; hashes: string[]; payer: string;
+  controller?: string; nullsetHash?: string; issuedSlot?: bigint;
 }
 export interface PofChain {
   slot(): Promise<bigint>;
@@ -13,7 +14,9 @@ export interface PofChain {
   anchorLog(size: number, root: Uint8Array): Promise<{ signature: string; lamports: bigint }>;
   relayerBalance(): Promise<bigint>;
   /** [ed25519(controller, revokeBytes), revoke_signed()] paid by the relayer; absent until the program has it */
-  revokeSigned?(input: { subjectHash: Uint8Array; asset: number; signature: Uint8Array }): Promise<{ signature: string; lamports: bigint }>;
+  revokeSigned?(input: { subjectHash: Uint8Array; asset: number; signature: Uint8Array; validUntil?: bigint }): Promise<{ signature: string; lamports: bigint }>;
+  /** 1: the 148 POF-REVOKE1 bytes; 2: the 156 POF-REVOKE2 bytes with a valid_until slot (RV-01) */
+  revokeVersion?: number;
   /** incoming SOL transfers to the relayer since a slot: [{ signature, slot, lamports }] */
   incoming(sinceSlot: bigint): Promise<{ signature: string; slot: bigint; lamports: bigint }[]>;
   quoteLamports(): Promise<{ fee: bigint; rent: bigint; network: bigint }>;

@@ -14,7 +14,27 @@ import type { Store } from './store.js';
 // @ts-ignore: a plain ESM module shared with the browser client
 import * as B from '../lib/blind.mjs';
 
-export interface CreditKey { kid: string; n: string; e: string; d: string }
+export interface CreditKey { kid: string; n: string; e: string; d: string; jwk?: any }
+export interface PublicCreditKey { kid: string; n: string; e: string; fingerprint?: string }
+import PINS from '../lib/credit-pins.json';
+/** the pinned credit key and house ring per network (audit CR-01): bundled, so the published bundle hash fixes them; the
+ *  client builds the same file in (client/dist/pins.js), so a relayer cannot hand one buyer a key of its own */
+export const creditPins: { v: number; networks: Record<string, { kid: string; n: string; e: string; houseRing: string; retired?: PublicCreditKey[]; fingerprint?: string }> } = PINS as any;
+export function pinFor(network: string) {
+  const p = creditPins.networks[network];
+  if (!p) return null;
+  return { houseRing: p.houseRing, current: { kid: p.kid, n: p.n, e: p.e }, retired: p.retired || [], fingerprint: fingerprint({ kid: p.kid, n: p.n, e: p.e, houseRing: p.houseRing }) };
+}
+/** the fingerprint the client shows: sha256("pof:credit-key:v1\n<kid>\n<n>\n<e>\n<houseRing>"), 32 hex in groups of 4 */
+export const fingerprint = (k: { kid: string; n: string; e: string; houseRing: string }) =>
+  crypto.createHash('sha256').update(`pof:credit-key:v1\n${k.kid}\n${String(k.n).toLowerCase()}\n${k.e}\n${k.houseRing}`).digest('hex').slice(0, 32).match(/.{4}/g)!.join(' ');
+export const pinned = pinFor('mainnet');
+
+/** e = 65537 and a modulus of at least 3,072 bits (CR-01) */
+export function checkPublicKey(k: { n: string; e: string }) {
+  if (BigInt('0x' + k.e) !== 65537n) throw new PofError('BAD_CREDIT_KEY', 'a credit key must have e = 65537', 500);
+  if (BigInt('0x' + k.n).toString(2).length < 3072) throw new PofError('BAD_CREDIT_KEY', 'a credit key must be at least 3,072 bits', 500);
+}
 export interface HouseRing {
   /** the private SOL the house ring received in transaction `signature`, and that transaction's signers; null if none */
   received(signature: string): Promise<{ lamports: bigint; signers: string[] } | null>;
@@ -31,13 +51,37 @@ export const claimMessage = (m: { signature: string; owner: string; kid: string;
 export function creditKeyFromJson(json: string): CreditKey {
   const k = JSON.parse(json);
   if (!k.n || !k.e || !k.d) throw new PofError('KEY_MISSING', 'the credit key is not an RSA key', 500);
-  return { kid: k.kid || crypto.createHash('sha256').update(k.n).digest('hex').slice(0, 8), n: k.n, e: k.e, d: k.d };
+  return { kid: k.kid || crypto.createHash('sha256').update(k.n).digest('hex').slice(0, 8), n: k.n, e: k.e, d: k.d, ...(k.jwk ? { jwk: k.jwk } : {}) };
+}
+
+/** RSA signing of a blinded value through OpenSSL (constant time, RSA blinding, CRT: audit CR-03) */
+function rawSign(key: CreditKey, blindedHex: string): string {
+  const k = Math.ceil(key.n.length / 2);
+  if (!/^[0-9a-f]+$/.test(blindedHex) || blindedHex.length > 2 * k) throw new Error('a blinded value is hex, at most the modulus length');
+  const b = BigInt('0x' + blindedHex);
+  if (b < 2n || b >= BigInt('0x' + key.n)) throw new Error('a blinded value must be in [2, n)');
+  if (!key.jwk) return B.signBlinded(key, blindedHex); // test keys without CRT parts
+  const priv = crypto.createPrivateKey({ key: key.jwk, format: 'jwk' });
+  return crypto.privateDecrypt({ key: priv, padding: crypto.constants.RSA_NO_PADDING }, Buffer.from(blindedHex.padStart(2 * k, '0'), 'hex')).toString('hex');
 }
 
 export class Credits {
-  constructor(private store: Store, private key: CreditKey, private house: HouseRing | null, private houseRing: string, public unitLamports: bigint, public bundles: number[] = [5, 20]) {}
+  private verifyKeys: PublicCreditKey[];
+  constructor(private store: Store, private key: CreditKey, private house: HouseRing | null, private houseRing: string, public unitLamports: bigint, public bundles: number[] = [5, 20], pin: ReturnType<typeof pinFor> = null) {
+    if (pin) {
+      if (key.n.toLowerCase() !== pin.current.n.toLowerCase() || key.e !== pin.current.e) throw new PofError('CREDIT_KEY_NOT_PINNED', 'the configured credit key is not the pinned one (verifier/lib/credit-pins.json)', 500);
+      if (houseRing !== pin.houseRing) throw new PofError('CREDIT_KEY_NOT_PINNED', 'the house ring is not the pinned one', 500);
+      checkPublicKey(key);
+    }
+    this.verifyKeys = [{ kid: key.kid, n: key.n, e: key.e }, ...((pin && pin.retired) || [])];
+  }
 
-  offer() { return { unitLamports: String(this.unitLamports), bundles: this.bundles, houseRing: this.houseRing, key: B.publicKey(this.key), note: 'send unitLamports × count as a private transfer from your vault to houseRing, then claim with one blinded token per credit' }; }
+  offer() {
+    const pub = B.publicKey(this.key);
+    return { unitLamports: String(this.unitLamports), bundles: this.bundles, houseRing: this.houseRing, key: pub, fingerprint: fingerprint({ ...pub, houseRing: this.houseRing }),
+      pinned: 'verifier/lib/credit-pins.json (in the published bundle and the client build); a client must refuse any other key or house ring',
+      note: 'send unitLamports × count as a private transfer from your vault to houseRing, then claim with one blinded token per credit' };
+  }
 
   async claim(input: { signature: unknown; owner: unknown; blinded: unknown; proof: unknown }) {
     if (!this.house) throw new PofError('CREDITS_OFF', 'relay credits are not configured here', 503);
@@ -55,18 +99,27 @@ export class Credits {
     if (!got.signers.includes(owner)) throw new PofError('NOT_SENDER', 'owner did not sign that transfer');
     const want = this.unitLamports * BigInt(blinded.length);
     if (got.lamports !== want) throw new PofError('WRONG_AMOUNT', `that transfer paid ${got.lamports} lamports; ${blinded.length} credits cost exactly ${want}`);
-    if (!(await this.store.create(`relay/credits/claim/${signature}`, text(JSON.stringify({ count: blinded.length, kid: this.key.kid }))))) throw new PofError('ALREADY_CLAIMED', 'that transfer was claimed already');
-    try { return { kid: this.key.kid, signatures: blinded.map(b => B.signBlinded(this.key, b)) }; }
-    catch (e: any) { await this.store.del(`relay/credits/claim/${signature}`).catch(() => {}); throw new PofError('BAD_BLINDED', String(e?.message || e)); }
+    let signatures: string[];
+    try { signatures = blinded.map(b => rawSign(this.key, b)); } catch (e: any) { throw new PofError('BAD_BLINDED', String(e?.message || e)); }
+    const setHash = crypto.createHash('sha256').update(blinded.join(',')).digest('hex');
+    const rec = `relay/credits/claim/${signature}`;
+    if (!(await this.store.create(rec, text(JSON.stringify({ count: blinded.length, kid: this.key.kid, set: setHash }))))) {
+      // a repeat of the same claim (its answer was lost) gets the same signatures again: RSA is deterministic, nothing new
+      // is minted (CR-02); any other set for that transfer stays refused
+      const was = JSON.parse(Buffer.from((await this.store.get(rec)) || text('{}')).toString());
+      if (was.set !== setHash || was.kid !== this.key.kid) throw new PofError('ALREADY_CLAIMED', 'that transfer was claimed already, with other blinded values');
+    }
+    return { kid: this.key.kid, signatures };
   }
 
   /** checks a credit and marks it spent; returns the name to release if the certify surely did not land */
   async spend(credit: any, bindTo = ''): Promise<string> {
     if (!credit || typeof credit !== 'object') throw new PofError('BAD_CREDIT', 'credit is { kid, token, signature }');
-    if (credit.kid !== this.key.kid) throw new PofError('OLD_CREDIT_KEY', 'that credit was signed by another relayer key');
+    const vk = this.verifyKeys.find(k => k.kid === credit.kid);
+    if (!vk) throw new PofError('OLD_CREDIT_KEY', 'that credit was signed by a key this relayer does not honour');
     const token = String(credit.token || '');
     if (!/^[0-9a-f]{64}$/.test(token)) throw new PofError('BAD_CREDIT', 'credit.token is 32 bytes of hex');
-    if (!(await B.verifyCredit(this.key, token, String(credit.signature || '')))) throw new PofError('BAD_CREDIT', 'that credit was not signed by this relayer');
+    if (!(await B.verifyCredit(vk, token, String(credit.signature || '')))) throw new PofError('BAD_CREDIT', 'that credit was not signed by this relayer');
     const name = `relay/credits/spent/${hex(crypto.createHash('sha256').update('pof:credit:spent:').update(token).digest())}`;
     const mark = text('for:' + bindTo);
     if (!(await this.store.create(name, mark))) {
