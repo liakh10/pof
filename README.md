@@ -102,6 +102,7 @@ Environment for the functions (Vercel, or a local `.env` you do not commit): `SO
 | report | covers |
 |---|---|
 | [`reports/devx.md`](reports/devx.md) | SDK, read API, MCP server, bots, and their run against a local validator |
+| [`reports/rings.md`](reports/rings.md) | the browser client, the lab and the local end-to-end against the real Verifier |
 | [`reports/audit.md`](reports/audit.md) | the internal security review: scope, method, findings with status and failing tests |
 
 Other parts publish their reports in `reports/` as they land; the [changelog](CHANGELOG.md) lists each one.
