@@ -25,6 +25,7 @@ export async function createPofClient(opts = {}) {
     rpc: opts.rpc || ['/api/rpc' + (net === 'mainnet' ? '' : `?net=${net}`)],
     indexer: opts.indexer || (net === 'local' ? null : '/api/spr' + (net === 'mainnet' ? '' : `?net=${net}`)),
     attestUrl: opts.attestUrl || '/api/attest',
+    prover: opts.prover || null,   // the Helius prover URL (spends only); the site serves it behind a proxy that adds the key
     programId: opts.programId || null,
     minAgeSlots: BigInt(opts.minAgeSlots ?? 150),
     tree: C.RINGS.tree,
@@ -47,9 +48,8 @@ export async function createPofClient(opts = {}) {
   }
   const indexer = () => {
     if (!cfg.indexer) throw Error('no Rings indexer on this network');
-    const url = new URL(cfg.indexer, typeof location !== 'undefined' ? location.href : 'http://localhost/').href;
-    const [base, query] = url.split('?');
-    return new S.SprIndexer(new S.SprApi({ url: base + (query ? '' : ''), ...(query ? { fetch: (u, i) => fetch(String(u) + (String(u).includes('?') ? '&' : '?') + query, i) } : {}) }));
+    // the SDK posts to <base>/<method> and keeps the query (?net=devnet)
+    return new S.SprIndexer(new S.SprApi({ url: new URL(cfg.indexer, typeof location !== 'undefined' ? location.href : 'http://localhost/').href }));
   };
 
   /* ---------------------------------------------------------------- identities: the vault and the wallet's own Ring */
@@ -285,6 +285,40 @@ export async function createPofClient(opts = {}) {
     },
   };
 
+  /* ---------------------------------------------------------------- spend: withdraw out of the vault (the Helius prover)
+     The vault key signs in the page and pays its own fee and the nullifier PDA rent (0.00070612 SOL per spent note), so
+     fund it first (fundVault). Loads dist/spr-spend.js (the attested prover client) only now. */
+  async function fundVault(lamports = 5_000_000) {
+    const { SystemProgram, PublicKey } = await import('./dist/web3.js');
+    const ix = SystemProgram.transfer({ fromPubkey: new PublicKey(W.state().address), toPubkey: new PublicKey(who('vault').owner), lamports });
+    const r = await W.send([ix]); return r.wait();
+  }
+  async function withdraw({ asset = 0, amount, to, from = 'vault' }) {
+    if (from !== 'vault') throw Error("withdraw signs with the vault key in this page; the wallet's own Ring withdraws in the wallet");
+    if (!cfg.prover || !cfg.indexer) throw Error('withdraw needs the Rings indexer and prover');
+    const id = who('vault');
+    const X = await import('./dist/spr-spend.js');
+    const abs = u => new URL(u, typeof location !== 'undefined' ? location.href : 'http://localhost/').href;
+    const client = new X.SprClient({ solanaRpcUrl: abs(Array.isArray(cfg.rpc) ? cfg.rpc[0] : cfg.rpc), indexerUrl: abs(cfg.indexer), proverUrl: abs(cfg.prover), proverTee: X.SignedTeePolicy.forNetwork(net), allowInsecureHttp: true });
+    const keys = X.LocalKeys.fromKeypair(id.kp, client.proofService);
+    const wallet = id.syncWallet || (id.syncWallet = new S.Wallet({ identity: id.kp.shieldedAddress() }));
+    await S.syncWallet({ client, wallet, keys });
+    const a = C.ASSETS[asset];
+    const amt = typeof amount === 'bigint' ? amount : C.parseUnits(amount, a.decimals);
+    status('withdraw', { phase: 'prove' });
+    const tx = await X.buildWithdrawalTransaction({ client, wallet, keys, feePayer: id.owner, recipient: to || W.state().address, amount: amt, ...(asset === 0 ? {} : { asset: cfg.mints[asset] }) });
+    const signatures = { ...tx.signatures, [id.owner]: id.signing.sign(new Uint8Array(tx.messageBytes)) };
+    const wire = X.getBase64EncodedWireTransaction({ ...tx, signatures });
+    const signature = await rpc('sendTransaction', [wire, { encoding: 'base64', preflightCommitment: 'confirmed' }]);
+    status('withdraw', { phase: 'sent', signature });
+    for (let i = 0; i < 90; i++) {
+      const st = (await rpc('getSignatureStatuses', [[signature]])).value[0];
+      if (st && (st.confirmationStatus === 'confirmed' || st.confirmationStatus === 'finalized')) { if (st.err) throw Error('the withdrawal failed on chain: ' + JSON.stringify(st.err)); status('withdraw', { phase: 'done', signature }); return { signature, slot: BigInt(st.slot) }; }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    throw Error('the withdrawal was not confirmed in time');
+  }
+
   /* the controller key of a kit, as a signer ({ publicKey, sign(message) }) for revoke_by_holder and room joins: the
      wallet itself (kind 0, signs through the wallet), the badge key (kind 2, from the sealed kit), or the X key (kind 1) */
   async function controllerOf(kit, from = 'vault') {
@@ -309,7 +343,7 @@ export async function createPofClient(opts = {}) {
     config: cfg, onStatus: fn => { listeners.add(fn); return () => listeners.delete(fn); },
     ready: () => C.ready(), hasher: S.hasherState,
     connect: id => W.connect(id), wallet: () => W.state(),
-    deriveVault, deriveRing, isRegistered, register, shield, notes, balance, choose, subject, disclose, attest, certify, kits, controllerOf, vaultSigner: () => vaultSigner(),
+    deriveVault, deriveRing, isRegistered, register, shield, notes, balance, choose, subject, disclose, attest, certify, kits, controllerOf, vaultSigner: () => vaultSigner(), fundVault, withdraw,
     local, identity: from => { const id = from === 'ring' ? ring : vault; return id ? { kind: id.kind, owner: id.owner, ownerHash: C.hex(id.ownerHash) } : null; },
     forget() { for (const id of [vault, ring]) if (id) { id.nk.fill(0); id.kitKey.fill(0); id.ctlSeed.fill(0); } vault = ring = null; },
   };

@@ -229,7 +229,7 @@ Not proven:
   3. a "spent" note simulated by **preloading a nullifier PDA** (owner SPP, 11 bytes, `0x08…`) at its derived address with
      `--account`. That is byte-for-byte the state a real spend leaves, so `revoke_spent` and the keeper are tested
      against it;
-  4. how to start it: `pof/lab/README` (written with the lab), the same flags as `hush/program/test`.
+  4. how to start it: section 10.
 
 ## 9. Proposed CONTRACT text (for the section owners)
 - **§3 `tree_root` (program + verifier):** "the Rings **state** root of tree 0 (`777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor`)
@@ -245,6 +245,41 @@ Not proven:
   Poseidon(nf, next), whose root is one of the 100 roots at tree offset 17,232.) The certificate stores `tree` once
   (all notes in one tree)."
 
+## 10. The client, the lab and the local validator (how to run them)
+**Local validator with Rings cloned** (RPC `http://127.0.0.1:35899`, ws 35900, faucet 36900, gossip 35000, dynamic 35100-35300):
+```
+node pof/lab/rings-local/prep.mjs          # once: dumps ring1…/regy3… binaries, saves tree 0, protocol config, SOL interface,
+                                           # USDC registry + mint (mint authority rewritten to .run/usdc-authority.json), warp slot
+zsh pof/lab/rings-local/chain.sh start     # refuses when 3 validators already run; ledger in the rings scratchpad
+POF_PROGRAMS="pofP4QR…=path/pof.so" POF_ACCOUNTS="nf-pda.json" zsh pof/lab/rings-local/chain.sh start   # with the program, a spent PDA
+zsh pof/lab/rings-local/chain.sh stop
+```
+`.run/cloned-tree.b64` is the tree as loaded at genesis; `client/localtree.js` (LocalRings) needs it to rebuild leaves on top of
+the cloned frontier. LocalRings implements the Verifier's `RingsSource` (slot, treeHead, merklePaths, registryNullifierKey,
+spent, creation), so the verifier and program tests can run against the clone:
+`new LocalRings(jsonRpc('http://127.0.0.1:35899'), { cloned })`.
+
+**The lab:** `node pof/lab/serve.mjs` (or the `pof-lab` entry in `.claude/launch.json`) → `http://localhost:5491/lab/`. It serves the
+client, proxies `/api/rpc?net=local|devnet|mainnet` (mainnet read-only) and `/api/spr/<method>?net=` (Helius key server-side),
+and answers `POST /api/attest` with the real Verifier (`verifier/dist`) over LocalRings with a throwaway key. Buttons: dev
+wallet (local), connect (wallet picker), derive ring keys (the Phantom owner step), make vault, register, shield, sync,
+pick, certify (wallet or badge subject), kits (list, export, import).
+
+**Tests** (`cd pof/client`): `npm test` (core vectors from mainnet data + the local e2e against the real Verifier),
+`npm run test:lab` (the lab page in headless Chrome, 11 checks), `npm run test:devnet` (real spend through the Helius
+prover; waits for devnet SOL, OWNER-STEPS rings 2). `npm run build` rebuilds `dist/` and fails over the size budget.
+
+**Browser facts:** `dist/spr.js` + shared chunk = 139 KB gzip, `dist/hasher-simd.wasm` = 420 KB gzip (fetched next to the
+bundle with progress events, `hasher.wasm` 560 KB for browsers without WASM SIMD), `dist/spr-spend.js` = 202 KB gzip and
+loads only for a withdrawal. The bundle needs a secure context (https or localhost: Kit's WebCrypto guard). Wallet
+transactions are legacy messages (every wallet signs them); only a withdrawal is a version 1 transaction, signed by the vault
+key in the page. In headless Chrome the hasher was ready about 0.4 s after the page asked for it (localhost).
+
+**Production wiring the site needs** (not in rings' folders): `api/spr/[method].js` over `client/server/spr-proxy.js` with
+`HELIUS_KEYS`, a prover proxy for withdrawals (the prover's TEE channel is end-to-end encrypted, so a byte-for-byte proxy is
+safe), and `/api/rpc`.
+
 ## Changes
 - 2026-11-25 · rings · first version.
 - 2026-11-25 · rings · §8: the prover attests on mainnet and devnet with the key in the prover URL; devnet runs the full stack.
+- 2026-11-25 · rings · §10: the client, the lab, the local validator, the size budget.

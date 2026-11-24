@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POF lab</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light dark; --fg: #111; --bg: #fafafa; --mute: #666; --line: #ddd; --ok: #0a7d38; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #e8e8e8; --bg: #141414; --mute: #999; --line: #333; --ok: #4cc27a; --bad: #ff8a80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); background: var(--bg); }
+  h1 { font-size: 16px; margin: 0 0 4px; } h2 { font-size: 14px; margin: 18px 0 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+  p.note { color: var(--mute); margin: 0 0 10px; max-width: 900px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+  button, select, input { font: inherit; padding: 5px 9px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--fg); }
+  button { cursor: pointer; } button:disabled { opacity: .45; cursor: default; }
+  input { width: 140px; }
+  .bar { width: 260px; height: 8px; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; } .bar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .15s; }
+  table { border-collapse: collapse; margin: 6px 0; } td, th { border: 1px solid var(--line); padding: 3px 7px; text-align: left; white-space: nowrap; }
+  #log { white-space: pre-wrap; word-break: break-all; border: 1px solid var(--line); border-radius: 4px; padding: 8px; max-height: 360px; overflow: auto; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .mute { color: var(--mute); }
+  code { overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<h1>POF lab · the Rings client end to end</h1>
+<p class="note">A plain harness for pof/client. Local: a validator with Privacy Rings cloned from mainnet (lab/rings-local) and the real Verifier behind /api/attest. Devnet: the Helius indexer through /api/spr (no attest). Nothing here writes to mainnet.</p>
+
+<div class="row">
+  <label>network <select id="net"><option value="local">local clone</option><option value="devnet">devnet</option></select></label>
+  <button id="boot">Start</button>
+  <span class="bar" title="Poseidon WASM"><i id="hbar"></i></span><span id="hstate" class="mute">hasher: idle</span>
+</div>
+
+<h2>1 · wallet</h2>
+<div class="row">
+  <button id="devw" title="local only: a keypair made in this tab, funded by the local faucet">Dev wallet (local)</button>
+  <button id="connect">Connect a wallet</button>
+  <span id="who" class="mute">not connected</span>
+</div>
+<div class="row">
+  <button id="derive" title="the Rings derivation message: Solana off-chain message v0 with TSPP/derive/v1 (RINGS §6). A signature, not a transaction.">Derive ring keys</button>
+  <span id="derived" class="mute"></span>
+</div>
+
+<h2>2 · vault</h2>
+<div class="row">
+  <button id="vault">Make vault (one signature)</button>
+  <button id="register">Register vault</button>
+  <span id="vstate" class="mute"></span>
+</div>
+
+<h2>3 · shield</h2>
+<div class="row">
+  <select id="asset"><option value="0">SOL</option><option value="1">USDC</option></select>
+  <input id="amount" value="2" aria-label="amount">
+  <button id="shield">Shield into the vault</button>
+</div>
+
+<h2>4 · notes</h2>
+<div class="row"><button id="sync">Sync notes</button><span id="bal" class="mute"></span></div>
+<div id="notes"></div>
+
+<h2>5 · certify</h2>
+<div class="row">
+  <label>tier <select id="tier"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+  <label>subject <select id="kind"><option value="0">this wallet</option><option value="2">a fresh badge</option></select></label>
+  <button id="pick">Pick notes</button>
+  <button id="certify">Certify</button>
+</div>
+<div id="picked" class="mute"></div>
+
+<h2>6 · revoke kits</h2>
+<div class="row"><button id="kits">List</button><button id="export">Export file</button><label>import <input type="file" id="import" accept="application/json" style="width:auto"></label></div>
+<div id="kitlist"></div>
+
+<h2>log</h2>
+<div id="log"></div>
+
+<script type="module">
+import { createPofClient, core as C } from '../client/pof-client.js';
+import * as S from '../client/dist/spr.js';
+import * as walletJs from '../client/wallet.js';
+import { Transaction } from '../client/dist/web3.js';
+
+const $ = id => document.getElementById(id);
+const log = (msg, cls = '') => { const d = document.createElement('div'); d.className = cls; d.textContent = new Date().toISOString().slice(11, 19) + '  ' + msg; $('log').prepend(d); };
+const fail = e => { if (!e || e.silent) { log(e ? e.message : 'cancelled', 'mute'); return; } log((e.code ? e.code + ': ' : '') + (e.message || e) + (e.logs ? '\n' + e.logs.slice(-6).join('\n') : ''), 'bad'); console.error(e); };
+const run = fn => async () => { try { await fn(); } catch (e) { fail(e); } };
+let pof = null, lastNotes = [], lastPick = null, cfg = {};
+
+$('boot').onclick = run(async () => {
+  const net = $('net').value;
+  cfg = await fetch('/lab/config').then(r => r.json());
+  const cloned = net === 'local' ? await fetch('/lab/cloned-tree').then(r => r.ok ? r.text() : null) : null;
+  pof = await createPofClient({ network: net, rpc: ['/api/rpc?net=' + net], indexer: net === 'local' ? null : '/api/spr?net=' + net, attestUrl: '/api/attest', programId: cfg.program, minAgeSlots: 0, clonedTree: cloned ? Uint8Array.from(atob(cloned), c => c.charCodeAt(0)) : null });
+  pof.onStatus(s => {
+    if (s.step === 'hasher') {
+      const pct = s.total ? Math.round(100 * s.loaded / s.total) : (s.phase === 'ready' ? 100 : 0);
+      $('hbar').style.width = pct + '%';
+      $('hstate').textContent = `hasher: ${s.phase}${s.total ? ` ${Math.round(s.loaded / 1024)} / ${Math.round(s.total / 1024)} KB` : ''}${s.phase === 'ready' ? ` in ${s.ms} ms (${s.simd ? 'SIMD' : 'no SIMD'})` : ''}${s.error ? ' · ' + s.error : ''}`;
+    } else log(`${s.step}: ${s.phase || ''}${s.signature ? ' ' + s.signature : ''}${s.owner ? ' ' + s.owner : ''}${s.count !== undefined ? ' ' + s.count + ' notes' : ''}${s.code ? ' ' + s.code : ''}`, 'mute');
+  });
+  await pof.ready();
+  log(`started on ${net}; program ${cfg.program}`, 'ok');
+  window.pof = pof;
+});
+
+/* a dev wallet for the local chain: a keypair made in this tab, shown to the client like any injected wallet */
+$('devw').onclick = run(async () => {
+  if ($('net').value !== 'local') throw Error('the dev wallet is for the local chain only');
+  const seed = crypto.getRandomValues(new Uint8Array(32));
+  const key = S.SigningKey.fromEd25519Bytes(seed);
+  const pub = key.publicKey().ed25519();
+  const address = C.b58encode(pub);
+  const { PublicKey } = await import('../client/dist/web3.js');
+  const derivation = C.hex(S.ed25519DerivationMessage(pub));
+  window.solana = {
+    isDevWallet: true, publicKey: new PublicKey(address),
+    connect: async () => ({ publicKey: new PublicKey(address) }),
+    disconnect: async () => {},
+    signMessage: async bytes => ({ signature: C.hex(bytes) === derivation ? key.derivationSeed() : key.sign(bytes) }),
+    signTransaction: async tx => { tx.addSignature(new PublicKey(address), (await import('../client/dist/web3.js')).Buffer.from(key.sign(tx.serializeMessage()))); return tx; },
+  };
+  await walletJs.connect('dev');
+  const r = await fetch('/api/rpc?net=local', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'requestAirdrop', params: [address, 50e9] }) }).then(r => r.json());
+  log('dev wallet ' + address + ' · airdrop 50 SOL ' + (r.result || JSON.stringify(r.error)), 'ok');
+  $('who').textContent = 'dev wallet ' + address;
+});
+$('connect').onclick = run(async () => { const s = await walletJs.connect(); $('who').textContent = `${s.wallet} ${s.address}`; log('connected ' + s.wallet + ' ' + s.address, 'ok'); });
+
+$('derive').onclick = run(async () => {
+  const r = await pof.deriveRing();
+  $('derived').textContent = `owner hash ${r.ownerHash.slice(0, 16)}… · registered: ${r.registered}`;
+  log(`derive: ok (owner hash ${r.ownerHash}) · registered ${r.registered}`, 'ok');
+});
+$('vault').onclick = run(async () => { const v = await pof.deriveVault(); $('vstate').textContent = `vault ${v.owner} · registered: ${v.registered}`; log('vault ' + v.owner + ' owner hash ' + v.ownerHash, 'ok'); });
+$('register').onclick = run(async () => { const r = await pof.register('vault'); log('registered ' + (r.already ? '(already)' : r.signature), 'ok'); $('vstate').textContent = `vault ${pof.identity('vault').owner} · registered: true`; });
+$('shield').onclick = run(async () => { const r = await pof.shield({ asset: Number($('asset').value), amount: $('amount').value, into: 'vault' }); log('shielded · ' + r.signature + ' at slot ' + r.slot, 'ok'); });
+$('sync').onclick = run(async () => {
+  lastNotes = await pof.notes({ from: 'vault' });
+  const rows = lastNotes.map(n => `<tr><td>${n.leafIndex}</td><td>${n.asset === C.ASSETS[0].mint ? 'SOL' : 'USDC'}</td><td>${C.formatUnits(n.amount, n.asset === C.ASSETS[0].mint ? 9 : 6)}</td><td>${n.slot ?? ''}</td><td><code>${(n.sig || '').slice(0, 16)}…</code></td><td><code>${C.hex(n.nullifier).slice(0, 16)}…</code></td></tr>`).join('');
+  $('notes').innerHTML = lastNotes.length ? `<table><tr><th>leaf</th><th>asset</th><th>amount</th><th>slot</th><th>tx</th><th>nullifier</th></tr>${rows}</table>` : '<span class="mute">no notes</span>';
+  $('bal').textContent = `SOL ${C.formatUnits(pof.balance(lastNotes, 0), 9)} · USDC ${C.formatUnits(pof.balance(lastNotes, 1), 6)}`;
+});
+$('pick').onclick = run(async () => {
+  lastPick = await pof.choose({ asset: Number($('asset').value), tier: Number($('tier').value), from: 'vault', list: lastNotes.length ? lastNotes : undefined });
+  $('picked').textContent = lastPick.ready ? `ready: ${lastPick.notes.length} note(s), leaves ${lastPick.notes.map(n => n.leafIndex).join(', ')}, excess ${lastPick.excess}` : lastPick.waitSlots ? `wait ${lastPick.waitSlots} slots` : `short of the tier by ${lastPick.short}`;
+});
+$('certify').onclick = run(async () => {
+  const asset = Number($('asset').value), tier = Number($('tier').value), kind = Number($('kind').value);
+  const r = await pof.certify({ asset, tier, subjectKind: kind, from: 'vault' });
+  log(`attested · log index ${r.logIndex} · subject ${r.subjectHash.slice(0, 16)}… · expiry slot ${r.expirySlot} · controller ${r.controller}\nattestation ${r.attestation}`, 'ok');
+});
+const showKits = () => { const k = pof.kits.list(); $('kitlist').innerHTML = k.length ? `<table><tr><th>subject</th><th>asset</th><th>tier</th><th>log</th><th>expiry slot</th><th>revoke pairs</th></tr>${k.map(x => `<tr><td>${['wallet', 'x', 'badge'][x.subject.kind]} ${x.subject.value.slice(0, 10)}…</td><td>${C.ASSETS[x.asset].name}</td><td>${x.tier}</td><td>${x.logIndex}</td><td>${x.expirySlot}</td><td>${x.revoke.length}</td></tr>`).join('')}</table>` : '<span class="mute">no kits</span>'; };
+$('kits').onclick = run(async () => showKits());
+$('export').onclick = run(async () => pof.kits.download());
+$('import').onchange = run(async () => { const f = $('import').files[0]; if (f) { log('imported ' + pof.kits.import(await f.text()) + ' kit(s)', 'ok'); showKits(); } });
+</script>
+</body>
+</html>
