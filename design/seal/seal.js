@@ -250,16 +250,24 @@ function renderCard() {
   const v = !hot && verdict ? verdict : null;
   card.dataset.good = v && v.good ? '1' : '0';
   if (!c) {
-    if (v) { card.dataset.state = 'verdict'; card.innerHTML = `<span class="cc-pin" data-card-pin></span><p class="cc-verdict">${esc(v.head)}</p><p class="cc-kind">Subject</p><p class="cc-subj">${esc(short(v.q, 10))}</p><p class="cc-note" style="margin-top:14px">${esc(v.sub)}</p>`; return; }
+    if (v) { card.dataset.state = 'verdict'; card.innerHTML = `<span class="cc-pin" data-card-pin></span><p class="cc-head"><span>Check</span></p><p class="cc-verdict">${esc(v.head)}</p><dl class="cc-rows"><div><dt>Subject</dt><dd><span class="mono">${esc(short(v.q, 10))}</span></dd></div></dl><p class="cc-note">${esc(v.sub)}</p>`; return; }
     if (card.dataset.state !== 'empty') { card.dataset.state = 'empty'; card.innerHTML = emptyCard; }
     return;
   }
   const t = tierParts(c.tierLabel, c.asset), s = stateOf(c), subj = subjectLine(c), hashOnly = subj === c.subjectHash;
+  const at = order.indexOf(c.address);
   card.dataset.state = s;
-  card.innerHTML = `<span class="cc-pin" data-card-pin></span>${v ? `<p class="cc-verdict">${esc(v.head)}</p>` : ''}
-  <div class="cc-top"><div><p class="cc-kind">${esc(KIND_TEXT[c.kind] || c.kind)}</p><p class="cc-subj" title="${esc(subj)}">${hashOnly ? 'hash ' : ''}${esc(short(subj, 6))}</p></div>${markSVG({ state: s })}</div>
+  const rows = [
+    ['Subject', `${esc(KIND_TEXT[c.kind] || c.kind)} <span class="mono" title="${esc(subj)}">${hashOnly ? 'hash ' : ''}${esc(short(subj, 6))}</span>`],
+    ['Status', `<span class="st"><i aria-hidden="true"></i>${esc(STATUS_TEXT[c.status] || c.status)}</span>`],
+    ['Certified', `<span class="mono">slot ${num(c.certifiedSlot)}</span>`],
+  ];
+  if (s === 'revoked' && Number(c.revokedSlot)) rows.push(['Revoked', `<span class="mono">slot ${num(c.revokedSlot)}</span>`]);
+  card.innerHTML = `<span class="cc-pin" data-card-pin></span>
+  <p class="cc-head"><span>Certificate</span>${at >= 0 ? `<span class="mono">ring ${String(at + 1).padStart(2, '0')} of ${order.length}</span>` : ''}</p>
+  ${v ? `<p class="cc-verdict">${esc(v.head)}</p>` : ''}
   <p class="cc-tier" aria-label="${esc(c.tierLabel)}"><svg class="ge" viewBox="0 0 18 26" aria-hidden="true"><path d="M2.5 3.5 L15.5 10 L2.5 16.5 M2.5 23 H15.5"/></svg><b>${esc(t.amt)}</b><span class="sym">${esc(t.sym)}</span></p>
-  <div class="cc-foot"><span class="cc-status">${esc(STATUS_TEXT[c.status] || c.status)}</span><span class="mono">${s === 'revoked' && Number(c.revokedSlot) ? `revoked at ${num(c.revokedSlot)}` : `slot ${num(c.certifiedSlot)}`}</span></div>
+  <dl class="cc-rows">${rows.map(([k, val]) => `<div><dt>${k}</dt><dd>${val}</dd></div>`).join('')}</dl>
   <a class="cc-open" href="${esc(certPath(c))}">Open the certificate</a>`;
 }
 function drawCardLeader() {

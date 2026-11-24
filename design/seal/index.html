@@ -77,19 +77,21 @@
     </form>
   </figure>
 
-  <article class="cc" id="cc" data-card aria-live="polite" data-state="empty">
-    <span class="cc-pin" data-card-pin aria-hidden="true"></span>
-    <p class="cc-kind">The tiers a certificate can state</p>
-    <table class="cc-ladder"><thead><tr><th scope="col">Tier</th><th scope="col">SOL</th><th scope="col">USDC</th></tr></thead><tbody><tr><th scope="row">1</th><td>≥ 1</td><td>≥ 100</td></tr><tr><th scope="row">2</th><td>≥ 10</td><td>≥ 1,000</td></tr><tr><th scope="row">3</th><td>≥ 100</td><td>≥ 10,000</td></tr><tr><th scope="row">4</th><td>≥ 1,000</td><td>≥ 100,000</td></tr><tr><th scope="row">5</th><td>≥ 10,000</td><td>≥ 1,000,000</td></tr></tbody></table>
-    <p class="cc-note">No certificates yet. The first one draws itself into the seal the moment it lands on chain.</p>
-  </article>
 
+  <div class="col-right">
   <ol class="notes" data-notes>
     <li data-note="center"><span class="n mono">01</span><h2>Check any wallet or @handle</h2><p>Type it into the seal. The answer is read from the certificates on chain.</p></li>
     <li data-note="broken"><span class="n mono">02</span><h2>Broken is revoked</h2><p>Spend a disclosed note and the keeper proves it on chain. The ring stops and breaks, for everyone at once.</p></li>
     <li data-note="weight"><span class="n mono">03</span><h2>Weight is the tier</h2><p>A hairline is at least 1 SOL. The heaviest ring is at least 10,000 SOL or 1,000,000 USDC.</p></li>
     <li data-note="orange"><span class="n mono">04</span><h2>Orange is new</h2><p>The newest certificates sit by the centre and burn orange. Older ones settle outward in ink.</p></li>
   </ol>
+  <article class="cc" id="cc" data-card aria-live="polite" data-state="empty">
+    <span class="cc-pin" data-card-pin aria-hidden="true"></span>
+    <p class="cc-head"><span>Certificate tiers</span></p>
+    <table class="cc-ladder"><thead><tr><th scope="col">Tier</th><th scope="col">SOL</th><th scope="col">USDC</th></tr></thead><tbody><tr><th scope="row">1</th><td>≥ 1</td><td>≥ 100</td></tr><tr><th scope="row">2</th><td>≥ 10</td><td>≥ 1,000</td></tr><tr><th scope="row">3</th><td>≥ 100</td><td>≥ 10,000</td></tr><tr><th scope="row">4</th><td>≥ 1,000</td><td>≥ 100,000</td></tr><tr><th scope="row">5</th><td>≥ 10,000</td><td>≥ 1,000,000</td></tr></tbody></table>
+    <p class="cc-note">No certificates yet. The first one draws itself into the seal the moment it lands on chain.</p>
+  </article>
+  </div>
 
   <svg class="leaders" data-leaders aria-hidden="true"><g data-note-leaders></g><path class="card-leader" data-card-leader d=""/><circle class="card-dot" data-card-dot r="3.5" cx="-20" cy="-20"/></svg>
 </section>
