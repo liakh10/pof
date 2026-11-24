@@ -80,23 +80,32 @@ export function decodeLeaf(b: Uint8Array) {
 export const sthBytes = (programId: Uint8Array, size: bigint | number, root: Uint8Array): Uint8Array => concat(text('POF-STH1'), programId, u64le(size), root);
 export const anchorMemo = (size: bigint | number, root: Uint8Array): string => `pof:log:${String(size)}:${Buffer.from(root).toString('hex')}`;
 
-/* §4: the message a wallet (kind 0) or a badge key (kind 2) signs to prove the subject. Human-readable, so a wallet shows
-   what it signs. `slot` is a recent slot read by the client; the Verifier takes it within SUBJECT_PROOF_SLOTS. */
-export function subjectMessage(m: { programId: string; kind: number; value: string; ring: string; asset: number; tier: number; payer: string; slot: bigint | number }): Uint8Array {
+/* §4: the disclosure message. The ring owner ALWAYS signs it (POF-02: openings plus nk alone must not certify anybody); for a
+   wallet (kind 0) or badge (kind 2) subject, the subject key signs the same bytes too (one signature when the wallet is the
+   ring owner). Human-readable, so a wallet shows what it signs; domain-separated by its first line. `slot` is a recent slot
+   read by the client; the Verifier takes it within SUBJECT_PROOF_SLOTS. */
+export function disclosureMessage(m: { programId: string; kind: number; value: string; ring: string; controller: string; asset: number; tier: number; payer: string; slot: bigint | number }): Uint8Array {
   return text([
-    'Proof of Funds: subject proof',
+    'Proof of Funds: disclosure v2',
     `program: ${m.programId}`,
-    `subject: ${['wallet', 'x', 'badge'][m.kind]} ${m.value}`,
+    `subject: ${['wallet', 'x', 'badge'][m.kind]} ${m.kind === 1 ? normalHandle(m.value) : m.value}`,
     `ring: ${m.ring}`,
+    `controller: ${m.controller}`,
     `asset: ${ASSETS[m.asset]?.name} tier: ${m.tier}`,
     `payer: ${m.payer}`,
     `slot: ${String(m.slot)}`,
   ].join('\n'));
 }
 
-/* the X link token (subject kind 1 proof): the Verifier's own signature over this, so no state is kept between link and attest */
-export const linkTokenBytes = (programId: Uint8Array, handle: string, expiresAt: bigint | number): Uint8Array =>
-  concat(text('POF-LINK1'), programId, text(normalHandle(handle)), Uint8Array.of(0), u64le(expiresAt));
+/** @deprecated the v1 name; the disclosure message replaced it (CONTRACT §4, 2026-11-25) */
+export const subjectMessage = (m: { programId: string; kind: number; value: string; ring: string; asset: number; tier: number; payer: string; slot: bigint | number; controller?: string }) =>
+  disclosureMessage({ ...m, controller: m.controller ?? m.value });
+
+/* the X link id (subject kind 1 proof): the Verifier's own signature over (handle, controller, expiry), so no state is kept
+   between link and attest, and a link id only certifies with the controller it was issued for (POF-03). An unbound link
+   (controller = the default key) proves the handle to the bots but cannot certify. */
+export const linkTokenBytes = (programId: Uint8Array, handle: string, controller: Uint8Array, expiresAt: bigint | number): Uint8Array =>
+  concat(text('POF-LINK2'), programId, text(normalHandle(handle)), Uint8Array.of(0), controller, u64le(expiresAt));
 
 export const certificateSeeds = (subjectHash: Uint8Array, asset: number): Uint8Array[] => [text('cert'), subjectHash, Uint8Array.of(asset)];
 export { toB58 };

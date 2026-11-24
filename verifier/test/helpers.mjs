@@ -96,19 +96,31 @@ export function makeCtx({ relayFree = false, env = {} } = {}) {
   const locks = new V.NoteLocks(store, V.sha256(sealKey), 9000n, chain);
   const verifier = new V.Verifier({ programId, minAgeSlots: 150n, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 150n, relayer: relayerSigner.address, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, log, keeper, locks);
   const relayer = new V.Relayer({ address: relayerSigner.address, verifierKey: signer.publicKey, programId, dailyCapLamports: 1_000_000_000n, balanceFloorLamports: 50_000_000n, quoteTtlSec: 1800, free: relayFree, hmacKey: V.sha256(sealKey, Uint8Array.of(1)) }, store, chain, log);
-  const linker = new V.Linker(store, (h, exp) => verifier.linkToken(h, exp));
+  const linker = new V.Linker(store, (h, exp, ctl) => verifier.linkToken(h, exp, ctl));
   const ctx = { env: { POF_PROGRAM: V.toB58(programId), CRON_SECRET: 'cron-test', ...env }, programId, signer, relayerSigner, store, rings, chain, log, keeper, locks, verifier, relayer, linker, sealKey, dir };
   return ctx;
 }
 
-/** a §4 package for these notes */
-export function pkg(ctx, r, notes, { kind = 0, value, asset = 0, tier = 1, relay = false, proof, slot, controller } = {}) {
+/** a §4 package for these notes, as the client builds it: the ring owner signs the disclosure message; for a wallet or
+ *  badge subject the subject key signs it too (`subjectSigner`, default: the ring's own wallet for kind 0); an X subject
+ *  carries a link id bound to its controller (an unbound one passed in is re-issued bound, as a client that linked with its
+ *  controller would hold) */
+export function pkg(ctx, r, notes, { kind = 0, value, asset = 0, tier = 1, relay = false, proof, slot, controller, subjectSigner, ringSigner } = {}) {
   const payer = relay ? ctx.relayerSigner.address : r.owner;
   const v = value ?? (kind === 0 ? r.owner : undefined);
   const s = slot ?? ctx.rings.slotNow - 10n;
-  let pr = proof;
-  if (pr === undefined && kind === 0) pr = hex(r.wallet.sign(V.subjectMessage({ programId: V.toB58(ctx.programId), kind, value: v, ring: r.owner, asset, tier, payer, slot: s })));
-  const out = { v: 1, subject: { kind, value: v, proof: pr, slot: String(s) }, asset, tier, ring: { owner: r.owner, nk: hex(r.nk) }, notes: notes.map(n => n.opening), payer, relay };
-  if (kind === 1 && controller !== null) out.controller = controller || r.owner;
+  const ctl = kind === 1 ? (controller === null ? undefined : (controller || r.owner)) : v;
+  let link = proof;
+  if (kind === 1 && typeof link === 'string' && ctl) {
+    const parts = link.split('.');
+    if (parts.length === 4 && parts[1] === '11111111111111111111111111111111') link = ctx.verifier.linkToken(parts[0], Number(parts[2]), ctl);
+  }
+  const msg = V.disclosureMessage({ programId: V.toB58(ctx.programId), kind, value: v, ring: r.owner, controller: ctl || '11111111111111111111111111111111', asset, tier, payer, slot: s });
+  const ringProof = hex((ringSigner || r.wallet).sign(msg));
+  let subjectProof = link;
+  if (kind === 0) subjectProof = proof ?? (subjectSigner ? hex(subjectSigner.sign(msg)) : undefined);
+  if (kind === 2) subjectProof = proof ?? hex(subjectSigner.sign(msg));
+  const out = { v: 1, subject: { kind, value: v, slot: String(s), ...(subjectProof !== undefined ? { proof: subjectProof } : {}) }, asset, tier, ring: { owner: r.owner, nk: hex(r.nk), proof: ringProof }, notes: notes.map(n => n.opening), payer, relay };
+  if (kind === 1 && ctl) out.controller = ctl;
   return out;
 }

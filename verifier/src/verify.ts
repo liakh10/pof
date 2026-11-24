@@ -6,7 +6,7 @@
 import { PofError, compareBytes, equal, fromB58, hex, unhex, toB58 } from './codec.js';
 import {
   ASSETS, SUBJECT, encodeAttestation, linkTokenBytes, normalHandle, nullsetHash, saltedNullifier, sortHashes, subjectHash,
-  subjectMessage, tierMinimum, logLeaf,
+  disclosureMessage, tierMinimum, logLeaf,
 } from './contract.js';
 import { verifySig, type Signer } from './keys.js';
 import type { RingsSource } from './rings.js';
@@ -54,9 +54,9 @@ function sigBytes(v: unknown, name: string): Uint8Array {
 
 export interface Disclosure {
   v: 1;
-  subject: { kind: number; value: string; proof: string; slot?: string | number };
+  subject: { kind: number; value: string; proof?: string; slot: string | number };
   asset: number; tier: number;
-  ring: { owner: string; nk: string };
+  ring: { owner: string; nk: string; proof: string };
   notes: { tree: string; leafIndex: string; asset: string; amount: string; blinding: string; sig: string; dataHash?: string; ringDataHash?: string; ringProgramId?: string }[];
   payer: string; relay?: boolean;
   /** kind 1 only: the key the holder's client keeps to revoke the certificate and join rooms with it */
@@ -73,19 +73,28 @@ export class Verifier {
 
   get key() { return this.signer.address; }
 
-  /** the X link token (kind 1 proof), signed by the same key: "handle, until unix time" */
-  linkToken(handle: string, expiresAt: number): string {
+  /** the X link id (kind 1 proof), signed by the same key: "handle, controller, until unix time" (CONTRACT §4) */
+  linkToken(handle: string, expiresAt: number, controller?: string | null): string {
     const h = normalHandle(handle);
-    const sig = this.signer.sign(linkTokenBytes(this.cfg.programId, h, expiresAt));
-    return `${h}.${expiresAt}.${hex(sig)}`;
+    const ctl = controller ? fromB58(controller, 32, 'controller') : new Uint8Array(32);
+    const sig = this.signer.sign(linkTokenBytes(this.cfg.programId, h, ctl, expiresAt));
+    return `${h}.${toB58(ctl)}.${expiresAt}.${hex(sig)}`;
   }
-  checkLinkToken(handle: string, token: unknown) {
+  /** checks a link id; returns its controller (null when unbound). With `controller`, the id must be bound to exactly it. */
+  checkLinkToken(handle: string, token: unknown, controller?: string): string | null {
     if (typeof token !== 'string') throw new PofError('BAD_SUBJECT_PROOF', 'an X subject needs the link id from /api/link/check');
-    const [h, exp, sig] = token.split('.');
+    const [h, ctl, exp, sig] = token.split('.');
     const n = normalHandle(handle);
-    if (h !== n || !/^\d+$/.test(exp || '') || !/^[0-9a-f]{128}$/.test(sig || '')) throw new PofError('BAD_SUBJECT_PROOF', 'that link id is not for this handle');
+    if (h !== n || !ctl || !/^\d+$/.test(exp || '') || !/^[0-9a-f]{128}$/.test(sig || '')) throw new PofError('BAD_SUBJECT_PROOF', 'that link id is not for this handle');
+    const ctlBytes = fromB58(ctl, 32, 'link controller');
+    if (!verifySig(unhex(sig, 64), linkTokenBytes(this.cfg.programId, n, ctlBytes, Number(exp)), this.signer.publicKey)) throw new PofError('BAD_SUBJECT_PROOF', 'that link id was not issued by this Verifier');
     if (Number(exp) < Date.now() / 1000) throw new PofError('LINK_EXPIRED', 'the handle link expired: post a fresh code and link again');
-    if (!verifySig(unhex(sig, 64), linkTokenBytes(this.cfg.programId, n, Number(exp)), this.signer.publicKey)) throw new PofError('BAD_SUBJECT_PROOF', 'that link id was not issued by this Verifier');
+    const bound = ctlBytes.some(x => x !== 0) ? ctl : null;
+    if (controller !== undefined) {
+      if (!bound) throw new PofError('LINK_UNBOUND', 'that link id is not bound to a controller key; link again with the controller from your client');
+      if (bound !== controller) throw new PofError('LINK_OTHER_CONTROLLER', 'that link id was issued for another controller key');
+    }
+    return bound;
   }
 
   async attest(pkg: unknown): Promise<AttestResult> {
@@ -117,13 +126,16 @@ export class Verifier {
 
     const slot = await this.rings.slot();
 
-    /* the subject */
+    /* the proofs: the ring owner signs the disclosure message (always); the subject key signs it too for a wallet or badge;
+       an X subject shows a link id bound to the same controller (POF-02, POF-03) */
+    const at = u64(subj.slot ?? field(p, 'slot'), 'subject.slot');
+    if (at > slot + 50n || slot - at > this.cfg.subjectProofSlots) throw new PofError('SUBJECT_PROOF_STALE', `sign the disclosure message again with a slot from the last ${this.cfg.subjectProofSlots} slots`);
+    const msg = disclosureMessage({ programId: toB58(this.cfg.programId), kind, value, ring: owner, controller: toB58(controller), asset, tier, payer: p.payer, slot: at });
+    if (!verifySig(sigBytes(field(ring, 'proof'), 'ring.proof'), msg, ownerBytes)) throw new PofError('BAD_RING_PROOF', 'ring.proof must be the ring owner\'s signature over the disclosure message (CONTRACT §4)');
     if (kind === SUBJECT.wallet || kind === SUBJECT.badge) {
-      const at = u64(subj.slot, 'subject.slot');
-      if (at > slot + 50n || slot - at > this.cfg.subjectProofSlots) throw new PofError('SUBJECT_PROOF_STALE', `sign the subject message again with a slot from the last ${this.cfg.subjectProofSlots} slots`);
-      const msg = subjectMessage({ programId: toB58(this.cfg.programId), kind, value, ring: owner, asset, tier, payer: p.payer, slot: at });
-      if (!verifySig(sigBytes(subj.proof, 'subject.proof'), msg, fromB58(value, 32, 'subject'))) throw new PofError('BAD_SUBJECT_PROOF', 'the subject signature does not match the subject message');
-    } else if (kind === SUBJECT.x) this.checkLinkToken(value, subj.proof);
+      const same = kind === SUBJECT.wallet && value === owner && (subj.proof === undefined || subj.proof === ring.proof);
+      if (!same && (subj.proof == null || !verifySig(sigBytes(subj.proof, 'subject.proof'), msg, fromB58(value, 32, 'subject')))) throw new PofError('BAD_SUBJECT_PROOF', 'the subject signature does not match the disclosure message');
+    } else if (kind === SUBJECT.x) this.checkLinkToken(value, subj.proof, toB58(controller));
 
     /* the Ring's owner and the nullifier key */
     const npk = await this.rings.registryNullifierKey(owner);

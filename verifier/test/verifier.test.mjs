@@ -75,13 +75,17 @@ test('rejections, each with its own code', async () => {
   await code(c.verifier.attest({ ...ok(), notes: [{ ...n.opening, asset: V.ASSETS[1].mint }] }), 'WRONG_ASSET');
   // somebody else's nk
   const other = ring(); c.rings.register(other);
-  await code(c.verifier.attest({ ...ok(), ring: { owner: r.owner, nk: hex(other.nk) } }), 'NULLIFIER_KEY_MISMATCH');
-  await code(c.verifier.attest({ ...ok(), ring: { owner: r.owner, nk: 'zz' } }), 'BAD_HEX');
+  await code(c.verifier.attest({ ...ok(), ring: { ...ok().ring, nk: hex(other.nk) } }), 'NULLIFIER_KEY_MISMATCH');
+  await code(c.verifier.attest({ ...ok(), ring: { ...ok().ring, nk: 'zz' } }), 'BAD_HEX');
   // unregistered owner
   const lone = ring();
   await code(c.verifier.attest(pkg(c, lone, [n])), 'NO_RING');
   // wrong subject signature, stale subject slot
+  await code(c.verifier.attest({ ...ok(), ring: { ...ok().ring, proof: hex(other.wallet.sign(new Uint8Array(3))) } }), 'BAD_RING_PROOF');
+  await code(c.verifier.attest({ ...ok(), ring: { owner: r.owner, nk: hex(r.nk) } }), 'BAD_BASE58');
   await code(c.verifier.attest({ ...ok(), subject: { ...ok().subject, proof: hex(other.wallet.sign(new Uint8Array(3))) } }), 'BAD_SUBJECT_PROOF');
+  // a signature over another tier does not carry over
+  await code(c.verifier.attest({ ...ok(), ring: pkg(c, r, [n], { tier: 2 }).ring }), 'BAD_RING_PROOF');
   await code(c.verifier.attest(pkg(c, r, [n], { slot: c.rings.slotNow - 5000n })), 'SUBJECT_PROOF_STALE');
   // relay with the wrong payer
   await code(c.verifier.attest({ ...ok(), relay: true }), 'BAD_PAYER');
@@ -111,44 +115,56 @@ test('a note whose root fell out of the on-chain history is refused', async () =
   await code(c.verifier.attest(pkg(c, r, [a])), 'NOT_IN_TREE');
 });
 
-test('vault mode: a wallet subject certified from a separate vault ring, the wallet signs the ring line', async () => {
+test('vault mode: a wallet subject certified from a separate vault ring; both the vault and the wallet sign', async () => {
   const c = makeCtx(); const vault = ring(); c.rings.register(vault); const main = ring();
   const n = c.rings.note(vault, 2n * SOL);
+  const p = pkg(c, vault, [n], { kind: 0, value: main.owner, subjectSigner: main.wallet });
+  p.payer = main.owner;
+  await code(c.verifier.attest(p), 'BAD_RING_PROOF'); // the payer line changed: both signatures must be over the final bytes
   const s = c.rings.slotNow - 3n;
-  const msg = V.subjectMessage({ programId: V.toB58(c.programId), kind: 0, value: main.owner, ring: vault.owner, asset: 0, tier: 1, payer: main.owner, slot: s });
-  const p = { v: 1, subject: { kind: 0, value: main.owner, proof: hex(main.wallet.sign(msg)), slot: String(s) }, asset: 0, tier: 1, ring: { owner: vault.owner, nk: hex(vault.nk) }, notes: [n.opening], payer: main.owner };
-  const out = await c.verifier.attest(p);
+  const msg = V.disclosureMessage({ programId: V.toB58(c.programId), kind: 0, value: main.owner, ring: vault.owner, controller: main.owner, asset: 0, tier: 1, payer: main.owner, slot: s });
+  const q = { v: 1, subject: { kind: 0, value: main.owner, proof: hex(main.wallet.sign(msg)), slot: String(s) }, asset: 0, tier: 1, ring: { owner: vault.owner, nk: hex(vault.nk), proof: hex(vault.wallet.sign(msg)) }, notes: [n.opening], payer: main.owner };
+  const out = await c.verifier.attest(q);
   assert.equal(out.subjectHash, hex(V.subjectHash(0, main.owner)));
-  // the same signature cannot be replayed for another ring
+  // without the wallet's own signature, the vault alone cannot name a wallet
+  const r2 = c.rings.note(vault, 2n * SOL);
+  await code(c.verifier.attest({ ...q, subject: { ...q.subject, proof: undefined }, notes: [r2.opening] }), 'BAD_SUBJECT_PROOF');
+  // and the wallet's signature cannot be replayed for another ring
   const other = ring(); c.rings.register(other);
   const n2 = c.rings.note(other, 2n * SOL);
-  await code(c.verifier.attest({ ...p, ring: { owner: other.owner, nk: hex(other.nk) }, notes: [n2.opening] }), 'BAD_SUBJECT_PROOF');
+  await code(c.verifier.attest({ ...q, ring: { owner: other.owner, nk: hex(other.nk), proof: hex(other.wallet.sign(msg)) }, notes: [n2.opening] }), 'BAD_RING_PROOF');
 });
 
 test('X handle subject: a link id from the Verifier, case-insensitive, expiry enforced, other handles refused', async () => {
   const c = makeCtx(); const r = ring(); c.rings.register(r);
   const n = c.rings.note(r, 2n * SOL);
-  const link = c.verifier.linkToken('@SomeAnon', Math.floor(Date.now() / 1000) + 600);
   const ctl = ring();
+  const link = c.verifier.linkToken('@SomeAnon', Math.floor(Date.now() / 1000) + 600, ctl.owner);
   await code(c.verifier.attest(pkg(c, r, [n], { kind: 1, value: '@someanon', proof: link, relay: true, controller: null })), 'BAD_BASE58');
   const out = await c.verifier.attest(pkg(c, r, [n], { kind: 1, value: '@someanon', proof: link, relay: true, controller: ctl.owner }));
   assert.equal(out.controller, ctl.owner);
   assert.equal(out.subjectHash, hex(V.subjectHash(1, 'someanon')));
   assert.equal(V.toB58(V.decodeAttestation(Buffer.from(out.attestation, 'hex')).payer), c.relayerSigner.address);
   const m = c.rings.note(r, 2n * SOL);
-  await code(c.verifier.attest(pkg(c, r, [m], { kind: 1, value: 'otheranon', proof: link, relay: true })), 'BAD_SUBJECT_PROOF');
-  const old = c.verifier.linkToken('someanon', Math.floor(Date.now() / 1000) - 1);
-  await code(c.verifier.attest(pkg(c, r, [m], { kind: 1, value: 'someanon', proof: old, relay: true })), 'LINK_EXPIRED');
+  await code(c.verifier.attest(pkg(c, r, [m], { kind: 1, value: 'otheranon', proof: link, relay: true, controller: ctl.owner })), 'BAD_SUBJECT_PROOF');
+  // a link id issued for one controller does not certify with another (POF-03)
+  await code(c.verifier.attest(pkg(c, r, [m], { kind: 1, value: 'someanon', proof: link, relay: true, controller: r.owner })), 'LINK_OTHER_CONTROLLER');
+  const old = c.verifier.linkToken('someanon', Math.floor(Date.now() / 1000) - 1, ctl.owner);
+  await code(c.verifier.attest(pkg(c, r, [m], { kind: 1, value: 'someanon', proof: old, relay: true, controller: ctl.owner })), 'LINK_EXPIRED');
   const forged = link.slice(0, -4) + '0000';
-  await code(c.verifier.attest(pkg(c, r, [m], { kind: 1, value: 'someanon', proof: forged, relay: true })), 'BAD_SUBJECT_PROOF');
+  await code(c.verifier.attest(pkg(c, r, [m], { kind: 1, value: 'someanon', proof: forged, relay: true, controller: ctl.owner })), 'BAD_SUBJECT_PROOF');
+  // an unbound link (the bots' kind) cannot certify
+  const unbound = c.verifier.linkToken('someanon', Math.floor(Date.now() / 1000) + 600);
+  assert.equal(c.verifier.checkLinkToken('someanon', unbound), null);
+  await code(Promise.resolve().then(() => c.verifier.checkLinkToken('someanon', unbound, ctl.owner)), 'LINK_UNBOUND');
 });
 
 test('badge subject: signed by the badge key', async () => {
   const c = makeCtx(); const r = ring(); c.rings.register(r); const badge = ring();
   const n = c.rings.note(r, 2n * SOL);
   const s = c.rings.slotNow;
-  const msg = V.subjectMessage({ programId: V.toB58(c.programId), kind: 2, value: badge.owner, ring: r.owner, asset: 0, tier: 1, payer: c.relayerSigner.address, slot: s });
-  const out = await c.verifier.attest(pkg(c, r, [n], { kind: 2, value: badge.owner, proof: hex(badge.wallet.sign(msg)), relay: true, slot: s }));
+  const out = await c.verifier.attest(pkg(c, r, [n], { kind: 2, value: badge.owner, subjectSigner: badge.wallet, relay: true, slot: s }));
+  await code(c.verifier.attest(pkg(c, r, [c.rings.note(r, 2n * SOL)], { kind: 2, value: badge.owner, subjectSigner: r.wallet, relay: true, slot: s })), 'BAD_SUBJECT_PROOF');
   assert.equal(out.subjectHash, hex(V.subjectHash(2, badge.owner)));
 });
 
@@ -176,8 +192,8 @@ test('USDC tiers use 6 decimals and the USDC mint', async () => {
 test('the wallet subject signature passes as base58 too', async () => {
   const c = makeCtx(); const r = ring(); c.rings.register(r);
   const p = pkg(c, r, [c.rings.note(r, 2n * SOL)]);
-  p.subject.proof = V.toB58(Buffer.from(p.subject.proof, 'hex'));
-  assert.ok(p.subject.proof.length > 64);
+  p.ring.proof = V.toB58(Buffer.from(p.ring.proof, 'hex'));
+  assert.ok(p.ring.proof.length > 64);
   const out = await c.verifier.attest(p);
   assert.equal(out.subjectHash, hex(V.subjectHash(0, r.owner)));
 });

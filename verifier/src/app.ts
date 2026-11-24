@@ -17,7 +17,7 @@ import { Keeper } from './keeper.js';
 import { Relayer } from './relayer.js';
 import { Linker } from './linker.js';
 import { NoteLocks } from './locks.js';
-import { bucket, windowCap } from './limits.js';
+import { bucket, sweepLimits, windowCap } from './limits.js';
 import type { PofChain } from './chain.js';
 import { makeProgramChain } from './program.js';
 
@@ -73,8 +73,8 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
     chain = await makeProgramChain({ web3, rpcUrl: rpcUrls[0], programId: pid, relayer: relayerSigner, verifier: signer, rings });
   }
   const log = new TransparencyLog(store, signer, programId);
-  const keeper = new Keeper(store, sealKey, rings, chain);
   const certifyWindow = BigInt(env.POF_CERTIFY_WINDOW_SLOTS || 300); // the program's max_attest_age
+  const keeper = new Keeper(store, sealKey, rings, chain, certifyWindow);
   const locks = new NoteLocks(store, sha256(text('pof:locks:'), sealKey), certifyWindow, chain);
   const mints: Record<number, string> = { 0: ASSETS[0].mint, 1: env.POF_USDC_MINT || ASSETS[1].mint };
   const verifier = new Verifier({
@@ -87,7 +87,7 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
     dailyCapLamports: BigInt(env.POF_RELAY_DAILY_LAMPORTS ?? 2_000_000_000), balanceFloorLamports: BigInt(env.POF_RELAY_FLOOR_LAMPORTS ?? 50_000_000),
     quoteTtlSec: 1800, free: env.POF_RELAY_FREE === '1', hmacKey: sha256(text('pof:quote:'), sealKey),
   }, store, chain, log) : null;
-  const linker = new Linker(store, (h, exp) => verifier.linkToken(h, exp));
+  const linker = new Linker(store, (h, exp, ctl) => verifier.linkToken(h, exp, ctl));
   ctx = { env, programId, signer, relayerSigner, store, rings, chain, log, keeper, locks, verifier, relayer, linker, sealKey };
   return ctx;
 }
@@ -135,7 +135,7 @@ export const routes = {
     if (req.method !== 'POST') throw new PofError('METHOD', 'GET or POST', 405);
     const who = clientOf(req);
     bucket(`attest:${who}`, 6, 6);
-    await windowCap(c.store, 'attest', who, Number(c.env.POF_ATTEST_PER_10MIN || 30));
+    await windowCap(c.store, 'attest', who, Number(c.env.POF_ATTEST_PER_10MIN || 30), c.sealKey);
     return json(await c.verifier.attest(await body(req)));
   }),
 
@@ -174,9 +174,9 @@ export const routes = {
     if (req.method !== 'POST') throw new PofError('METHOD', 'POST', 405);
     const who = clientOf(req);
     bucket(`link:${who}`, 4, 4);
-    await windowCap(c.store, 'link', who, 20);
+    await windowCap(c.store, 'link', who, 20, c.sealKey);
     const b = await body(req, 2048);
-    return json(await c.linker.start(b.handle));
+    return json(await c.linker.start(b.handle, b.controller));
   }),
 
   /** GET /api/link?id=<link id> → { verified, handle, expiresAt } (the bots and /verify read it) */
@@ -185,8 +185,8 @@ export const routes = {
     bucket(`linkverify:${clientOf(req)}`, 60, 30);
     const id = new URL(req.url).searchParams.get('id') || '';
     const handle = id.split('.')[0] || '';
-    try { c.verifier.checkLinkToken(handle, id); const exp = Number(id.split('.')[1]); return json({ verified: true, handle, expiresAt: exp }); }
-    catch (e: any) { if (e?.code === 'BAD_HANDLE' || e?.code === 'BAD_SUBJECT_PROOF' || e?.code === 'LINK_EXPIRED') return json({ verified: false, handle: handle || null, reason: e.code }); throw e; }
+    try { const controller = c.verifier.checkLinkToken(handle, id); const exp = Number(id.split('.')[2]); return json({ verified: true, handle, controller, expiresAt: exp }); }
+    catch (e: any) { if (['BAD_HANDLE', 'BAD_SUBJECT_PROOF', 'LINK_EXPIRED', 'BAD_BASE58', 'BAD_LENGTH'].includes(e?.code)) return json({ verified: false, handle: handle || null, reason: e.code }); throw e; }
   }),
 
   linkCheck: wrap(async (req) => {
@@ -194,7 +194,7 @@ export const routes = {
     if (req.method !== 'POST') throw new PofError('METHOD', 'POST', 405);
     bucket(`linkcheck:${clientOf(req)}`, 10, 5);
     const b = await body(req, 2048);
-    return json(await c.linker.check(b.handle, b.post));
+    return json(await c.linker.check(b.handle, b.post, b.secret, b.controller));
   }),
 
   /** cron (off before launch: no vercel.json cron entry, and POF_KEEPER_LIVE must be 1) */
@@ -202,7 +202,9 @@ export const routes = {
     const c = await context();
     cronOk(req, c.env);
     if (c.env.POF_KEEPER_LIVE !== '1') return json({ ok: true, skipped: 'the keeper is off before launch (POF_KEEPER_LIVE)' });
-    return json(await c.keeper.scan());
+    const rep = await c.keeper.scan();
+    const swept = await sweepLimits(c.store).catch(() => 0);
+    return json({ ...rep, sweptLimitWindows: swept });
   }),
 
   /** cron: anchors the log head on chain (anchor_log, the §7 signed head) when the log grew since the last anchor */

@@ -8,7 +8,7 @@ const rej = async (p, code) => { try { await p; assert.fail('expected ' + code);
 async function relayed(c) {
   const r = ring(); c.rings.register(r); const ctl = ring();
   const n = c.rings.note(r, 3n * SOL);
-  const link = c.verifier.linkToken('anon', Math.floor(Date.now() / 1000) + 600);
+  const link = c.verifier.linkToken('anon', Math.floor(Date.now() / 1000) + 600, ctl.owner);
   const out = await c.verifier.attest(pkg(c, r, [n], { kind: 1, value: 'anon', proof: link, relay: true, controller: ctl.owner }));
   return { r, n, out };
 }
@@ -80,29 +80,39 @@ test('keeper: kits of attestations that never landed are dropped after expiry; r
   assert.equal(rep.dropped, 1);
 });
 
-test('linker: one-time code, author and code checked through the post, the code burns', async () => {
+test('linker: one-time code redeemed only with its secret, author and code checked, bound to the controller, the code burns', async () => {
   const c = makeCtx();
   let post = null;
-  c.linker = new V.Linker(c.store, (h, e) => c.verifier.linkToken(h, e), async () => ({ status: post ? 200 : 404, json: async () => post ? { code: 200, tweet: post } : { code: 404 } }));
-  const s = await c.linker.start('@AnonWhale');
-  assert.match(s.code, /^pof-[a-z2-9]{8}$/);
-  await rej(c.linker.check('anonwhale', 'not a link'), 'BAD_POST');
-  await rej(c.linker.check('anonwhale', 'https://x.com/anonwhale/status/123456789'), 'POST_NOT_FOUND');
-  post = { text: 'hi ' + s.code, author: { screen_name: 'SomeoneElse' }, created_timestamp: Math.floor(Date.now() / 1000) };
-  await rej(c.linker.check('anonwhale', 'https://x.com/anonwhale/status/123456789'), 'WRONG_AUTHOR');
-  post = { text: 'hi pof-aaaaaaaa', author: { screen_name: 'AnonWhale' }, created_timestamp: Math.floor(Date.now() / 1000) };
-  await rej(c.linker.check('anonwhale', '123456789'), 'CODE_NOT_IN_POST');
-  post = { text: 'Linking: ' + s.code.toUpperCase(), author: { screen_name: 'AnonWhale' }, created_timestamp: Math.floor(Date.now() / 1000) };
-  const ok = await c.linker.check('@ANONWHALE', 'https://twitter.com/AnonWhale/status/123456789?s=20');
-  assert.equal(ok.handle, 'anonwhale');
-  c.verifier.checkLinkToken('anonwhale', ok.link);
-  await rej(c.linker.check('anonwhale', '123456789'), 'NO_CODE');          // burnt
-  // five wrong tries lock the code
-  const s2 = await c.linker.start('other_one');
-  post = { text: 'nope', author: { screen_name: 'other_one' }, created_timestamp: Math.floor(Date.now() / 1000) };
-  for (let i = 0; i < 5; i++) await rej(c.linker.check('other_one', '1234567'), 'CODE_NOT_IN_POST');
-  post = { text: s2.code, author: { screen_name: 'other_one' }, created_timestamp: Math.floor(Date.now() / 1000) };
-  await rej(c.linker.check('other_one', '1234567'), 'TOO_MANY_TRIES');
+  c.linker = new V.Linker(c.store, (h, e, ctl) => c.verifier.linkToken(h, e, ctl), async () => ({ status: post ? 200 : 404, json: async () => post ? { code: 200, tweet: post } : { code: 404 } }));
+  const ctl = ring();
+  const s = await c.linker.start('@AnonWhale', ctl.owner);
+  assert.match(s.code, /^pof-[a-z2-9]{8}$/); assert.match(s.secret, /^[0-9a-f]{32}$/);
+  const now = () => Math.floor(Date.now() / 1000);
+  await rej(c.linker.check('anonwhale', '123456789'), 'NO_SECRET');
+  await rej(c.linker.check('anonwhale', '123456789', 'ab'.repeat(16)), 'NO_CODE');
+  await rej(c.linker.check('anonwhale', 'not a link', s.secret), 'BAD_POST');
+  await rej(c.linker.check('anonwhale', 'https://x.com/anonwhale/status/123456789', s.secret), 'POST_NOT_FOUND');
+  post = { text: 'hi ' + s.code, author: { screen_name: 'SomeoneElse' }, created_timestamp: now() };
+  await rej(c.linker.check('anonwhale', 'https://x.com/anonwhale/status/123456789', s.secret), 'WRONG_AUTHOR');
+  post = { text: 'hi pof-aaaaaaaa', author: { screen_name: 'AnonWhale' }, created_timestamp: now() };
+  await rej(c.linker.check('anonwhale', '123456789', s.secret), 'CODE_NOT_IN_POST');
+  post = { text: 'Linking: ' + s.code.toUpperCase(), author: { screen_name: 'AnonWhale' }, created_timestamp: now() };
+  await rej(c.linker.check('anonwhale', '123456789', s.secret, ring().owner), 'LINK_OTHER_CONTROLLER');
+  const ok = await c.linker.check('@ANONWHALE', 'https://twitter.com/AnonWhale/status/123456789?s=20', s.secret);
+  assert.equal(ok.handle, 'anonwhale'); assert.equal(ok.controller, ctl.owner);
+  assert.equal(c.verifier.checkLinkToken('anonwhale', ok.link, ctl.owner), ctl.owner);
+  await rej(c.linker.check('anonwhale', '123456789', s.secret), 'NO_CODE');          // burnt
+  // a second start does not cancel the first (POF-09)
+  const a1 = await c.linker.start('other_one'); await c.linker.start('other_one');
+  post = { text: a1.post, author: { screen_name: 'other_one' }, created_timestamp: now() };
+  const unb = await c.linker.check('other_one', '1234567', a1.secret);
+  assert.equal(unb.controller, null);
+  // five wrong tries lock a code
+  const s2 = await c.linker.start('third_one');
+  post = { text: 'nope', author: { screen_name: 'third_one' }, created_timestamp: now() };
+  for (let i = 0; i < 5; i++) await rej(c.linker.check('third_one', '1234567', s2.secret), 'CODE_NOT_IN_POST');
+  post = { text: s2.code, author: { screen_name: 'third_one' }, created_timestamp: now() };
+  await rej(c.linker.check('third_one', '1234567', s2.secret), 'TOO_MANY_TRIES');
 });
 
 test('HTTP: routes answer JSON, every rejection has a code, limits answer 429, cron routes need the secret', async () => {
@@ -131,10 +141,11 @@ test('HTTP: routes answer JSON, every rejection has a code, limits answer 429, c
   for (let i = 0; i < 8; i++) last = await V.areas.attest()(req('/api/attest', { method: 'POST', body: '{}', ip: 9 }));
   assert.equal(last.status, 429); assert.ok(last.headers.get('retry-after'));
   // link verify through the rewrite path
-  const link = c.verifier.linkToken('anon', Math.floor(Date.now() / 1000) + 60);
+  const ctlK = ring().owner;
+  const link = c.verifier.linkToken('anon', Math.floor(Date.now() / 1000) + 60, ctlK);
   res = await V.areas.link()(req('/api/link?id=' + encodeURIComponent(link)));
-  assert.deepEqual(await res.json(), { verified: true, handle: 'anon', expiresAt: Number(link.split('.')[1]) });
-  res = await V.areas.link()(req('/api/link/verify?id=anon.1.00'));
+  assert.deepEqual(await res.json(), { verified: true, handle: 'anon', controller: ctlK, expiresAt: Number(link.split('.')[2]) });
+  res = await V.areas.link()(req('/api/link/verify?id=anon.1.1.00'));
   assert.equal((await res.json()).verified, false);
   res = await V.areas.keeper()(req('/api/keeper/scan'));
   assert.equal(res.status, 403);

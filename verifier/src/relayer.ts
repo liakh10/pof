@@ -61,16 +61,7 @@ export class Relayer {
     const logIndex = Number(input.logIndex);
     if (!Number.isInteger(logIndex) || logIndex < 0) throw new PofError('BAD_LOG_INDEX', 'logIndex comes with the attestation');
 
-    let paid: string | null = null;
-    if (!this.cfg.free) {
-      const q = this.parseQuote(input.quote);
-      const inc = await this.chain.incoming(q.slot - 150n);
-      for (const t of inc) {
-        if (t.lamports !== q.lamports) continue;
-        if (await this.store.create(`relay/paid/${t.signature}`, new Uint8Array(Buffer.from(hex(att).slice(0, 64))))) { paid = t.signature; break; }
-      }
-      if (!paid) throw new PofError('NOT_PAID', `no unused payment of exactly ${q.lamports} lamports to ${this.cfg.address} yet; it can take a few seconds to land`, 402);
-    }
+    /* every refusal that does not depend on the payment comes first, so a refused request never uses up a payment (POF-08) */
     const spend = await this.spend();
     const used = spend.reduce((s, [, l]) => s + BigInt(l), 0n);
     const q = await this.chain.quoteLamports();
@@ -78,7 +69,19 @@ export class Relayer {
     if (used + cost > this.cfg.dailyCapLamports) throw new PofError('RELAY_CAP', 'the relayer reached its spend cap for the last 24 hours; your payment stays valid, try later or certify from your own wallet', 429);
     if ((await this.chain.relayerBalance()) < cost + this.cfg.balanceFloorLamports) throw new PofError('RELAY_LOW', 'the relayer is low on SOL; your payment stays valid, try later', 503);
 
-    const r = await this.chain.certify({ attestation: att, signature: sig, verifierKey: this.cfg.verifierKey, logIndex, hashes: sortHashes(hashes) });
+    let paid: string | null = null;
+    if (!this.cfg.free) {
+      const quote = this.parseQuote(input.quote);
+      const inc = await this.chain.incoming(quote.slot - 150n);
+      for (const t of inc) {
+        if (t.lamports !== quote.lamports) continue;
+        if (await this.store.create(`relay/paid/${t.signature}`, new Uint8Array(Buffer.from(hex(att).slice(0, 64))))) { paid = t.signature; break; }
+      }
+      if (!paid) throw new PofError('NOT_PAID', `no unused payment of exactly ${quote.lamports} lamports to ${this.cfg.address} yet; it can take a few seconds to land`, 402);
+    }
+    let r;
+    try { r = await this.chain.certify({ attestation: att, signature: sig, verifierKey: this.cfg.verifierKey, logIndex, hashes: sortHashes(hashes) }); }
+    catch (e) { if (paid) await this.store.del(`relay/paid/${paid}`).catch(() => {}); throw e; } // a failed certify gives the payment back
     spend.push([Math.floor(Date.now() / 1000), String(r.lamports)]);
     await putJson(this.store, 'relay/spend.json', spend);
     return { signature: r.signature, payment: paid, certificate: (await this.chain.certificate(a.subjectHash, a.asset))?.address ?? null };

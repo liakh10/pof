@@ -2,7 +2,7 @@
   "name": "@pof/verifier",
   "version": "0.1.0",
   "private": true,
-  "description": "Proof of Funds Verifier: checks a Privacy Rings disclosure, signs the CONTRACT §3 attestation, appends the transparency log; plus the relayer, the keeper and the X-handle linker.",
+  "description": "Proof of Funds Verifier: checks a Privacy Rings disclosure, signs the CONTRACT \u00a73 attestation, appends the transparency log; plus the relayer, the keeper and the X-handle linker.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -22,5 +22,11 @@
   "devDependencies": {
     "esbuild": "0.28.2",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "uuid": "9.0.1",
+    "rpc-websockets": {
+      "uuid": "9.0.1"
+    }
   }
 }
