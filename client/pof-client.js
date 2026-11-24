@@ -25,7 +25,7 @@ export async function createPofClient(opts = {}) {
     rpc: opts.rpc || ['/api/rpc' + (net === 'mainnet' ? '' : `?net=${net}`)],
     indexer: opts.indexer || (net === 'local' ? null : '/api/spr' + (net === 'mainnet' ? '' : `?net=${net}`)),
     attestUrl: opts.attestUrl || '/api/attest',
-    prover: opts.prover || null,   // the Helius prover URL (spends only); the site serves it behind a proxy that adds the key
+    prover: opts.prover || (net === 'local' ? null : '/api/spr-prover' + (net === 'mainnet' ? '' : `?net=${net}`)),   // spends only; the site's proxy adds the key
     programId: opts.programId || null,
     minAgeSlots: BigInt(opts.minAgeSlots ?? 150),
     tree: C.RINGS.tree,

@@ -3,6 +3,7 @@
 //                                              Helius with a key from ~/.config/helius/site_keys (never sent to the page).
 //                                              Mainnet is read-only here: sendTransaction, requestAirdrop and simulate are refused.
 //   POST /api/spr/<method>?net=devnet|mainnet  the Rings indexer proxy (client/server/spr-proxy.js)
+//   ANY  /api/spr-prover/<route>?net=           the Rings prover proxy (same file), for withdrawals
 //   POST /api/attest                           the real Verifier (verifier/dist) over LocalRings on the local clone, with a
 //                                              throwaway signing key made at start; local network only
 //   GET  /lab/cloned-tree                      the tree account bytes the local validator was started with (base64)
@@ -18,7 +19,7 @@ const port = Number(process.argv[process.argv.indexOf('--port') + 1]) || 5491;
 const LOCAL = process.env.POF_LOCAL_RPC || 'http://127.0.0.1:35899';
 const PROGRAM = process.env.POF_PROGRAM || 'pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT';
 const keys = (() => { try { return fs.readFileSync(process.env.HOME + '/.config/helius/site_keys', 'utf8').split('\n').map(s => s.trim()).filter(Boolean); } catch { return []; } })();
-const { sprProxy } = await import('../client/server/spr-proxy.js');
+const { sprProxy, proverProxy } = await import('../client/server/spr-proxy.js');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.wasm': 'application/wasm', '.json': 'application/json', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8' };
 const clonedFile = path.join(here, 'rings-local/.run/cloned-tree.b64');
 
@@ -56,8 +57,14 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const send = (status, body, type = 'application/json') => { res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' }); res.end(body); };
   try {
-    const body = await new Promise(r => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => r(b)); });
+    const bodyBuf = await new Promise(r => { const parts = []; req.on('data', c => parts.push(c)); req.on('end', () => r(Buffer.concat(parts))); });
+    const body = bodyBuf.toString('utf8');
     if (url.pathname === '/api/rpc' && req.method === 'POST') { const r = await rpcProxy(url.searchParams.get('net') || 'local', body); return send(r.status, r.body); }
+    if (url.pathname.startsWith('/api/spr-prover/')) {
+      const hdr = new Headers(); for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') hdr.set(k, v);
+      const r = await proverProxy(new Request(url.href, { method: req.method, headers: hdr, body: req.method === 'POST' ? bodyBuf : undefined }), { keys, route: url.pathname.slice('/api/spr-prover'.length) });
+      const out = {}; r.headers.forEach((v, k) => (out[k] = v)); res.writeHead(r.status, out); return res.end(Buffer.from(await r.arrayBuffer()));
+    }
     if (url.pathname.startsWith('/api/spr/')) {
       const r = await sprProxy(new Request(url.href, { method: req.method, headers: { 'content-type': 'application/json' }, body: req.method === 'POST' ? body : undefined }), { keys });
       return send(r.status, await r.text());

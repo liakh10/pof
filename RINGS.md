@@ -275,11 +275,19 @@ loads only for a withdrawal. The bundle needs a secure context (https or localho
 transactions are legacy messages (every wallet signs them); only a withdrawal is a version 1 transaction, signed by the vault
 key in the page. In headless Chrome the hasher was ready about 0.4 s after the page asked for it (localhost).
 
-**Production wiring the site needs** (not in rings' folders): `api/spr/[method].js` over `client/server/spr-proxy.js` with
-`HELIUS_KEYS`, a prover proxy for withdrawals (the prover's TEE channel is end-to-end encrypted, so a byte-for-byte proxy is
-safe), and `/api/rpc`.
+**Production proxies** (rings owns them): `api/spr/[method].js` → `client/server/spr-proxy.js`.
+`POST /api/spr/<method>[?net=devnet]` passes only the seven indexer read methods; `/api/spr-prover/<route>[?net=devnet]`
+(rewritten in `vercel.json` to `/api/spr/prover?path=`) passes only `/attestation`, `/health`, `/proving-keys`,
+`/prove/<key>[/status|/indexed]` with the `Spr-Tee*` headers both ways, bytes unread (the SDK encrypts to the enclave).
+Keys: Vercel env `HELIUS_KEYS` (comma separated) or `HELIUS_API_KEY`; a 429/5xx rotates to the next key; the key is
+scrubbed from every answer. Brakes per caller address and function instance: 240 indexer reads and 300 prover calls a
+minute, 256 KB and 4 MB bodies, 25 s upstream timeout. Proven: `client/test/proxy.test.mjs` (stubbed, 6),
+`client/test/proxy-live.mjs` (devnet + mainnet through the lab server: the SDK attests the Nitro prover and reads the
+indexer, 5/5), `lab/test/prover-browser.mjs` (the same attestation inside headless Chrome, signed TEE policy fetched by the
+page: devnet 0.9 s, mainnet 0.5 s). `/api/rpc` is not rings' (the site's RPC proxy).
 
 ## Changes
 - 2026-11-25 · rings · first version.
 - 2026-11-25 · rings · §8: the prover attests on mainnet and devnet with the key in the prover URL; devnet runs the full stack.
 - 2026-11-25 · rings · §10: the client, the lab, the local validator, the size budget.
+- 2026-11-25 · rings · §10: the production indexer and prover proxies (api/spr), with limits and tests.

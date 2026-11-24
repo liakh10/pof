@@ -39,9 +39,17 @@
     "api/status/sample.js": {
       "maxDuration": 60,
       "includeFiles": "{sdk/dist/**,sdk/package.json,verifier/dist/BUILD.json}"
+    },
+    "api/spr/[method].js": {
+      "maxDuration": 60,
+      "includeFiles": "client/server/spr-proxy.js"
     }
   },
   "rewrites": [
+    {
+      "source": "/api/spr-prover/:path*",
+      "destination": "/api/spr/prover?path=:path*"
+    },
     {
       "source": "/v1",
       "destination": "/api/v1?path="
