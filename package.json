@@ -1,0 +1,7 @@
+{
+  "name": "pof",
+  "private": true,
+  "type": "module",
+  "description": "Proof of Funds: one repo for the program, verifier, client, API, SDK, MCP server, bots and site",
+  "engines": { "node": ">=20" }
+}

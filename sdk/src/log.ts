@@ -124,8 +124,20 @@ export interface SignedTreeHead {
   verifierKey: string;
 }
 
+/** A verifier key given as base58 or as 64 hex characters. */
+export function keyBytes(k: string): Uint8Array {
+  return /^(0x)?[0-9a-fA-F]{64}$/.test(k) ? fromHex(k) : toAddressBytes(k);
+}
+const sameKey = (a: string, b: string) => {
+  try {
+    return encodeBase58(keyBytes(a)) === encodeBase58(keyBytes(b));
+  } catch {
+    return false;
+  }
+};
+
 export function verifyTreeHead(sth: SignedTreeHead, programId: AddressLike): Promise<boolean> {
-  return ed25519Verify(toAddressBytes(sth.verifierKey), treeHeadMessage(programId, sth.treeSize, sth.rootHash), fromHex(sth.signature));
+  return ed25519Verify(keyBytes(sth.verifierKey), treeHeadMessage(programId, sth.treeSize, sth.rootHash), fromHex(sth.signature));
 }
 
 export interface LogLeaf {
@@ -190,7 +202,7 @@ export async function verifyLogEntry(args: {
   if (args.head) {
     const trusted = args.trustedKeys ?? [leaf.verifierKey];
     checks.headSigned =
-      trusted.includes(args.head.verifierKey) &&
+      trusted.some((k) => sameKey(k, args.head!.verifierKey)) &&
       args.head.treeSize === args.proof.treeSize &&
       args.head.rootHash.toLowerCase() === args.proof.rootHash.toLowerCase() &&
       (await verifyTreeHead(args.head, leaf.attestation.programId));

@@ -117,8 +117,20 @@ export async function verifyConsistency(args) {
 export function treeHeadMessage(programId, treeSize, rootHash) {
     return concat(utf8("POF-STH1"), toAddressBytes(programId), u64le(treeSize), h(rootHash));
 }
+/** A verifier key given as base58 or as 64 hex characters. */
+export function keyBytes(k) {
+    return /^(0x)?[0-9a-fA-F]{64}$/.test(k) ? fromHex(k) : toAddressBytes(k);
+}
+const sameKey = (a, b) => {
+    try {
+        return encodeBase58(keyBytes(a)) === encodeBase58(keyBytes(b));
+    }
+    catch {
+        return false;
+    }
+};
 export function verifyTreeHead(sth, programId) {
-    return ed25519Verify(toAddressBytes(sth.verifierKey), treeHeadMessage(programId, sth.treeSize, sth.rootHash), fromHex(sth.signature));
+    return ed25519Verify(keyBytes(sth.verifierKey), treeHeadMessage(programId, sth.treeSize, sth.rootHash), fromHex(sth.signature));
 }
 export function parseLeaf(leaf) {
     const b = h(leaf);
@@ -160,7 +172,7 @@ export async function verifyLogEntry(args) {
     if (args.head) {
         const trusted = args.trustedKeys ?? [leaf.verifierKey];
         checks.headSigned =
-            trusted.includes(args.head.verifierKey) &&
+            trusted.some((k) => sameKey(k, args.head.verifierKey)) &&
                 args.head.treeSize === args.proof.treeSize &&
                 args.head.rootHash.toLowerCase() === args.proof.rootHash.toLowerCase() &&
                 (await verifyTreeHead(args.head, leaf.attestation.programId));

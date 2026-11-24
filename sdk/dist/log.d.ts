@@ -33,6 +33,8 @@ export interface SignedTreeHead {
     signature: Hex;
     verifierKey: string;
 }
+/** A verifier key given as base58 or as 64 hex characters. */
+export declare function keyBytes(k: string): Uint8Array;
 export declare function verifyTreeHead(sth: SignedTreeHead, programId: AddressLike): Promise<boolean>;
 export interface LogLeaf {
     version: number;

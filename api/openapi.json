@@ -1,0 +1,878 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Proof of Funds API",
+    "version": "1.0.0",
+    "description": "Read-only, cached, CORS-open JSON over the pof and pof_gate programs on Solana and the Verifier's transparency log. Everything here can also be read straight from chain with @pof/sdk; the API is a convenience, not a trust point.",
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "/v1",
+      "description": "this deployment"
+    }
+  ],
+  "paths": {
+    "/certificates/{subject}": {
+      "get": {
+        "operationId": "getCertificates",
+        "summary": "Certificates of one subject",
+        "description": "`subject` is `@handle`, `x:handle`, `wallet:<base58>`, `badge:<base58>`, a bare base58 key (tried as wallet and as badge), or a 64-hex subject hash. Every asset is returned unless `asset` is set. With `asset` and `minTier`, the answer carries a `check` you can gate on.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "examples": {
+              "handle": {
+                "value": "@anon"
+              },
+              "wallet": {
+                "value": "wallet:7Xf...base58"
+              }
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SOL",
+                "USDC",
+                "0",
+                "1"
+              ]
+            }
+          },
+          {
+            "name": "minTier",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "found or not (an empty list is not an error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "query",
+                    "slot",
+                    "subjects",
+                    "live",
+                    "certificates"
+                  ],
+                  "properties": {
+                    "query": {
+                      "type": "string"
+                    },
+                    "slot": {
+                      "type": "integer"
+                    },
+                    "subjects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "value": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "subjectHash": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "live": {
+                      "type": "boolean",
+                      "description": "true when at least one certificate is live"
+                    },
+                    "certificates": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Certificate"
+                      }
+                    },
+                    "check": {
+                      "type": "object",
+                      "properties": {
+                        "asset": {
+                          "type": "string"
+                        },
+                        "minTier": {
+                          "type": "integer"
+                        },
+                        "minTierLabel": {
+                          "type": "string"
+                        },
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "ok",
+                            "no_certificate",
+                            "below_tier",
+                            "revoked_spent",
+                            "revoked_by_holder",
+                            "expired"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    },
+    "/certificates": {
+      "get": {
+        "operationId": "listCertificates",
+        "summary": "List certificates",
+        "parameters": [
+          {
+            "name": "asset",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SOL",
+                "USDC",
+                "0",
+                "1"
+              ]
+            }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "description": "exact tier"
+          },
+          {
+            "name": "minTier",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "live",
+                "revoked_spent",
+                "revoked_by_holder",
+                "expired",
+                "any"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "wallet",
+                "x",
+                "badge"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "nextCursor from the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "slot",
+                    "total",
+                    "certificates"
+                  ],
+                  "properties": {
+                    "slot": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "cursor": {
+                      "type": "integer"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "certificates": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Certificate"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    },
+    "/rooms": {
+      "get": {
+        "operationId": "listRooms",
+        "summary": "Every pof_gate room",
+        "responses": {
+          "200": {
+            "description": "rooms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rooms": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RoomSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    },
+    "/rooms/{room}": {
+      "get": {
+        "operationId": "getRoom",
+        "summary": "A room with its members and their live status",
+        "parameters": [
+          {
+            "name": "room",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "the Room account address"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "room",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/RoomSummary"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "slot": {
+                          "type": "integer"
+                        },
+                        "liveMembers": {
+                          "type": "integer"
+                        },
+                        "members": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "address": {
+                                "type": "string"
+                              },
+                              "subjectHash": {
+                                "type": "string"
+                              },
+                              "certificate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "certificateStatus": {
+                                "type": "string",
+                                "enum": [
+                                  "live",
+                                  "revoked_spent",
+                                  "revoked_by_holder",
+                                  "expired",
+                                  "missing"
+                                ]
+                              },
+                              "tier": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "live": {
+                                "type": "boolean",
+                                "description": "the certificate is live AND meets the room's asset and tier"
+                              },
+                              "joinedSlot": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "operationId": "getStats",
+        "summary": "Counters for the wall and the status page",
+        "responses": {
+          "200": {
+            "description": "stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer"
+                    },
+                    "live": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "revoked": {
+                      "type": "integer"
+                    },
+                    "revokedSpent": {
+                      "type": "integer"
+                    },
+                    "revokedByHolder": {
+                      "type": "integer"
+                    },
+                    "expired": {
+                      "type": "integer"
+                    },
+                    "solCertified": {
+                      "type": "number",
+                      "description": "sum of the tier minimums of live SOL certificates (never an amount held)"
+                    },
+                    "usdcCertified": {
+                      "type": "number"
+                    },
+                    "byAsset": {
+                      "type": "object"
+                    },
+                    "bySubjectKind": {
+                      "type": "object"
+                    },
+                    "log": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "treeSize": {
+                          "type": "integer"
+                        },
+                        "rootHash": {
+                          "type": "string"
+                        },
+                        "signatureValid": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    },
+    "/log/head": {
+      "get": {
+        "operationId": "getLogHead",
+        "summary": "The signed tree head of the transparency log",
+        "responses": {
+          "200": {
+            "description": "head",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedTreeHead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    },
+    "/log/proof/{id}": {
+      "get": {
+        "operationId": "getLogProof",
+        "summary": "One log entry with its RFC 9162 inclusion proof against the current signed head, verified",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "the leaf index (a certificate's logIndex)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "entry and proof",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer"
+                    },
+                    "leaf": {
+                      "type": "string",
+                      "description": "345 bytes hex (CONTRACT §7)"
+                    },
+                    "leafHash": {
+                      "type": "string"
+                    },
+                    "attestation": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "description": "the parsed §3 attestation inside the leaf"
+                    },
+                    "proof": {
+                      "type": "object",
+                      "properties": {
+                        "treeSize": {
+                          "type": "integer"
+                        },
+                        "rootHash": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "head": {
+                      "$ref": "#/components/schemas/SignedTreeHead"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    },
+                    "checks": {
+                      "type": "object",
+                      "properties": {
+                        "leafParses": {
+                          "type": "boolean"
+                        },
+                        "attestationSigned": {
+                          "type": "boolean"
+                        },
+                        "included": {
+                          "type": "boolean"
+                        },
+                        "headSigned": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ]
+                        },
+                        "programMatches": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Certificate": {
+        "type": "object",
+        "required": [
+          "address",
+          "kind",
+          "subjectHash",
+          "asset",
+          "tier",
+          "tierLabel",
+          "status",
+          "live",
+          "certifiedSlot",
+          "expirySlot"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "the Certificate PDA [\"cert\", subject_hash, [asset]]"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "the subject as you asked for it (wallet, handle or badge key); null in lists, since the chain stores only its hash"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "wallet",
+              "x",
+              "badge"
+            ]
+          },
+          "subjectHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "asset": {
+            "type": "string",
+            "enum": [
+              "SOL",
+              "USDC"
+            ]
+          },
+          "assetId": {
+            "type": "integer"
+          },
+          "tier": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "tierLabel": {
+            "type": "string",
+            "examples": [
+              "≥ 1,000 SOL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "live",
+              "revoked_spent",
+              "revoked_by_holder",
+              "expired"
+            ],
+            "description": "status at `slot`: a live certificate past its expiry slot reads expired before anyone calls expire"
+          },
+          "statusOnChain": {
+            "type": "string",
+            "enum": [
+              "live",
+              "revoked_spent",
+              "revoked_by_holder",
+              "expired"
+            ]
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "certifiedSlot": {
+            "type": "integer"
+          },
+          "expirySlot": {
+            "type": "integer"
+          },
+          "revokedSlot": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "logIndex": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "the transparency log entry of the attestation"
+          },
+          "noteCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "payer": {
+            "type": "string"
+          },
+          "verifierKey": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SignedTreeHead": {
+        "type": "object",
+        "required": [
+          "treeSize",
+          "rootHash",
+          "signature",
+          "verifierKey"
+        ],
+        "properties": {
+          "treeSize": {
+            "type": "integer"
+          },
+          "rootHash": {
+            "type": "string"
+          },
+          "slot": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "signature": {
+            "type": "string",
+            "description": "ed25519 over \"POF-STH1\" ‖ program_id ‖ tree_size u64 LE ‖ root_hash (80 bytes)"
+          },
+          "verifierKey": {
+            "type": "string"
+          },
+          "signatureValid": {
+            "type": "boolean",
+            "description": "checked by this API; check it yourself with @pof/sdk verifyTreeHead"
+          },
+          "programId": {
+            "type": "string"
+          }
+        }
+      },
+      "RoomSummary": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "creator": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset": {
+            "type": "string"
+          },
+          "minTier": {
+            "type": "integer"
+          },
+          "minTierLabel": {
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer"
+          },
+          "createdSlot": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "the request cannot be read; error.code says why",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "nothing there",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Upstream": {
+        "description": "the Solana RPC or the transparency log did not answer; retry",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}
