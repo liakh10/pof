@@ -29,7 +29,7 @@ by default and never discloses the key of your main ring.
 
 **The Verifier also learns who goes with what.** One request names the subject and the vault; the vault's funding
 deposit is public on chain and names the wallet that made it. So the Verifier operator can link subject, vault and
-funding wallet for every certificate it signs, and the relayer can link each relay credit to the vault that bought it.
+funding wallet for every certificate it signs, and, until relay credits are used in their blind form, the relayer can link each credit to the vault that bought it.
 The vault isolates the nullifier key, not identity: it is linked to the funding wallet in public anyway
 ([Privacy guidance](privacy), "What still links").
 
