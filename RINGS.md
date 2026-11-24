@@ -286,8 +286,33 @@ minute, 256 KB and 4 MB bodies, 25 s upstream timeout. Proven: `client/test/prox
 indexer, 5/5), `lab/test/prover-browser.mjs` (the same attestation inside headless Chrome, signed TEE policy fetched by the
 page: devnet 0.9 s, mainnet 0.5 s). `/api/rpc` is not rings' (the site's RPC proxy).
 
+## 11. The client API, for the site's /get page
+```js
+import { createPofClient, explain } from '/client/pof-client.js';
+const pof = await createPofClient({ network: 'mainnet', programId });     // rpc /api/rpc, indexer /api/spr, prover /api/spr-prover
+pof.onStatus(s => …);            // { step, phase, … } — steps: hasher, vault, ring, register, shield, sync, age, delay, subject,
+                                 // attest, relay, credits, withdraw, transfer; pof.progress() = { hasher, last }
+await pof.ready();               // the hasher: phases fetching → verifying → compiling → ready (fromCache on later visits)
+await pof.connect();             // the wallet picker (any number of wallets, deep links on phones)
+await pof.deriveVault({ passphrase? });   // VAULT_LOCKED / PASSPHRASE_NEEDED { nonDeterministic | migrate } ask for a passphrase
+await pof.register('vault');     // once; 0.00116 SOL rent
+await pof.shield({ asset: 0 | 1, amount: '12.5' });        // VAULT_BACKUP_NEEDED until kits.download() for a random key
+const list = await pof.notes();  const pick = await pof.choose({ asset, tier, list });   // ready | waitSlots, readyAtSlot | short
+const pv = await pof.privacy({ subjectKind, pick });       // { ok, needsConsent, warnings: [{ code, level, text }] }
+await pof.waitForAge({ asset, tier, signal });              // countdown in status('age')
+await pof.linkStart({ handle }) → post it → await pof.linkCheck({ handle, post })   // X subjects; the secret stays in the tab
+await pof.certify({ asset, tier, subjectKind, handle, linkId, delaySlots, allowWalletPayer, payNow });
+await pof.credits.buy({ count }); await pof.credits.count();                 // relay credits (private transfer)
+pof.kits.list(); await pof.kits.download({ passphrase? }); await pof.kits.import(text, { passphrase });
+await pof.controllerOf(kit);     // the key for revoke_by_holder and room joins
+explain(error)                   // { code, title, action, retry, silent, waitSlots? } for every refusal
+```
+Wallet (subject 0) certificates return the attestation for the holder's wallet to submit with the program's `certify`;
+X and badge certificates are submitted by the relayer.
+
 ## Changes
 - 2026-11-25 · rings · first version.
 - 2026-11-25 · rings · §8: the prover attests on mainnet and devnet with the key in the prover URL; devnet runs the full stack.
 - 2026-11-25 · rings · §10: the client, the lab, the local validator, the size budget.
 - 2026-11-25 · rings · §10: the production indexer and prover proxies (api/spr), with limits and tests.
+- 2026-11-25 · rings · §11: the client API for /get.
