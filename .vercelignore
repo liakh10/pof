@@ -1,2 +1,14 @@
 # never deployed: the lab harness (a local tool; audit POF-27 keeps it off the production origin)
 lab/
+# lead (deploy): build artefacts and heavy research folders never ship
+program/target/
+program/test-ledger/
+program/node_modules/
+zk/
+fuzz/
+audit/
+bench/
+examples/*/target/
+*.so
+*.ptau
+*.zkey
