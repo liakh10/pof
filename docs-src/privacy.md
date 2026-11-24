@@ -78,6 +78,14 @@ the keeper's sealed pairs, and rate-limit counters named by a keyed hash of the 
 keeper). Phase 2 removes the operator's view of amounts and `nk`
 ([Phase 2](phase-2)); it does not remove the host's view of your IP. Use the network path you trust.
 
+## The log is a permanent history
+
+The transparency log holds no amounts, but it holds one entry for **every attestation the Verifier signs, including the
+ones you never submit**: the subject hash, asset, tier, issue slot, payer and controller. The public escrow listing keeps
+the same certificates' (sealed) revoke pairs. Nothing is removed. A handle's subject hash is not secret (anyone can hash a
+list of handles and compare), so for an X handle the log shows that you asked, when, and every tier you held, for good.
+If a handle must not be seen asking, do not attest for it: there is no "try and cancel" that leaves no record.
+
 ## What still links, in one list
 
 Even when every habit above is followed:
@@ -86,6 +94,7 @@ Even when every habit above is followed:
   hidden);
 - **subject, vault and wallet, for the operator**: the Verifier learns them together at attest time, and the relayer
   sees which vaults buy credits (not which certificate each credit later pays for);
+- **a handle and its certificate history, in public, forever**: through the transparency log (above);
 - **a certificate and its vault, in public, after a revocation by spend**: the revealed nullifier matches a spend the
   vault signed. Revoke first, then move, and this one does not happen.
 

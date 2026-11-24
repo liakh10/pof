@@ -71,8 +71,8 @@ No. `revoke_spent` needs a salted nullifier that matches one stored on the certi
 accounts that it is spent. Only the controller can revoke it otherwise.
 
 **How long does a certificate last?**
-Until it is revoked, or until its expiry slot: 216,000 slots after the Verifier signed by default (the program allows up to
-6,480,000). `renew` re-checks the same notes and extends it; short validity is what keeps a certificate from outliving
+Until it is revoked, or until its expiry slot: 216,000 slots after the Verifier signed (the launch value; the program never
+allows more than 1,512,000). `renew` re-checks the same notes and extends it; short validity is what keeps a certificate from outliving
 its money if no keeper is watching.
 
 **Why a separate vault and not my main ring?**

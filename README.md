@@ -103,7 +103,12 @@ Environment for the functions (Vercel, or a local `.env` you do not commit): `SO
 |---|---|
 | [`reports/devx.md`](reports/devx.md) | SDK, read API, MCP server, bots, and their run against a local validator |
 | [`reports/rings.md`](reports/rings.md) | the browser client, the lab and the local end-to-end against the real Verifier |
+| [`reports/program.md`](reports/program.md) | the programs: unit tests, the local-validator suite, wind-down, rehearsal, own-CA, compute units, rent |
+| [`reports/verifier.md`](reports/verifier.md) | the Verifier, the log, the relayer, the keeper, the linker, and the local end-to-end |
+| [`reports/zk.md`](reports/zk.md) | phase 2: circuit parity, constraints, the development setup, the browser prover |
 | [`reports/audit.md`](reports/audit.md) | the internal security review: scope, method, findings with status and failing tests |
+| [`reports/audit2.md`](reports/audit2.md) | the second internal review, with failing tests in `audit2/test/` |
+| fuzz and property tests | the programs under random and hostile instruction sequences: `fuzz/` (report `reports/fuzz.md` when published) |
 
 Other parts publish their reports in `reports/` as they land; the [changelog](CHANGELOG.md) lists each one.
 

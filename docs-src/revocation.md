@@ -11,7 +11,8 @@ A certificate ends in one of three ways. Each one is an instruction anyone can c
 | how | who | when | what becomes public |
 |---|---|---|---|
 | `revoke_spent` | anyone holding a disclosed note's salt and nullifier | a disclosed note is spent on the Rings program | that note's salt and nullifier (status 1) |
-| `revoke_by_holder` | the certificate's controller | any time | nothing beyond the revocation (status 2) |
+| `revoke_by_holder` | the certificate's controller, signing the transaction | any time | nothing beyond the revocation (status 2) |
+| `revoke_signed` | anyone (normally the relayer) submitting the controller's signed revoke statement | any time, until the statement's `valid_until` slot | the same as `revoke_by_holder` (status 2) |
 | `expire` | anyone | after `expiry_slot` (or during the wind-down) | nothing; the account closes and its rent goes back to its payer |
 
 A certificate whose status byte is still "live" but whose `expiry_slot` has passed reads as **expired** everywhere (the
@@ -31,7 +32,9 @@ program: 11 bytes, first byte 8. The program checks the account at that address 
 **(b) The nullifier tree.** The pool may later close nullifier PDAs once their batch is folded into the indexed nullifier
 tree (height 40). Then the caller passes `membership = { leaf_index, next_value, path }`: the leaf
 `Poseidon(nullifier, next_value)` and its siblings must hash to one of the 100 nullifier roots stored at offset 17,232 of
-the tree account. About 35,000 compute units with the Poseidon syscall.
+the tree account. About 35,000 compute units with the Poseidon syscall. A full 40-level path does not fit a legacy
+transaction; a staged variant that writes the path into a buffer account over two transactions (`open_path`,
+`stage_path`, `revoke_spent_staged`) is being added to the program (CONTRACT §5 (b')).
 
 An absent or closed PDA is never read as "unspent"; there is no path that trusts a statement from the Verifier or from us.
 
@@ -80,6 +83,23 @@ that transaction to confirm, and only then spend.
 The controller signs `revoke_by_holder`. For a wallet certificate the controller is the wallet; for a badge it is the badge
 key (kept in the sealed kit); for an X handle it is the key the client rebuilds from the vault seed. Status becomes 2, the
 revoked slot is set, the Treasury's live count and live tier sum go down.
+
+## revoke_signed: a holder's revoke with no wallet in it
+
+For a handle or badge certificate, signing `revoke_by_holder` as a transaction would need the controller key to hold SOL
+for the fee, and whoever funds it appears in public. `revoke_signed` avoids that. The controller signs, with ed25519,
+only these 156 bytes (CONTRACT §5):
+
+```
+"POF-REVOKE1" (11) ‖ program id (32) ‖ certificate address (32) ‖ subject hash (32) ‖ asset (1) ‖
+nullset_hash (32) ‖ issued_slot (u64) ‖ valid_until (u64)
+```
+
+Anyone may submit them in an Ed25519 instruction followed by `revoke_signed(valid_until)`, and pay the fee; the relayer
+does it at `POST /api/relay/revoke` after checking the signature against the certificate's controller. The statement
+names the certificate's own values, so it cannot revoke a renewed or remade certificate, and it is refused once the slot
+is past `valid_until` (the client suggests the current slot plus 1,500), so a signed revoke cannot be held back and used
+later.
 
 ## expire
 

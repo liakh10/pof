@@ -163,7 +163,7 @@ Then it signs, with ed25519, exactly these bytes (CONTRACT §3):
 | 111 | 1 | note count |
 | 112 | 32 | `nullset_hash` |
 | 144 | 8 | issued slot (the slot the Verifier read) |
-| 152 | 8 | expiry slot (issued + 216,000 by default; the program accepts at most `validity_slots`, 6,480,000) |
+| 152 | 8 | expiry slot (issued + `validity_slots`: 216,000 at launch, never more than 1,512,000) |
 | 160 | 32 | payer |
 | 192 | 32 | controller |
 | 224 | 16 | random nonce |
@@ -202,7 +202,7 @@ Verifier key in Config and whose message equals the rebuilt bytes. It also check
 - kinds 0 and 2: the subject hash is the §1 hash of the controller; kind 1: the controller is not the default key;
 - the asset is enabled and the tier exists in its table; 1 to 8 salted hashes, strictly ascending;
 - `issued_slot ≤ now`, `now − issued_slot ≤ 300`; `root_slot ≤ issued_slot`, `issued_slot − root_slot ≤ 9,000`;
-  `issued_slot < expiry_slot ≤ issued_slot + 6,480,000`, `expiry_slot > now`;
+  `issued_slot < expiry_slot ≤ issued_slot + validity_slots` (216,000 at launch, capped at 1,512,000), `expiry_slot > now`;
 - not paused, not winding down;
 - an existing certificate account is replaced only if it is no longer live and the new attestation is newer; its rent goes
   back to its previous payer.

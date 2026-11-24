@@ -40,6 +40,14 @@ fact: every attestation the Verifier signs is in the public [transparency log](t
 code that signed it is in each entry. The log does not prevent a false attestation; it makes one permanent and
 attributable. Phase 2 removes the Verifier's view entirely ([Phase 2](phase-2)).
 
+**The log and the escrow keep every attempt.** Every attestation the Verifier signs is appended to the public
+transparency log, and its revoke pairs to the public (sealed) escrow listing, **including attestations that were never
+submitted on chain**. Each entry carries the subject hash, the asset, the tier, the issue slot, the payer and the
+controller, and the log is never pruned. An X-handle subject hash is `sha256("pof:x:" ‖ handle)`, which anyone can
+reverse by hashing a list of handles. So the log shows, permanently, that a handle asked for a certificate (even one it
+never submitted) and every tier it held through renewals and remakes, long after the certificate ended (internal review
+finding A2-06).
+
 ## 2. The Verifier's signing key and the program admin
 
 The program accepts attestations signed by one ed25519 key at a time, stored in its `Config`. The admin can:
@@ -47,7 +55,8 @@ The program accepts attestations signed by one ed25519 key at a time, stored in 
 - **pause** certify and renew at once (`set_paused`), for a leaked key; revocation and expiry never pause;
 - **propose a new key** (`set_verifier`), which takes over only after a delay counted in slots (216,000 slots at launch,
   never fewer than 9,000), so a key cannot be swapped in quietly; anyone can read the pending key and its slot in `Config`;
-- set the fee, up to a hard cap of 0.25 SOL per certify or renew, and enable or disable an asset. A tier table, once set,
+- set the fee, up to a hard cap of 0.25 SOL per certify or renew; set the validity between 9,000 and 1,512,000 slots;
+  enable or disable an asset. A tier table, once set,
   cannot be changed, so an issued tier never changes meaning.
 
 The admin cannot sign attestations. The `pof` program is deployed with the upgradeable loader, and its upgrade
@@ -84,8 +93,9 @@ interval plus one transaction. If the keeper stopped, a spent certificate would 
 **Before launch the keeper is off.**
 
 What limits this:
-- certificates are short-lived: the Verifier issues them for 216,000 slots by default (the program allows up to
-  `validity_slots`, 6,480,000 in the launch Config), and `renew` on the same notes re-checks them and extends them;
+- certificates are short-lived: `validity_slots` is 216,000 in the launch Config (the admin can set it between 9,000 and
+  1,512,000, the program's hard cap), the Verifier issues for 216,000 by default, and `renew` on the same notes re-checks
+  them and extends them;
 - the kits are escrowed to every registered keeper, so one stopped operator does not keep spent certificates alive once
   a second keeper is registered;
 - the [status page](status) publishes our keeper's last run in slots, so a stopped keeper is visible.

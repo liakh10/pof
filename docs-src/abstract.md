@@ -33,6 +33,7 @@ zero-knowledge proof.
 |---|---|
 | The subject (wallet, or the hash of an X handle, or a badge key) | everyone (an X handle is stored as a hash, but anyone can hash a handle and compare) |
 | The asset and the tier | everyone |
+| Every attestation the Verifier signs, submitted or not, with its subject hash, tier and slots | everyone, permanently, in the transparency log |
 | The slots it was issued at, expires at, was revoked at | everyone |
 | How many notes back it (1 to 8) | everyone |
 | The payer (the wallet itself, or the relayer for handles and badges) and the controller key | everyone |

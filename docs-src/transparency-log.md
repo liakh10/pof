@@ -25,7 +25,9 @@ later submits it. A leaf is exactly 377 bytes (CONTRACT §7):
 | 369 | 8 | the slot the Verifier read when it appended the entry |
 
 No amounts, no openings, no nullifiers, no salts. The attestation carries the salted `nullset_hash`, which cannot be tested
-against a nullifier without the salts.
+against a nullifier without the salts. It does carry the subject hash, the asset, the tier, the slots, the payer and the
+controller, for every attestation, including ones never submitted; an X handle's subject hash can be reversed with a list
+of handles ([Privacy guidance](privacy), "The log is a permanent history").
 
 ## How it is built
 

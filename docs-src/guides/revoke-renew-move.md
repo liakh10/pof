@@ -27,9 +27,9 @@ and choose revoke. The certificate's **controller** signs:
 
 Revoking reveals no secret. It is the step to take **before** you move funds behind a handle or badge certificate (see
 below). Every transaction also needs an account that pays its network fee, and that account appears in the
-transaction. For a handle or badge certificate, the relayer can send the revocation for you: the controller key signs
-a revoke statement in the page and the relayer pays the fee, so no wallet appears (this needs the program's signed revoke,
-which is being added; until then the page tells you which account pays before you confirm).
+transaction. For a handle or badge certificate, the relayer sends the revocation for you: the controller key signs a short revoke
+statement in the page, valid for a short window of slots, and the relayer submits it and pays the fee, so no wallet
+appears (`revoke_signed`, see [Revocation](../revocation)).
 
 If you lost the kit, you can still revoke a wallet certificate (the wallet is the controller) and a handle certificate
 (the controller comes back from the vault); a badge's key lives only in the kit.

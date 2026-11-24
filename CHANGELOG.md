@@ -10,13 +10,14 @@ the first release of each will move its section under a version heading with its
 | program (`pof`, `pof_gate`) | 0.1.0 | `program/` |
 | verifier (Verifier, log, relayer, keeper, X linker) | 0.1.0 | `verifier/`, `api/attest`, `api/relay`, `api/link`, `api/keeper` |
 | client | 0.1.0 | `client/`, `lab/` |
-| sdk (`@pof/sdk`) | 0.1.0 | `sdk/` |
+| sdk (`@pof/sdk`) | 0.2.0 | `sdk/` |
 | api (`/v1`, `/api/status`, `/api/spr`) | 0.1.0 | `api/` |
 | mcp | 0.1.0 | `mcp/` |
 | bots | 0.1.0 | `bots/` |
 | witness and cli | 0.1.0 | `witness/`, `cli/` |
 | contract | §1 to §8 | `CONTRACT.md`, `RINGS.md` |
 | embed (`<pof-badge>`) | 0.1.0 | `embed/` |
+| site | 0.1.0 | site root, `site/`, `ui/` |
 | zk (phase 2) | in development | `zk/` |
 
 ## program
@@ -33,8 +34,13 @@ the first release of each will move its section under a version heading with its
   `close_room`, `release_room`). No fees, no admin. (`54aa589`)
 - IDLs in `program/idl/`, consumed by the SDK, the Verifier and the API. (`54aa589`)
 - `launch.mjs`, `wind-down.mjs`, `ops.mjs`; the suite, wind-down, rehearsal and own-CA tests. (`73d71dd`)
+- `revoke_signed(valid_until)`: the controller's ed25519 signature over the 156 POF-REVOKE1 bytes, submitted and paid by
+  anyone, so no wallet signs or pays a holder's revoke. (`b605c03`, `74654cb`)
+- The program test report: unit 7/7, suite 32/32 twice, wind-down 7/7, rehearsal 23/23, own-CA 12/12. (`ad07261`)
 #### Changed
 - Config gains `held_delay` and `held_until`; IDLs refreshed. (`73d71dd`)
+- Launch `validity_slots` is 216,000; the program's cap is 1,512,000 (it was 13,000,000). (`b605c03`)
+- `launch.mjs` stops on a Verifier or relayer key mismatch; launch and wind-down never print the RPC key. (`74654cb`)
 #### Security
 - POF-07: remaking a certificate pays the prior payer the rent only; a donated surplus goes to the Treasury. POF-17: a
   lowered rotation delay waits out the old one. POF-22: `renew` refuses an expired certificate. (`73d71dd`)
@@ -56,10 +62,19 @@ the first release of each will move its section under a version heading with its
   `GET /api/keeper/escrow`; `scripts/witness-keeper.mjs`, an independent keeper in one file. (`035f6a6`)
 - `renew` with the holder's salts. (`035f6a6`)
 - The keeper writes `keeper/last-scan.json` for the status page. (`d84df76`)
+- Relay credits: blind RSA-FDH credits bought by a private transfer to the relayer's house ring, unlinkable to the
+  certificate they pay for (`lib/blind.mjs`, shared with the client); the credit key and house ring pinned per network in
+  `lib/credit-pins.json`. (`432b0cd`, `2a36df1`)
+- The relayed revoke, `POST /api/relay/revoke`: checks the controller's POF-REVOKE1 signature and submits
+  `revoke_signed`. (`432b0cd`, `1d05f29`)
+- The verifier test report; mainnet read-only checks and the local end-to-end with their outputs. (`3033364`, `641800c`, `b0ece0a`)
+- `keys.mjs --vercel` pushes keys to the project env through stdin only. (`8c03fa9`)
 #### Changed
 - Default certificate validity is 216,000 slots (the program still accepts up to `validity_slots`). (`035f6a6`)
 - The Vercel build verifies that the bundle equals the published hash and fails the deploy otherwise. (`0387b66`)
 - Rate-limit counters are named by a keyed hash of the client address per window, swept by the keeper. (`d84df76`)
+- The bundle reads only files inside `verifier/` (the IDL is vendored), and the build fails on any outside input. (`b35bc58`)
+- An attestation is issued at the later of the slot and tree reads, so `ROOT_TOO_OLD` cannot race. (`3033364`)
 #### Security
 - POF-02: the ring owner signs the disclosure message v2 (`ring.proof`), always. (`d84df76`)
 - POF-03, POF-09: an X code is redeemable only with the starter's secret; link ids are bound to the controller
@@ -68,6 +83,11 @@ the first release of each will move its section under a version heading with its
 - POF-05, POF-06: kits are kept per attestation until they can no longer land or their certificate dies. (`d84df76`)
 - POF-08: the relayer refuses before it uses a payment, and releases it on a failed `certify`. (`d84df76`)
 - POF-01: keeper escrow (above). (`035f6a6`)
+- POF-26: the X controller signs the disclosure message (`subject.controllerProof`). POF-28: lock releases are tombstone
+  generations; the relayer refunds only a `certify` that surely did not land. (`302a98f`) POF-30: payment and credit
+  marks are bound to the whole attestation. (`11b629a`)
+- CR-01 to CR-04 (credit key pinning, repeated claims, OpenSSL signing, retired keys), RV-01 (the relayed revoke checked
+  against the controller, with a valid-until slot). (`2a36df1`)
 
 ## client
 
@@ -84,8 +104,21 @@ the first release of each will move its section under a version heading with its
   comes from the vault seed, not `nk`; old kits are re-sealed. POF-11: vault message v2 with domain, purpose and warning,
   determinism check, random vault key with a passphrase backup otherwise. POF-12: X and badge certificates go through the
   relayer, paid from the vault; a wallet payer needs explicit consent. (`d9bec9f`)
+- Round 2: verified, cached Poseidon WASM; USDC and mixed assets end to end on the clone; note-age countdown and an
+  optional random delay; structured privacy states; the random vault key kept only in a passphrase box (POF-27); the X
+  controller signature (POF-26); the wallet matrix (Phantom, Solflare, Backpack, Wallet Standard, MPC-style, phones).
+  (`542b844`)
+- Round 3: blind relay credits (claim v2), the relayed revoke. (`b22ca29`) Pinned credit key and house ring (CR-01), the
+  controller's revoke signature checked before sending (RV-01). (`3f5c1f0`, `72ba781`, `6f8a43a`)
+- LocalRings reads version 1 transactions. (`5f95342`)
 
 ## sdk
+
+### [Unreleased] 0.2.0
+#### Changed
+- The IDL with the held rotation delay; log checks require `trustedKeys`; release tarball 0.2.0. (`6ee8fa6`)
+#### Added
+- Examples: an Anchor OTC desk gated by `require_certificate`, a static gated page, MCP configuration. (`6ee8fa6`)
 
 ### [Unreleased] 0.1.0
 #### Added
@@ -147,6 +180,22 @@ the first release of each will move its section under a version heading with its
   project's witness cron parked. (`6780b93`, `39e02d9`)
 - `cli/`: `pof check`, `watch`, `rooms`, `config`, `stats`, `log head|proof|verify` (keys and anchor read from chain).
   (`c4f9a99`)
+#### Security
+- W-01 (unlogged certificates raise an alarm, found by their signed bytes), W-02 (heads only by the active Verifier key),
+  W-03 (witness gossip, split view). (`f359010`)
+
+## site
+
+### [Unreleased] 0.1.0
+#### Added
+- The Swiss poster system, the home page with the live certificate wall, the docs, guides, reports, changelog and
+  developers pages, and the `/api/rpc` proxy. (`3fec3ab`)
+- `/get`, `/c` with an in-browser log proof, `/verify`, `/log`, `/status`, `/rooms`; the live share card. (`6cf2008`)
+- The film, the restyled `/link`, the CSP; the relay credit key fingerprint checked on `/get` and shown on `/status`.
+  (`1e9dfa2`, `982bdf0`, `d933b70`, `a4309aa`, `8008170`)
+#### Changed
+- Deploy: the static site is served from the repository root; build artefacts, research folders and local env files are
+  kept out of the upload. (`2dfd1ea`, `7b27c21`, `0586a00`)
 
 ## contract
 
@@ -164,13 +213,21 @@ the first release of each will move its section under a version heading with its
 #### Added
 - `/developers` content and the devx test report (`ec99afb`); the Rings client test report (`d449f65`).
 - The internal security review, round 1: 25 findings, failing proofs in `audit/test/` (`9407010`, `cf763b5`); round 2
-  re-review: the High findings fixed and re-tested, POF-26 to POF-29 new (`78234b3`).
+  re-review: the High findings fixed and re-tested, POF-26 to POF-29 new (`78234b3`); round 3, the zk path (ZK-01
+  Critical, ZK-02 to ZK-04 High) and the witness (`889cc50`); round 4, blind credits and the relayed revoke (`fb1ab58`).
+- The second internal review, `reports/audit2.md`: 11 findings (2 Medium, 4 Low, 5 Info), failing tests in
+  `audit2/test/` (`da61cb1`).
+- Test reports: program (`ad07261`), verifier (`3033364`), Rings client round 2 (`b992105`).
 - The protocol paper in `docs-src/` and the litepaper (`c0fd4df`, `0218cba`); `README.md`, `SECURITY.md`, `LICENSE`
   (Apache-2.0), this changelog.
+- User guides in `docs-src/guides/` and a FAQ section for non-developers (`0296c1f`); the vault isolates the nullifier
+  key, not identity, and what still links (`5e82f9f`, `893780f`); the validity bound, the relayed revoke and the log as a
+  permanent history (A2-06, A2-09).
 
 ## zk
 
 In development (`zk/`, `62937c7`): the phase 2 Groth16 circuit (circom 2, 4 notes, the Rings Poseidon), witness and
 escrow code, parity tests against the Rings SDK and mainnet leaves, a development setup, the browser prover and the
-`certify_zk` patch for `pof`, documented in `docs-src/zk.md`. Not deployed: `certify_zk` stays off until a public
-ceremony has run. It will get its own version when it ships.
+`certify_zk` patch for `pof`, documented in `docs-src/zk.md`. A development setup (2^17, with a transcript) and fixes for the round 3 findings, with
+`certify_zk` passing 12/12 on a local validator (`d7f850b`). Not deployed: `certify_zk` stays off until the findings are
+re-reviewed and a public ceremony has run. It will get its own version when it ships.
