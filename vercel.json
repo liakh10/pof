@@ -12,6 +12,21 @@
     "api/bots.js": {
       "maxDuration": 30,
       "includeFiles": "{bots/*.js,bots/link.html,api/v1/_lib.js,sdk/dist/**,sdk/package.json}"
+    },
+    "api/attest/index.js": {
+      "maxDuration": 30
+    },
+    "api/attest/log.js": {
+      "maxDuration": 30
+    },
+    "api/relay/[fn].js": {
+      "maxDuration": 60
+    },
+    "api/link/[fn].js": {
+      "maxDuration": 30
+    },
+    "api/keeper/[fn].js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
@@ -34,6 +49,11 @@
     {
       "source": "/link",
       "destination": "/api/bots?fn=link"
+    },
+    {
+      "source": "/api/link",
+      "destination": "/api/link/verify"
     }
-  ]
+  ],
+  "buildCommand": "npm --prefix verifier ci && npm --prefix verifier run build"
 }

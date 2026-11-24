@@ -220,3 +220,40 @@ export const routes = {
     return json({ ok: true, anchored: true, head: mark, signature: r.signature });
   }),
 };
+
+/** a Vercel Node function ((req, res)) around a Web handler */
+export function node(handler: (req: Request) => Promise<Response>) {
+  return async (req: any, res: any) => {
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const url = `${proto}://${req.headers.host || 'localhost'}${req.url}`;
+    let bodyText: string | undefined;
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+      if (typeof req.body === 'string') bodyText = req.body;
+      else if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) bodyText = JSON.stringify(req.body);
+      else if (Buffer.isBuffer(req.body)) bodyText = req.body.toString('utf8');
+      else { const chunks: Buffer[] = []; let n = 0; for await (const c of req) { n += c.length; if (n > 65_536) break; chunks.push(c); } bodyText = Buffer.concat(chunks).toString('utf8'); }
+    }
+    const headers = new Headers();
+    for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v);
+    const r = await handler(new Request(url, { method: req.method, headers, body: bodyText }));
+    res.statusCode = r.status;
+    r.headers.forEach((v, k) => res.setHeader(k, v));
+    res.end(req.method === 'HEAD' ? '' : await r.text());
+  };
+}
+
+/** the routes behind one function per area: /api/relay/[fn], /api/link/[fn], /api/keeper/[fn] */
+export const byFn = (table: Record<string, (req: Request) => Promise<Response>>) => async (req: Request) => {
+  const u = new URL(req.url);
+  const fn = u.searchParams.get('fn') || u.pathname.split('/').filter(Boolean).pop() || '';
+  const h = table[fn];
+  if (!h) return fail(new PofError('NOT_FOUND', `no route ${fn}; try ${Object.keys(table).join(', ')}`, 404));
+  return h(req);
+};
+export const areas = {
+  attest: () => routes.attest,
+  log: () => routes.log,
+  relay: () => byFn({ quote: routes.relayQuote, certify: routes.relayCertify }),
+  link: () => byFn({ start: routes.linkStart, check: routes.linkCheck, verify: routes.linkVerify, link: routes.linkVerify }),
+  keeper: () => byFn({ scan: routes.keeperScan, anchor: routes.keeperAnchor }),
+};

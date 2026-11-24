@@ -1,12 +1,12 @@
 {
   "bundle": "dist/pof-verifier.mjs",
-  "sha256": "4055aecbb02acf1e5b3a243fbc9a59afa37836a6d3aa4048ff0ba677da80fa56",
-  "bytes": 9762281,
+  "sha256": "72b190388cf9d5b046dc4d1c1749970937a5b4f5dc4606826e4aec86a3f6c4f4",
+  "bytes": 9764276,
   "esbuild": "0.28.2",
   "node": "v20",
   "lockfileSha256": "a3247f577aa0a07a799cff38ff9a360bd8e288c1c9b808f0fdfb6e4a93c19676",
   "sources": {
-    "app.ts": "ecb5491eabd595251887490e1439de0dd7c38ca95b8b25b3d8f9ced8aa945ad6",
+    "app.ts": "a558e20a6c62835524d6ef5ac377ccf5df4adfd283b8ff13808c1c7674de5772",
     "chain.ts": "c3d870965b1d58fa34d44210b66dde8da5ddd124dce04278ad8739eb5043e6a9",
     "codec.ts": "3d380b86222ce55d20c0335da50a9b67afa6b85428070a38174fa3e8e94200c4",
     "contract.ts": "d7a122e9648b7975dae218e2f66272b25f436bc91e68d9786919f59f3a2cc08a",
