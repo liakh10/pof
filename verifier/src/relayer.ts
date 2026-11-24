@@ -29,18 +29,21 @@ export class Relayer {
     const lamports = this.cfg.free ? 0n : q.fee + q.rent + q.network + tag;
     const slot = await this.chain.slot();
     const exp = Math.floor(Date.now() / 1000) + this.cfg.quoteTtlSec;
-    const body = `${lamports}.${slot}.${exp}`;
-    return { quote: `${body}.${this.mac(body)}`, lamports: String(lamports), payTo: this.cfg.address, expiresInSec: this.cfg.quoteTtlSec,
+    // a reference per quote (A2-03): the payment carries it in a memo, so only the payment made for this quote pays it,
+    // whatever other transfers the relayer receives, and nobody can claim a payment by asking quotes until one matches
+    const reference = crypto.randomBytes(16).toString('hex');
+    const body = `${lamports}.${slot}.${exp}.${reference}`;
+    return { quote: `${body}.${this.mac(body)}`, lamports: String(lamports), payTo: this.cfg.address, reference, memo: `pof:${reference}`, expiresInSec: this.cfg.quoteTtlSec,
       parts: { fee: String(q.fee), rent: String(q.rent), network: String(q.network), tag: String(this.cfg.free ? 0n : tag) },
-      note: this.cfg.free ? 'the relayer is free on this network' : 'pay exactly this many lamports to payTo, from any wallet or as a Ring withdrawal, then call certify with the quote' };
+      note: this.cfg.free ? 'the relayer is free on this network' : 'one transaction: a SystemProgram transfer of exactly lamports to payTo and a Memo instruction with the text memo; then call certify with the quote. Relay credits (/api/relay/credits) are the private way to pay' };
   }
 
   private parseQuote(q: unknown) {
     if (typeof q !== 'string') throw new PofError('BAD_QUOTE', 'certify needs the quote from /api/relay/quote');
-    const [l, s, e, m] = q.split('.');
-    if (!m || this.mac(`${l}.${s}.${e}`) !== m) throw new PofError('BAD_QUOTE', 'that quote was not issued by this relayer');
-    if (Number(e) < Date.now() / 1000) throw new PofError('QUOTE_EXPIRED', 'the quote expired: ask for a new one (a payment already sent still counts if it matches a new quote amount)');
-    return { lamports: BigInt(l), slot: BigInt(s) };
+    const [l, s, e, ref, m] = q.split('.');
+    if (!m || !/^[0-9a-f]{32}$/.test(ref || '') || this.mac(`${l}.${s}.${e}.${ref}`) !== m) throw new PofError('BAD_QUOTE', 'that quote was not issued by this relayer');
+    if (Number(e) < Date.now() / 1000) throw new PofError('QUOTE_EXPIRED', 'the quote expired: ask for a new one');
+    return { lamports: BigInt(l), slot: BigInt(s), reference: ref };
   }
 
   /** the rolling 24-hour spend, from relay/spend.json: [[unixSec, lamports], ...] */
@@ -77,16 +80,16 @@ export class Relayer {
       creditMark = await this.credits.spend(input.credit, attId);
     } else if (!this.cfg.free) {
       const quote = this.parseQuote(input.quote);
-      const inc = await this.chain.incoming(quote.slot - 150n);
+      const inc = await this.chain.incoming(quote.slot - 150n, quote.reference);
       const mark = new Uint8Array(Buffer.from('for:' + attId)); // bound to this exact attestation (POF-30)
       for (const t of inc) {
-        if (t.lamports !== quote.lamports) continue;
+        if (t.lamports !== quote.lamports || t.reference !== quote.reference) continue;
         if (await this.store.create(`relay/paid/${t.signature}`, mark)) { paid = t.signature; break; }
         // a payment already bound to this same attestation (an earlier try whose outcome was uncertain) may be used again
         const was = await this.store.get(`relay/paid/${t.signature}`);
         if (was && Buffer.from(was).equals(Buffer.from(mark))) { paid = t.signature; break; }
       }
-      if (!paid) throw new PofError('NOT_PAID', `no unused payment of exactly ${quote.lamports} lamports to ${this.cfg.address} yet; it can take a few seconds to land`, 402);
+      if (!paid) throw new PofError('NOT_PAID', `no unused payment of exactly ${quote.lamports} lamports to ${this.cfg.address} with the memo pof:${quote.reference} yet; it can take a few seconds to land`, 402);
     }
     /* the payment comes back only when the certify surely did not land (refused before a block, or landed and failed) and
        the certificate does not hold this attestation; an uncertain send keeps the payment bound to this attestation, so the

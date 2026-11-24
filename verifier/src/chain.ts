@@ -17,8 +17,9 @@ export interface PofChain {
   revokeSigned?(input: { subjectHash: Uint8Array; asset: number; signature: Uint8Array; validUntil?: bigint }): Promise<{ signature: string; lamports: bigint }>;
   /** 1: the 148 POF-REVOKE1 bytes; 2: the 156 POF-REVOKE2 bytes with a valid_until slot (RV-01) */
   revokeVersion?: number;
-  /** incoming SOL transfers to the relayer since a slot: [{ signature, slot, lamports }] */
-  incoming(sinceSlot: bigint): Promise<{ signature: string; slot: bigint; lamports: bigint }[]>;
+  /** SystemProgram transfers to the relayer since a slot, in transactions that carry the memo "pof:<reference>" (A2-03):
+   *  a refund, a close or any other credit that is not a transfer instruction never counts */
+  incoming(sinceSlot: bigint, reference: string): Promise<{ signature: string; slot: bigint; lamports: bigint; reference: string }[]>;
   quoteLamports(): Promise<{ fee: bigint; rent: bigint; network: bigint }>;
   /** the Config's max_attest_age: how long after its issue slot the program still accepts an attestation */
   maxAttestAge?(): Promise<bigint>;

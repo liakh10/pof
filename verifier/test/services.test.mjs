@@ -375,3 +375,17 @@ test('A2-02: no chain view, no signature (CHAIN_OFF), and a lock without a chain
   const v = new V.Verifier(c.verifier.cfg, c.signer, c.rings, c.log, c.keeper, locks);
   await rej(v.attest(pkg(c, r, [c.rings.note(r, 2n * SOL)])), 'CHAIN_OFF');
 });
+
+test('A2-03: a quote binds its payment by a memo reference; a transfer for another reference does not pay it', async () => {
+  const c = makeCtx();
+  const r = ring(); c.rings.register(r); const ctl = ring();
+  const out = await c.verifier.attest(pkg(c, r, [c.rings.note(r, 3n * SOL)], { kind: 1, value: 'memo_ref', proof: c.verifier.linkToken('memo_ref', Math.floor(Date.now() / 1000) + 600, ctl.owner), relay: true, controller: ctl.owner }));
+  const q = await c.relayer.quote();
+  assert.match(q.reference, /^[0-9a-f]{32}$/); assert.equal(q.memo, 'pof:' + q.reference);
+  const body = { attestation: out.attestation, signature: out.signature, logIndex: out.logIndex, quote: q.quote, hashes: out.hashes };
+  c.chain.inbox.push({ signature: 'otherQuote', slot: c.rings.slotNow, lamports: BigInt(q.lamports), reference: 'ff'.repeat(16) });
+  await rej(c.relayer.certify(body), 'NOT_PAID');
+  await rej(c.relayer.certify({ ...body, quote: q.quote.replace(q.reference, 'ee'.repeat(16)) }), 'BAD_QUOTE');
+  c.chain.inbox.push({ signature: 'thisQuote', slot: c.rings.slotNow, lamports: BigInt(q.lamports), reference: q.reference });
+  assert.equal((await c.relayer.certify(body)).payment, 'thisQuote');
+});

@@ -81,7 +81,8 @@ export class FakeChain {
   }
   async anchorLog(size, root) { this.sent.push({ kind: 'anchor', size, root: hex(root) }); return { signature: 'sigAnchor', lamports: 5000n }; }
   async relayerBalance() { return this.balance; }
-  async incoming() { return this.inbox; }
+  /** an inbox entry without a reference models a payment that carried the memo being asked for */
+  async incoming(since, reference) { return this.inbox.filter(t => !t.reference || t.reference === reference).map(t => ({ ...t, reference: t.reference || reference })); }
   async quoteLamports() { return { fee: 10_000_000n, rent: 3_000_000n, network: 10_000n }; }
   async maxAttestAge() { return 300n; }
 }

@@ -146,17 +146,27 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
       return send([edIx(msg, o.verifier.sign(msg)), ix], 'anchor_log');
     },
     async relayerBalance() { return BigInt(await conn.getBalance(payer.publicKey)); },
-    async incoming(sinceSlot) {
-      const sigs = await conn.getSignaturesForAddress(payer.publicKey, { limit: 60 }, 'confirmed');
-      const out: { signature: string; slot: bigint; lamports: bigint }[] = [];
-      for (const s of sigs.filter((s: any) => !s.err && BigInt(s.slot) >= sinceSlot)) {
-        const t = await conn.getTransaction(s.signature, { maxSupportedTransactionVersion: 1, commitment: 'confirmed' });
-        if (!t?.meta) continue;
-        const keys = t.transaction.message.getAccountKeys ? t.transaction.message.getAccountKeys({ accountKeysFromLookups: t.meta.loadedAddresses }).staticAccountKeys.concat(t.meta.loadedAddresses?.writable || [], t.meta.loadedAddresses?.readonly || []) : t.transaction.message.accountKeys;
-        const i = keys.findIndex((k: any) => k.equals(payer.publicKey));
-        if (i <= 0) continue; // index 0 is the fee payer: our own transactions
-        const d = BigInt(t.meta.postBalances[i]) - BigInt(t.meta.preBalances[i]);
-        if (d > 0n) out.push({ signature: s.signature, slot: BigInt(s.slot), lamports: d });
+    async incoming(sinceSlot, reference) {
+      const me = payer.publicKey.toBase58();
+      const out: { signature: string; slot: bigint; lamports: bigint; reference: string }[] = [];
+      let before: string | undefined;
+      for (let page = 0; page < 10; page++) { // back to the quote's slot, at most 1,000 signatures (A2-03, POF-16)
+        const sigs = await conn.getSignaturesForAddress(payer.publicKey, { limit: 100, ...(before ? { before } : {}) }, 'confirmed');
+        if (!sigs.length) break;
+        for (const s0 of sigs) {
+          if (s0.err || BigInt(s0.slot) < sinceSlot) continue;
+          if (s0.memo && !String(s0.memo).includes(`pof:${reference}`)) continue; // the node's memo summary: skip other quotes cheaply
+          const t: any = await conn.getParsedTransaction(s0.signature, { maxSupportedTransactionVersion: 1, commitment: 'confirmed' });
+          if (!t?.meta || t.meta.err) continue;
+          const all = [...t.transaction.message.instructions, ...(t.meta.innerInstructions || []).flatMap((x: any) => x.instructions)];
+          const memo = all.some((ix: any) => (ix.program === 'spl-memo' || String(ix.programId) === 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr') && String(ix.parsed ?? '').trim() === `pof:${reference}`);
+          if (!memo) continue;
+          const lamports = all.filter((ix: any) => ix.program === 'system' && ix.parsed?.type === 'transfer' && ix.parsed.info?.destination === me && ix.parsed.info?.source !== me)
+            .reduce((x: bigint, ix: any) => x + BigInt(ix.parsed.info.lamports), 0n);
+          if (lamports > 0n) out.push({ signature: s0.signature, slot: BigInt(s0.slot), lamports, reference });
+        }
+        if (BigInt(sigs[sigs.length - 1].slot) < sinceSlot) break;
+        before = sigs[sigs.length - 1].signature;
       }
       return out;
     },
