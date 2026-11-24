@@ -104,6 +104,17 @@ export function worst(states) {
   return states.reduce((w, s) => ((RANK[s] ?? 0) > (RANK[w] ?? 0) ? s : w), "ok");
 }
 
+/** Where the Verifier is reached from. Never the request's Host header on Vercel (audit POF-20): an explicit
+ *  POF_STATUS_ORIGIN, else the production domain Vercel sets, else this deployment's own URL. The Host header is used only
+ *  off Vercel (a local run). */
+export function selfOrigin(env = process.env, requestOrigin = "") {
+  const o = env.POF_STATUS_ORIGIN
+    || (env.VERCEL_ENV === "production" && env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : "")
+    || (env.VERCEL_URL ? `https://${env.VERCEL_URL}` : "")
+    || (env.VERCEL ? "" : requestOrigin);
+  return String(o || "").replace(/\/+$/, "");
+}
+
 /** Env → the dependencies of one run. Tests build their own. */
 export function depsFromEnv(env = process.env, origin = "") {
   const rpcUrls = [...new Set(String(env.SOLANA_RPC || env.RPC_URL || "").split(",").map((s) => s.trim()).filter(Boolean))];
@@ -114,7 +125,7 @@ export function depsFromEnv(env = process.env, origin = "") {
     rpcUrls,
     programId,
     indexer: env.HELIUS_API_KEY ? { url: (env.HELIUS_SPR_URL || "https://mainnet.helius-rpc.com/v1/spr").replace(/\/+$/, ""), apiKey: env.HELIUS_API_KEY } : null,
-    origin: (env.POF_STATUS_ORIGIN || origin || "").replace(/\/+$/, ""),
+    origin: selfOrigin(env, origin),
     keeperLive: env.POF_KEEPER_LIVE === "1",
     network: env.POF_NETWORK || "mainnet",
     limits: { ...LIMITS, relayFloorLamports: Number(env.POF_RELAY_FLOOR_LAMPORTS || LIMITS.relayFloorLamports) },

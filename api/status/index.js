@@ -5,6 +5,13 @@ import { cachedRun, depsFromEnv, historyView, originOf, scrub, send, storeFromEn
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return send(res, 204, null);
   if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, { error: { code: "METHOD", message: "GET" } });
+  // one cacheable URL: a query string would skip the edge cache and cost a fresh set of upstream reads (audit POF-14)
+  if (String(req.url || "").includes("?")) {
+    res.statusCode = 308;
+    res.setHeader("location", "/api/status");
+    res.setHeader("cache-control", "public, s-maxage=3600");
+    return res.end();
+  }
   try {
     const d = depsFromEnv(process.env, originOf(req));
     d.store = storeFromEnv(process.env);

@@ -26,6 +26,11 @@ The overall state is the worst of ok, degraded and down; off and unknown do not 
 
 All windows are counted in **slots**, read from the chain.
 
+`/api/status` takes no parameters: a request with a query string is redirected to the plain URL, so every visitor shares
+the one cached answer and nobody can make the page read the chain or the indexer on demand. The Verifier and the log are
+reached at the address set in `POF_STATUS_ORIGIN`, or else the production domain Vercel sets for the project, or else the
+deployment's own URL; never at the address a request claims in its Host header.
+
 ## The checks
 
 ### Solana RPC (`rpc`)

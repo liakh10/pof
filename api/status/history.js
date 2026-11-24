@@ -4,6 +4,12 @@ import { historyView, scrub, send, storeFromEnv } from "./_core.js";
 
 export default async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, { error: { code: "METHOD", message: "GET" } });
+  if (String(req.url || "").includes("?")) {
+    res.statusCode = 308;
+    res.setHeader("location", "/api/status/history");
+    res.setHeader("cache-control", "public, s-maxage=3600");
+    return res.end();
+  }
   try {
     const store = storeFromEnv(process.env);
     if (!store) return send(res, 200, { history: null, note: "no store configured on this deployment" }, "public, s-maxage=60");

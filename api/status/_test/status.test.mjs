@@ -254,3 +254,23 @@ test("sample handler: refuses without the cron secret", async () => {
   assert.equal(res.statusCode, 403);
   if (old === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = old;
 });
+
+test("the Verifier origin never comes from the Host header on Vercel (POF-20)", () => {
+  assert.equal(S.selfOrigin({ VERCEL: "1", VERCEL_ENV: "production", VERCEL_PROJECT_PRODUCTION_URL: "pof.example" }, "https://evil.test"), "https://pof.example");
+  assert.equal(S.selfOrigin({ VERCEL: "1", VERCEL_ENV: "preview", VERCEL_URL: "pof-abc.vercel.app" }, "https://evil.test"), "https://pof-abc.vercel.app");
+  assert.equal(S.selfOrigin({ VERCEL: "1" }, "https://evil.test"), "");
+  assert.equal(S.selfOrigin({ POF_STATUS_ORIGIN: "https://set.test/" }, "https://evil.test"), "https://set.test");
+  assert.equal(S.selfOrigin({}, "http://localhost:3000"), "http://localhost:3000");
+});
+
+test("GET /api/status with a query string redirects without running a check (POF-14)", async () => {
+  const { default: statusHandler } = await import("../index.js");
+  const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(b) { this.body = b; } };
+  let fetched = false;
+  const orig = globalThis.fetch;
+  globalThis.fetch = async () => { fetched = true; throw new Error("no"); };
+  try { await statusHandler({ method: "GET", url: "/api/status?x=1", headers: { host: "pof.test" } }, res); } finally { globalThis.fetch = orig; }
+  assert.equal(res.statusCode, 308);
+  assert.equal(res.headers.location, "/api/status");
+  assert.equal(fetched, false);
+});
