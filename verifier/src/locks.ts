@@ -2,13 +2,13 @@
    HMAC(seal key, nullifier): no amount, and nobody without the key can test a nullifier against it.
    Each note's lock is a chain of generations notes/<key>/<gen>; taking a lock is a create-if-absent of the next generation
    (atomic in Blob and in the folder store), so two parallel attests can never both take it (POF-04). The newest generation
-   is the lock. It binds while its certificate is live on chain, or, before it lands, until issued + certifyWindow (the
-   program refuses a certify older than max_attest_age). The same subject and asset may take its own lock again (renew). */
+   is the lock. It binds while its certificate is live on chain, or, before it lands, for as long as the program could still
+   accept the attestation (see binding). The same subject and asset may take its own lock again (renew). */
 import crypto from 'node:crypto';
 import { PofError, unhex } from './codec.js';
 import { getJson, type Store } from './store.js';
 import type { PofChain } from './chain.js';
-import { STATUS } from './chain.js';
+import { STATUS, landingWindow } from './chain.js';
 
 export interface Lock { subjectHash: string; asset: number; issuedSlot: number; expirySlot: number }
 const gk = (base: string, g: number) => `${base}/${String(g).padStart(8, '0')}`;
@@ -17,14 +17,17 @@ export class NoteLocks {
   constructor(private store: Store, private key: Uint8Array, private certifyWindow: bigint, private chain: PofChain | null) {}
   private name(nf: Uint8Array) { return 'notes/' + crypto.createHmac('sha256', this.key).update('pof:lock:').update(nf).digest('hex'); }
 
+  /** A lock binds while its certificate is live, or while its attestation may still land: issued + the larger of the
+   *  configured window and the Config's max_attest_age (the program's cap when unread), plus a margin. Without a chain to
+   *  read it binds until the attestation's expiry, since the certificate may be live (audit A2-02). */
   private async binding(l: Lock, slot: bigint): Promise<boolean> {
     if (slot > BigInt(l.expirySlot)) return false;
-    if (this.chain) {
-      const c = await this.chain.certificate(unhex(l.subjectHash, 32), l.asset);
-      if (c && c.status === STATUS.live && c.expirySlot > slot) return true;
-    }
-    return slot <= BigInt(l.issuedSlot) + this.certifyWindow;
+    if (!this.chain) return true;
+    const c = await this.chain.certificate(unhex(l.subjectHash, 32), l.asset);
+    if (c && c.status === STATUS.live && c.expirySlot > slot) return true;
+    return slot <= BigInt(l.issuedSlot) + await landingWindow(this.chain, this.certifyWindow);
   }
+  get hasChain() { return !!this.chain; }
 
   /** the newest generation: [gen, lock] or [-1, null]. Generations are never deleted (a release is a tombstone generation on
    *  top), so the chain has no gaps and the first missing generation ends it; a head hint skips the old ones. */

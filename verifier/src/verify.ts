@@ -26,6 +26,8 @@ export interface VerifierConfig {
   relayer: string | null;       // the relayer's address: payer when relay is true
   mints: Record<number, string>;// asset → mint (USDC differs on a local validator)
   bundleHash: Uint8Array;
+  /** tests and the lab only: sign with note locks that cannot see the chain (they then bind until expiry) */
+  allowNoChain?: boolean;
 }
 
 let sdk: any = null;
@@ -126,6 +128,8 @@ export class Verifier {
       if (p.payer !== this.cfg.relayer) throw new PofError('BAD_PAYER', `with relay: true the payer is the relayer ${this.cfg.relayer}`);
     }
     if (!Array.isArray(p.notes) || p.notes.length < 1 || p.notes.length > 8) throw new PofError('BAD_NOTES', 'disclose 1 to 8 notes');
+    // one note, one live certificate needs the chain's view of certificates; without it nothing is signed (A2-02)
+    if (this.locks && !this.locks.hasChain && !this.cfg.allowNoChain) throw new PofError('CHAIN_OFF', 'the Verifier cannot read the pof program here, so it signs nothing; try again later', 503);
 
     let slot = await this.rings.slot();
 

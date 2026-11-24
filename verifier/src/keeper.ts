@@ -7,7 +7,7 @@ import { PofError, hex, sha256, unhex } from './codec.js';
 import { open, putJson, seal, type Store } from './store.js';
 import { decodeAttestation } from './contract.js';
 import type { PofChain } from './chain.js';
-import { STATUS } from './chain.js';
+import { STATUS, landingWindow } from './chain.js';
 import type { RingsSource } from './rings.js';
 
 export interface Kit { subjectHash: string; asset: number; tree: string; expirySlot: number; attestation: string; kit: { h: string; salt: string; nullifier: string }[] }
@@ -30,8 +30,10 @@ export class Keeper {
   /** one pass over every kit; returns what it did, without salts or nullifiers. A kit is kept while it can still land
    *  (issued + maxAttestAge) or while its certificate is live; it is never dropped because another attestation of the same
    *  subject is live (POF-05). Dead kits go at the first scan after they can no longer land (POF-06). */
-  async scan({ maxRevokes = 10, graceSlots = 9000n, maxAttestAge = this.maxAttestAge, budgetMs = 40_000 } = {}) {
+  async scan({ maxRevokes = 10, graceSlots = 9000n, maxAttestAge = undefined as bigint | undefined, budgetMs = 40_000 } = {}) {
     const started = Date.now();
+    // a kit is kept while its attestation may still land: the Config's max_attest_age (the program's cap when unread)
+    const landWindow = maxAttestAge ?? await landingWindow(this.chain, this.maxAttestAge);
     if (!this.rings || !this.chain) throw new PofError('KEEPER_OFF', 'the keeper has no chain configured', 503);
     const slot = await this.chain.slot();
     const report = { slot: Number(slot), kits: 0, live: 0, pending: 0, dropped: 0, revoked: [] as { certificate: string; index: number; signature: string }[], errors: [] as string[] };
@@ -47,7 +49,7 @@ export class Keeper {
       try { k = await this.read(name); } catch { report.errors.push(`${name.split('/')[2]}: unreadable`); continue; }
       try {
         const issued = decodeAttestation(unhex(k.attestation)).issuedSlot;
-        const canLand = slot <= issued + maxAttestAge;
+        const canLand = slot <= issued + landWindow;
         const cert = await this.chain.certificate(unhex(k.subjectHash, 32), k.asset);
         const mine = !!cert && cert.hashes.length === k.kit.length && k.kit.every(x => cert.hashes.includes(x.h));
         if (!mine) {

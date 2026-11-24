@@ -1,6 +1,7 @@
 /* The Verifier's, the relayer's, the keeper's and the credit keys, made for this project only.
      node scripts/keys.mjs            make the missing ones in ~/.config/pof/ (dir 700, files 600); print public keys only
-     node scripts/keys.mjs --pin      also write the public credit key and house ring into lib/credit-pins.json (audit CR-01)
+     node scripts/keys.mjs --pin      also write each network's public credit key and house ring into lib/credit-pins.json
+                                      (CR-01; one key and one relayer per network, A2-05)
      node scripts/keys.mjs --vercel   also replace POF_VERIFIER_KEY, POF_RELAYER_KEY, POF_SEAL_KEY and POF_CREDIT_KEY in the
                                       linked Vercel project (production + preview): `vercel env rm` then `vercel env add`, the
                                       value through stdin only (VERCEL_BIN overrides the binary, for the test)
@@ -68,20 +69,29 @@ function rsaKey(name) {
 const v = keypair('verifier'), r = keypair('relayer'), s = sealKey(), k = x25519Key('keeper'), c = rsaKey('credits-rsa');
 console.log(JSON.stringify({ dir, verifier: v.pub, relayer: r.pub, seal: 'present (not shown)', keeperX25519: k.pub, creditKey: c.kid }, null, 2));
 // the public credit key and the house ring are pinned in the bundle and in the client (audit CR-01): lib/credit-pins.json,
-// public halves only, one entry per network; a rotation moves the old key to `retired` (still honoured, CR-04)
+// public halves only, one entry per network, and each network has its own credit key and relayer (house ring), so devnet
+// SOL can never buy mainnet credits (audit A2-05). Mainnet uses relayer.json + credits-rsa.json; another network <net> uses
+// relayer-<net>.json + credits-rsa-<net>.json. A rotation moves the old key to `retired` (still honoured, CR-04).
 if (process.argv.includes('--pin')) {
   const pinFile = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../lib/credit-pins.json');
   const prev = fs.existsSync(pinFile) ? JSON.parse(fs.readFileSync(pinFile, 'utf8')) : { v: 1, networks: {} };
   const nets = (process.env.POF_PIN_NETWORKS || 'mainnet,devnet').split(',');
   for (const net of nets) {
+    const ck = net === 'mainnet' ? c : rsaKey(`credits-rsa-${net}`);
+    const rk = net === 'mainnet' ? r : keypair(`relayer-${net}`);
     const was = prev.networks[net];
-    const retired = [...((was && was.retired) || [])];
-    if (was && was.kid !== c.kid && !retired.some(x => x.kid === was.kid)) retired.push({ kid: was.kid, n: was.n, e: was.e });
-    const entry = { kid: c.kid, n: c.pub.n.toLowerCase(), e: c.pub.e, houseRing: r.pub, retired };
+    const retired = [...((was && was.retired) || [])].filter(x => x.kid !== ck.kid);
+    if (was && was.kid !== ck.kid && !retired.some(x => x.kid === was.kid)) retired.push({ kid: was.kid, n: was.n, e: was.e });
+    const entry = { kid: ck.kid, n: ck.pub.n.toLowerCase(), e: ck.pub.e, houseRing: rk.pub, retired };
     const fp = crypto.createHash('sha256').update(`pof:credit-key:v1\n${entry.kid}\n${entry.n}\n${entry.e}\n${entry.houseRing}`).digest('hex').slice(0, 32).match(/.{4}/g).join(' ');
     prev.networks[net] = { ...entry, fingerprint: fp };
-    console.log(`pinned ${net}: credit key ${c.kid}, house ring ${r.pub}, fingerprint ${fp}`);
+    console.log(`pinned ${net}: credit key ${ck.kid}, house ring ${rk.pub}, fingerprint ${fp}`);
   }
+  // a network never honours another network's key, current or retired
+  const current = new Set(Object.values(prev.networks).map(x => x.kid));
+  for (const [net, x] of Object.entries(prev.networks)) x.retired = (x.retired || []).filter(k => !current.has(k.kid) || k.kid === x.kid).filter(k => k.kid !== x.kid);
+  const kids = Object.values(prev.networks).map(x => x.kid), rings = Object.values(prev.networks).map(x => x.houseRing);
+  if (new Set(kids).size !== kids.length || new Set(rings).size !== rings.length) { console.error('two networks share a credit key or a house ring: refusing to write'); process.exit(1); }
   fs.writeFileSync(pinFile, JSON.stringify(prev, null, 2) + '\n');
 }
 

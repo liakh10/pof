@@ -83,6 +83,7 @@ export class FakeChain {
   async relayerBalance() { return this.balance; }
   async incoming() { return this.inbox; }
   async quoteLamports() { return { fee: 10_000_000n, rent: 3_000_000n, network: 10_000n }; }
+  async maxAttestAge() { return 300n; }
 }
 
 export function makeCtx({ relayFree = false, env = {} } = {}) {

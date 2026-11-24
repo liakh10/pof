@@ -360,3 +360,18 @@ test('the relayed revoke bytes equal the program\'s revoke_bytes (156 bytes, POF
   const idl = JSON.parse((await import('node:fs')).readFileSync(new URL('../idl/pof.json', import.meta.url), 'utf8'));
   assert.deepEqual(idl.instructions.find(i => i.name === 'revoke_signed').args.map(a => a.name), ['valid_until']);
 });
+
+test('A2-05: each network pins its own credit key and house ring, and never honours another network\'s key', () => {
+  const nets = V.creditPins.networks;
+  assert.notEqual(nets.mainnet.n, nets.devnet.n); assert.notEqual(nets.mainnet.houseRing, nets.devnet.houseRing);
+  for (const [a, x] of Object.entries(nets)) for (const [b, y] of Object.entries(nets)) if (a !== b) assert.ok(!(x.retired || []).some(k => k.kid === y.kid || k.n === y.n), `${a} honours ${b}'s key`);
+  for (const n of Object.keys(nets)) { const p = V.pinFor(n); V.checkPublicKey(p.current); assert.equal(p.fingerprint, nets[n].fingerprint); }
+});
+
+test('A2-02: no chain view, no signature (CHAIN_OFF), and a lock without a chain binds until expiry', async () => {
+  const c = makeCtx();
+  const r = ring(); c.rings.register(r);
+  const locks = new V.NoteLocks(c.store, V.sha256(c.sealKey), 300n, null);
+  const v = new V.Verifier(c.verifier.cfg, c.signer, c.rings, c.log, c.keeper, locks);
+  await rej(v.attest(pkg(c, r, [c.rings.note(r, 2n * SOL)])), 'CHAIN_OFF');
+});

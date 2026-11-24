@@ -99,6 +99,7 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
   }
   const edIx = (message: Uint8Array, signature: Uint8Array) => Ed25519Program.createInstructionWithPublicKey({ publicKey: Buffer.from(o.verifier.publicKey), message: Buffer.from(message), signature: Buffer.from(signature) });
 
+  let cfgCache: { at: number; age: bigint } | null = null;
   const chain: PofChain = {
     async slot() { return BigInt(await conn.getSlot('confirmed')); },
     async certificate(sh, asset) {
@@ -158,6 +159,12 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
         if (d > 0n) out.push({ signature: s.signature, slot: BigInt(s.slot), lamports: d });
       }
       return out;
+    },
+    async maxAttestAge() {
+      if (cfgCache && Date.now() - cfgCache.at < 60_000) return cfgCache.age;
+      const cfg = await config();
+      cfgCache = { at: Date.now(), age: BigInt(cfg.params.max_attest_age) };
+      return cfgCache.age;
     },
     async quoteLamports() {
       const cfg = await config();

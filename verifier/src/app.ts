@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { PofError, fromB58, hex, sha256, text, unhex } from './codec.js';
 import { ASSETS } from './contract.js';
-import { signerFromJson, type Signer } from './keys.js';
+import { signerFromJson, signerFromSeed, type Signer } from './keys.js';
 import { BlobStore, FsStore, type Store } from './store.js';
 import { TransparencyLog } from './log.js';
 import { HeliusRings, jsonRpc, type RingsSource } from './rings.js';
@@ -71,12 +71,15 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
   const rings = overrides.rings || new HeliusRings(rpc, { url: env.HELIUS_SPR_URL || 'https://mainnet.helius-rpc.com/v1/spr', apiKey: env.HELIUS_API_KEY || (() => { const k = String(env.HELIUS_KEYS || '').split(',').map(s => s.trim()).filter(Boolean); return k.length ? k[Math.floor(Math.random() * k.length)] : undefined; })() }, rpcUrls[0]);
   const base = { env, programId, signer, relayerSigner, store, rings, sealKey };
   let chain: PofChain | null = overrides.chain !== undefined ? overrides.chain : chainFactory ? await chainFactory(base as any) : null;
-  if (overrides.chain === undefined && !chainFactory && relayerSigner) {
+  if (overrides.chain === undefined && !chainFactory) {
+    // the chain view is needed for the note locks even without a relayer key: then it reads only (a throwaway payer that
+    // holds nothing, so it cannot send anything)
     const web3 = await import('@solana/web3.js');
-    chain = await makeProgramChain({ web3, rpcUrl: rpcUrls[0], programId: pid, relayer: relayerSigner, verifier: signer, rings });
+    const reader = relayerSigner || signerFromSeed(new Uint8Array(crypto.randomBytes(32)));
+    chain = await makeProgramChain({ web3, rpcUrl: rpcUrls[0], programId: pid, relayer: reader, verifier: signer, rings });
   }
   const log = new TransparencyLog(store, signer, programId);
-  const certifyWindow = BigInt(env.POF_CERTIFY_WINDOW_SLOTS || 300); // the program's max_attest_age
+  const certifyWindow = BigInt(env.POF_CERTIFY_WINDOW_SLOTS || 300); // a floor; the Config's max_attest_age wins when larger (A2-02)
   const keeper = new Keeper(store, sealKey, rings, chain, certifyWindow);
   const locks = new NoteLocks(store, sha256(text('pof:locks:'), sealKey), certifyWindow, chain);
   const escrow = new Escrow(store);
@@ -91,7 +94,8 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
     dailyCapLamports: BigInt(env.POF_RELAY_DAILY_LAMPORTS ?? 2_000_000_000), balanceFloorLamports: BigInt(env.POF_RELAY_FLOOR_LAMPORTS ?? 50_000_000),
     quoteTtlSec: 1800, free: env.POF_RELAY_FREE === '1', hmacKey: sha256(text('pof:quote:'), sealKey),
   }, store, chain, log) : null;
-  const ck = env.POF_CREDIT_KEY || (() => { try { return fs.readFileSync(path.join(os.homedir(), '.config', 'pof', 'credits-rsa.json'), 'utf8'); } catch { return ''; } })();
+  const net = env.POF_NETWORK || 'mainnet';
+  const ck = env.POF_CREDIT_KEY || (() => { try { return fs.readFileSync(path.join(os.homedir(), '.config', 'pof', net === 'mainnet' ? 'credits-rsa.json' : `credits-rsa-${net}.json`), 'utf8'); } catch { return ''; } })();
   if (relayer && ck && relayerSigner) {
     const seed = relayerSigner.secretForWeb3().slice(0, 32);
     const house = sdkHouseRing({ store, seed, solanaRpcUrl: rpcUrls[0], indexerUrl: env.HELIUS_SPR_URL || 'https://mainnet.helius-rpc.com/v1/spr', apiKey: env.HELIUS_API_KEY, rpc });
