@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Proof of Funds badge</title>
+<style>
+  html, body { margin: 0; background: transparent; }
+  body { padding: 4px; }
+  body[data-theme="dark"] pof-badge { --pof-bg: #141518; --pof-fg: #ecebe6; --pof-muted: #9a9ca3; --pof-border: #2b2d31; --pof-live: #4fc184; --pof-revoked: #f07a7a; }
+</style>
+</head>
+<body>
+<!-- iframe fallback, for hosts that do not allow scripts:
+     <iframe src="https://<site>/embed/frame.html?subject=@anon&asset=SOL&min-tier=4" width="420" height="56" style="border:0" title="Proof of Funds"></iframe> -->
+<pof-badge id="b"></pof-badge>
+<script>
+  const q = new URLSearchParams(location.search);
+  const b = document.getElementById("b");
+  for (const k of ["asset", "min-tier", "refresh", "compact"]) if (q.has(k)) b.setAttribute(k, q.get(k));
+  if (q.get("theme") === "dark") document.body.dataset.theme = "dark";
+  b.setAttribute("subject", q.get("subject") ?? "");
+</script>
+<script type="module" src="./pof-badge.js"></script>
+</body>
+</html>
