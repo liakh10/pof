@@ -9,6 +9,7 @@ import { sealSVG } from './seal.js';
 const body = $('[data-c-body]');
 const raw = decodeURIComponent((location.pathname.match(/^\/c\/(.+)$/) || [])[1] || new URLSearchParams(location.search).get('subject') || '');
 let src, now = 0, shown = new Map();
+let validity = 216_000;   // the launch value of Config.params.validity_slots; read from chain below when the program is live
 
 addEventListener('pof:slot', e => { now = e.detail; });
 
@@ -86,7 +87,7 @@ function render(look) {
   $('[data-c-lead]').textContent = c0.status === 'live'
     ? 'Live right now. The notes behind it were unspent when it was certified, and a spend would have revoked it on chain.'
     : c0.status === 'revoked_spent' ? 'A note behind this certificate was spent, and the chain recorded it at the slot below. It no longer proves anything.'
-    : c0.status === 'revoked_by_holder' ? 'The holder revoked it. It no longer proves anything.' : 'It expired. Certificates last about 30 days unless renewed.';
+    : c0.status === 'revoked_by_holder' ? 'The holder revoked it. It no longer proves anything.' : `It expired. A certificate is valid for ${num(validity)} slots (${span(validity)}) from its Verifier signature unless the holder renews it.`;
   const url = location.origin + certPath(c0);
   body.innerHTML = certs.map(c => `
     <article class="cert-page grid" style="padding:0;row-gap:var(--s5)" data-addr="${esc(c.address)}">
@@ -137,6 +138,8 @@ async function watch() {
   src = await source();
   if (!raw) { body.innerHTML = `<div class="empty"><p class="h3">Name a subject.</p><p class="quiet">Open /c/ followed by a wallet, an @handle or a badge key, or use <a href="/verify">Verify</a>.</p></div>`; return; }
   try {
+    const cfg = await src.chain().getConfig().catch(() => null);
+    if (cfg && cfg.validitySlots) validity = cfg.validitySlots;
     render(await read());
     setInterval(() => { if (!document.hidden) watch(); }, 8000);
   } catch (e) {
