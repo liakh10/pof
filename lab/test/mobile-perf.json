@@ -1,35 +1,43 @@
 {
- "at": "2026-11-24T22:55:52.381Z",
- "note": "local Rings clone; sync and pick read the local chain (LocalRings), not the Helius indexer",
+ "at": "2026-11-24T22:57:41.130Z",
+ "note": "syncMs and pickMs read the local clone through LocalRings, which replays every Rings transaction of the local chain (it grows with the test history; not the production path); indexerSync is the production path (Helius indexer through /api/spr, devnet, empty vault)",
  "results": [
   {
    "cpu": "4x",
    "viewport": "375x812",
    "network": "150 ms, 6.4 Mbit/s",
-   "hasherColdMs": 2229,
-   "cold": "hasher: ready in 1746 ms (SIMD)",
+   "hasherColdMs": 2314,
+   "cold": "hasher: ready in 1790 ms (SIMD)",
    "hasherWarmMs": 462,
-   "warm": "hasher: ready 1252 / 1252 KB in 17 ms (SIMD, from cache)",
-   "vaultMs": 265,
-   "syncMs": 13962,
-   "pickMs": 1054,
-   "picked": "ready: 1 note(s), leaves 64273, excess 1000000000",
+   "warm": "hasher: ready 1252 / 1252 KB in 16 ms (SIMD, from cache)",
+   "vaultMs": 269,
+   "syncMs": 14959,
+   "pickMs": 1064,
+   "picked": "ready: 1 note(s), leaves 64277, excess 1000000000",
    "overflowX": false,
+   "indexerSync": {
+    "ms": 517,
+    "notes": 0
+   },
    "errors": []
   },
   {
    "cpu": "6x",
    "viewport": "375x812",
    "network": "150 ms, 6.4 Mbit/s",
-   "hasherColdMs": 2245,
-   "cold": "hasher: ready in 1736 ms (SIMD)",
-   "hasherWarmMs": 512,
-   "warm": "hasher: ready 1252 / 1252 KB in 16 ms (SIMD, from cache)",
-   "vaultMs": 315,
-   "syncMs": 14565,
-   "pickMs": 1051,
-   "picked": "ready: 1 note(s), leaves 64275, excess 1000000000",
+   "hasherColdMs": 2260,
+   "cold": "hasher: ready in 1769 ms (SIMD)",
+   "hasherWarmMs": 492,
+   "warm": "hasher: ready 1252 / 1252 KB in 21 ms (SIMD, from cache)",
+   "vaultMs": 314,
+   "syncMs": 16017,
+   "pickMs": 1048,
+   "picked": "ready: 1 note(s), leaves 64279, excess 1000000000",
    "overflowX": false,
+   "indexerSync": {
+    "ms": 522,
+    "notes": 0
+   },
    "errors": []
   }
  ]

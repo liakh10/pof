@@ -39,12 +39,25 @@ try {
     s0 = Date.now(); await page.click('#pick'); await page.waitForFunction(() => document.getElementById('picked').textContent.length > 0, null, { timeout: 60_000 }); t.pickMs = Date.now() - s0;
     t.picked = await page.$eval('#picked', e => e.textContent);
     t.overflowX = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    // the production path for sync: the Helius indexer through /api/spr (devnet, a fresh vault, so it measures the round
+    // trips and the SDK's work, not a note count), with a stand-in wallet that signs in the page
+    t.indexerSync = await page.evaluate(async () => {
+      const S = await import('/client/dist/spr.js');
+      const k = S.SigningKey.fromEd25519Bytes(crypto.getRandomValues(new Uint8Array(32)));
+      const { createPofClient, core: C } = await import('/client/pof-client.js');
+      const address = C.b58encode(k.publicKey().ed25519());
+      const W = { setChain() {}, state: () => ({ address }), signText: async t => k.sign(new TextEncoder().encode(t)), signBytes: async b => k.sign(b) };
+      const pof = await createPofClient({ network: 'devnet', rpc: ['/api/rpc?net=devnet'], indexer: '/api/spr?net=devnet', wallet: W, storage: new Map(), programId: 'pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT' });
+      await pof.ready(); await pof.deriveVault();
+      const t0 = performance.now(); const n = await pof.notes({ from: 'vault' });
+      return { ms: Math.round(performance.now() - t0), notes: n.length };
+    });
     t.errors = errors;
     results.push({ cpu: rate + 'x', viewport: '375x812', network: '150 ms, 6.4 Mbit/s', ...t });
     await ctx.close();
   }
 } finally { await browser.close(); }
-fs.writeFileSync(new URL('./mobile-perf.json', import.meta.url), JSON.stringify({ at: new Date().toISOString(), note: 'local Rings clone; sync and pick read the local chain (LocalRings), not the Helius indexer', results }, null, 1));
+fs.writeFileSync(new URL('./mobile-perf.json', import.meta.url), JSON.stringify({ at: new Date().toISOString(), note: 'syncMs and pickMs read the local clone through LocalRings, which replays every Rings transaction of the local chain (it grows with the test history; not the production path); indexerSync is the production path (Helius indexer through /api/spr, devnet, empty vault)', results }, null, 1));
 console.log(JSON.stringify(results, null, 1));
 const bad = results.some(r => r.errors.length || !/from cache/.test(r.warm) || !/ready: 1 note/.test(r.picked));
 process.exit(bad ? 1 : 0);
