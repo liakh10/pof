@@ -31,7 +31,7 @@ carries it.
 ## Keys
 `node scripts/keys.mjs` makes, once, in `~/.config/pof/` (dir 700, files 600): `verifier.json` and `relayer.json`
 (Solana keypair JSON), `seal.hex` (the keeper's AES key and the root of the lock, quote and rate-limit HMAC keys),
-`keeper.x25519` (our keeper's escrow key). It prints public keys only. `--vercel` pushes them to the linked project's env.
+`keeper.x25519` (our keeper's escrow key), `credits-rsa.json` (the RSA-3072 credit key). It prints public keys only. `--vercel` pushes them to the linked project's env.
 
 ## Environment
 | name | what |
@@ -45,6 +45,7 @@ carries it.
 | `POF_KEEPER_LIVE=1` | turns the keeper crons on (launch only) |
 | `POF_MIN_AGE_SLOTS` (150), `POF_VALIDITY_SLOTS` (216,000), `POF_SUBJECT_PROOF_SLOTS` (1,500), `POF_MAX_ROOT_LAG_SLOTS` (9,000), `POF_CERTIFY_WINDOW_SLOTS` (300) | must agree with the program's Config |
 | `POF_RELAY_DAILY_LAMPORTS` (2 SOL), `POF_RELAY_FLOOR_LAMPORTS` (0.05 SOL), `POF_ATTEST_PER_10MIN` (30) | relayer cap and floor, attest cap per client |
+| `POF_CREDIT_KEY`, `POF_CREDIT_UNIT_LAMPORTS` (0.01 SOL) | the relayer's RSA credit key (from `scripts/keys.mjs`), the price of one credit |
 
 ## HTTP
 | route | |
@@ -52,7 +53,9 @@ carries it.
 | `GET /api/attest` | the Verifier key, the bundle hash, the parameters |
 | `POST /api/attest` | §4 package → §3 attestation (CONTRACT §4) |
 | `GET /api/attest/log` | `?head`, `?entry=i`, `?proof=i&size=n`, `?consistency=m&size=n`, `?from=i&to=j` (CONTRACT §7) |
-| `GET /api/relay/quote`, `POST /api/relay/certify` | the relayer for X and badge subjects |
+| `GET /api/relay/quote`, `POST /api/relay/certify` | the relayer for X and badge subjects (a quote payment, or a credit) |
+| `GET /api/relay/credits`, `POST /api/relay/credits` | the credit offer; claim blind-signed credits for a private transfer to the house ring (`lib/blind.mjs`) |
+| `POST /api/relay/revoke` | a holder revoke signed by the controller (`POF-REVOKE1` bytes), sent by the relayer |
 | `POST /api/link/start`, `POST /api/link/check`, `GET /api/link?id=` | the X-handle linker |
 | `GET /api/keeper/escrow` | every live kit sealed to each registered keeper (public) |
 | `GET /api/keeper/scan`, `GET /api/keeper/anchor` | cron only (`Bearer CRON_SECRET`), off before launch |
@@ -79,6 +82,8 @@ rejection.
 | `LOCK_BUSY`, `LOG_BUSY` | 409/503 | a concurrent request; retry |
 | `RATE_LIMITED` | 429 | with `retry-after` |
 | `BAD_QUOTE`, `QUOTE_EXPIRED`, `NOT_PAID` | 400/402 | the relayer quote and payment |
+| `BAD_CREDIT`, `CREDIT_USED`, `OLD_CREDIT_KEY`, `CREDITS_OFF`, `BAD_BUNDLE`, `BAD_BLINDED`, `BAD_CLAIM_PROOF`, `NOT_RECEIVED`, `NOT_SENDER`, `WRONG_AMOUNT`, `ALREADY_CLAIMED` | 400/402/503 | relay credits |
+| `PROGRAM_NOT_READY` | 503 | the program has no signed revoke yet |
 | `BAD_SIGNATURE`, `BAD_HASHES`, `BAD_LOG_INDEX`, `WRONG_PROGRAM`, `ATTESTATION_EXPIRED`, `RELAY_NOT_FOR_WALLETS` | 400 | what the relayer is asked to submit |
 | `RELAY_CAP`, `RELAY_LOW`, `RELAY_OFF` | 429/503 | the relayer cannot pay now; the payment stays valid |
 | `CHAIN_REJECTED`, `CHAIN_UNCERTAIN`, `CHAIN_OFF` | 502/504/503 | the program refused, the confirmation did not arrive (check before retrying), or no program here |

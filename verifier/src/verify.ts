@@ -127,7 +127,7 @@ export class Verifier {
     }
     if (!Array.isArray(p.notes) || p.notes.length < 1 || p.notes.length > 8) throw new PofError('BAD_NOTES', 'disclose 1 to 8 notes');
 
-    const slot = await this.rings.slot();
+    let slot = await this.rings.slot();
 
     /* the proofs: the ring owner signs the disclosure message (always); the subject key signs it too for a wallet or badge;
        an X subject shows a link id bound to the same controller (POF-02, POF-03) */
@@ -159,6 +159,9 @@ export class Verifier {
       fromB58(tree, 32, 'notes[0].tree');
       const head = await this.rings.treeHead(tree);
       if (slot > head.slot + this.cfg.maxRootAgeSlots) throw new PofError('STALE_ROOT', 'the tree read is too old; try again', 503);
+      // the tree was read after the first slot read: issue at the later of the two, so root_slot <= issued_slot always holds
+      // (a Rings write between the two reads otherwise looked like a root from the future)
+      if (head.slot > slot) slot = head.slot;
       if (head.headSlot > slot || slot - head.headSlot > this.cfg.maxRootLagSlots) throw new PofError('ROOT_TOO_OLD', `the Rings tree has not changed for more than ${this.cfg.maxRootLagSlots} slots, which the program refuses; try again after the next Rings transaction`, 503);
       const mint = this.cfg.mints[asset];
       const notes = p.notes.map((n, i) => {

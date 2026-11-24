@@ -202,3 +202,13 @@ test('the wallet subject signature passes as base58 too', async () => {
   const out = await c.verifier.attest(p);
   assert.equal(out.subjectHash, hex(V.subjectHash(0, r.owner)));
 });
+
+test('a Rings write between the slot read and the tree read does not refuse (issued at the later read)', async () => {
+  const c = makeCtx(); const r = ring(); c.rings.register(r);
+  const n = c.rings.note(r, 2n * SOL);
+  const th = c.rings.treeHead.bind(c.rings);
+  c.rings.treeHead = async (t) => { const h = await th(t); return { ...h, headSlot: c.rings.slotNow + 3n, slot: c.rings.slotNow + 4n }; };
+  const out = await c.verifier.attest(pkg(c, r, [n]));
+  const a = V.decodeAttestation(Buffer.from(out.attestation, 'hex'));
+  assert.ok(a.rootSlot <= a.issuedSlot); assert.equal(a.issuedSlot, c.rings.slotNow + 4n);
+});
