@@ -90,8 +90,15 @@ test('local: vault → shield → sync → pick → §4 → the real Verifier si
   await assert.rejects(pof.certify({ asset: 0, tier: 1, subjectKind: 2, relay: false }), e => e.code === 'PAYER_LINKS_WALLET');
 
   // attest() over HTTP and the kit: saved, sealed under the vault-seed key (POF-10: not openable from nk), opened again
+  // the real Linker with fxtwitter stubbed by the post the holder made (the code it was given)
+  let posted = '';
+  const linker = new V.Linker(store, (h, exp, ctl) => verifier.linkToken(h, exp, ctl), async () => new Response(JSON.stringify({ tweet: { author: { screen_name: 'Some_Handle' }, text: posted, created_timestamp: Math.floor(Date.now() / 1000) } }), { status: 200 }));
   const srv = http.createServer(async (req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', async () => {
-    try { const ans = await verifier.attest(JSON.parse(b)); res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(ans)); }
+    try {
+      const j = JSON.parse(b || '{}'); const u = req.url;
+      const ans = u.endsWith('/link/start') ? await linker.start(j.handle, j.controller) : u.endsWith('/link/check') ? await linker.check(j.handle, j.post, j.secret, j.controller) : await verifier.attest(j);
+      res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(ans));
+    }
     catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: { code: e.code, message: e.message } })); } }); });
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   pof.config.attestUrl = `http://127.0.0.1:${srv.address().port}/api/attest`;
@@ -111,6 +118,24 @@ test('local: vault → shield → sync → pick → §4 → the real Verifier si
     // the controller of the badge kit signs as the badge
     const ctl = await pof.controllerOf(kit);
     assert.equal(ctl.publicKey, subjB.value);
+
+    // POF-03: an X subject. The code is redeemable only with the secret that stayed in this client, and the link id is bound
+    // to this vault's controller for the handle; the Verifier attests with it (the relayer is off here, so the holder accepts
+    // the wallet payer explicitly)
+    const st = await pof.linkStart({ handle: '@Some_Handle' });
+    posted = st.post;
+    await assert.rejects(linker.check('some_handle', 'https://x.com/some_handle/status/1234567890', '0'.repeat(32), st.controller), e => /NO_CODE|NO_SECRET/.test(e.code), 'a stranger with the public post and a guessed secret gets nothing');
+    const lk = await pof.linkCheck({ handle: 'some_handle', post: 'https://x.com/some_handle/status/1234567890' });
+    assert.equal(lk.controller, st.controller);
+    const subjX = await pof.subject({ kind: 1, value: 'some_handle', asset: 0, tier: 1, payer, from: 'vault', linkId: lk.linkId });
+    assert.equal(subjX.controller, st.controller);
+    const pkgX = JSON.parse(JSON.stringify(pof.disclose({ subject: subjX, asset: 0, tier: 1, notes: [notes.find(n => n.amount === 2_000_000_000n)], payer, from: 'vault' })));
+    assert.equal(pkgX.controller, st.controller);
+    const other = JSON.parse(JSON.stringify(pkgX)); other.controller = payer;   // the same link id with another controller
+    await assert.rejects(verifier.attest(other), e => /BAD_SUBJECT_PROOF|BAD_CONTROLLER|LINK|BAD_RING_PROOF/.test(e.code));
+    const ansX = await verifier.attest(pkgX).catch(e => e);
+    assert.ok(ansX.attestation ? ansX.attestation.length === 480 : /NOTE_IN_USE|LOCKED/.test(ansX.code), 'the X certificate is attested (or its note is already in use): ' + (ansX.code || 'ok'));
+    if (ansX.attestation) assert.equal(V.toB58(V.decodeAttestation(C.unhex(ansX.attestation)).controller), st.controller);
   } finally { srv.close(); }
   // POF-11: the vault message names the domain and warns; the deterministic check value is stored, a different seed refuses
   const again = await pof.deriveVault();
