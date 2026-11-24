@@ -1,0 +1,1 @@
+window.POF = { NAME: "Proof of Funds", TICKER: "POF", CA: "SOON", X_URL: "", DOMAIN: "", PROGRAM: "pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT", GATE: "gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU", ALT: "", START: "", LIVE: false };
