@@ -1,0 +1,10 @@
+/* POF rings facts: read-only mainnet/devnet reads behind RINGS.md. Uses the SDK installed in hush/node_modules and the Helius site keys in ~/.config/helius/site_keys (never printed). Run: node <file>.mjs */
+import fs from 'node:fs';
+const KEY=fs.readFileSync(process.env.HOME+'/.config/helius/site_keys','utf8').split('\n')[3].trim();
+const RPC=`https://devnet.helius-rpc.com/?api-key=${KEY}`;
+async function rpc(method, params){const r=await fetch(RPC,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})});const j=await r.json(); if(j.error) throw Error(String(j.error.message).slice(0,200)); return j.result;}
+for (const a of ['ring1GaLCuJnkUMVkX2JeZLTTX17wKsV4fZmPVzXANW','regy3WAeRXMYuMYxr5iK3Bf9Arr3PcxGxyzAddbiqDQ','777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor','EienwBSpsbAetT3RAAMzVA9rB5RHgCF7yTH7FFST6AK5','CiNmas621VuyofiDSrEPfTXHKrdZuB6jMKECyNiMpLXE']) { const x=await rpc('getAccountInfo',[a,{encoding:'base64',dataSlice:{offset:0,length:0}}]); console.log(a.slice(0,8), x.value?{owner:x.value.owner,exec:x.value.executable,lamports:x.value.lamports}:null); }
+const S='/Users/artem/Desktop/sol/hush/node_modules/@heliuslabs/spr/dist/';
+const {SprApi}=await import(S+'api/index.js'); const {SprIndexer}=await import(S+'client/indexer.js');
+for (const base of ['https://d34xe1hqb2ibg2.cloudfront.net']) { try { const ix=new SprIndexer(new SprApi({url:base})); const n=new Uint8Array(32); n[31]=7; const r=await ix.getNonInclusionProofs('777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor',[n]); console.log('devnet indexer ok', r.context, r.proofs[0].rootSeq); } catch(e){ console.log('devnet indexer err', e.code, JSON.stringify(e.details||{}).slice(0,200)); } }
+const r=await fetch('https://d34xe1hqb2ibg2.cloudfront.net/getUserRecords',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:'x',method:'getUserRecords',params:{owners:['11111111111111111111111111111111']}})}); console.log(r.status, (await r.text()).slice(0,200));
