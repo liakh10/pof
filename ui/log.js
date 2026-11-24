@@ -101,7 +101,7 @@ document.addEventListener('click', e => { const a = e.target.closest('[data-entr
   src = await source();
   try {
     await readHead();
-    readWitness();
+    if (head.treeSize) readWitness();
     await recent();
     const q = new URLSearchParams(location.search).get('entry');
     if (q !== null && /^\d+$/.test(q)) { $('#entry').value = q; check(Number(q)); }
