@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proof of Funds · post proof, not wallet</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="A public certificate that you hold at least a tier of SOL or USDC, proven from Helius Privacy Rings without showing the amount. It revokes itself the moment the money moves.">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<link rel="stylesheet" href="./v6.css">
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="./v6.js"></script>
+</head>
+<body class="v6" data-page="wall">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="26" height="26" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/" aria-current="page">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+
+<main id="main">
+<!-- ================================================================ the opening spread -->
+<section class="cover" aria-labelledby="cover-h">
+  <div class="g">
+    <aside class="margin cover-meta">
+      <p class="cap">Proof of Funds</p>
+      <p class="mnote">A live, public certificate of funds on Solana, built on Helius Privacy Rings.</p>
+      <nav class="toc" aria-label="Contents">
+        <p class="cap">Contents</p>
+        <ol>
+          <li><a href="#problem"><span>01</span>Problem</a></li>
+          <li><a href="#proof"><span>02</span>Proof</a></li>
+          <li><a href="#revocation"><span>03</span>Revocation</a></li>
+          <li><a href="#log"><span>04</span>Transparency log</a></li>
+          <li><a href="#builders"><span>05</span>For builders</a></li>
+          <li><a href="#trust"><span>06</span>Trust points</a></li>
+        </ol>
+      </nav>
+    </aside>
+
+    <h1 class="cover-h" id="cover-h">Post proof, <span>not wallet.</span></h1>
+
+    <div class="cover-text">
+      <p class="lede">A public certificate that you hold at least a tier of SOL or USDC. It never shows the amount, it can hide the wallet, and it revokes itself the moment the money moves.</p>
+      <div class="cover-act">
+        <a class="btn" href="/get">Get certified</a>
+        <a class="arrow-link" href="/verify">Verify anyone<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5"/></svg></a>
+      </div>
+      <figure class="figure-num">
+        <p class="fig-num" data-live-num aria-live="off">&nbsp;</p>
+        <figcaption><span class="cap">Fig. 1</span> The Solana mainnet slot, read live. The register of certificates fills from this chain, one slot at a time.</figcaption>
+      </figure>
+    </div>
+
+    <figure class="plate" data-plate>
+      <div class="plate-frame">
+        <img src="/film/poster.jpg" alt="" width="720" height="720" decoding="async">
+        <button class="plate-play" type="button" data-play aria-label="Play the film, 36 seconds, with sound and captions"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31"/><path d="M26 21 L44 32 L26 43 Z"/></svg></button>
+        <div class="plate-prog" aria-hidden="true"><i data-prog></i></div>
+      </div>
+      <figcaption class="plate-cap">
+        <span class="cap">Plate 1</span>
+        <span class="plate-text" data-cap aria-live="off">The film. Thirty-six seconds, with sound and captions.</span>
+        <span class="plate-ctl"><span class="mono" data-time>0:36</span><button type="button" class="tiny" data-mute hidden>Sound off</button></span>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ================================================================ 01 Problem -->
+<section class="ch" id="problem" aria-labelledby="h-problem">
+  <div class="g">
+    <p class="ch-n" aria-hidden="true">01</p>
+    <header class="ch-head">
+      <p class="cap">Problem</p>
+      <h2 id="h-problem">On public chains, the usual way to show you can pay is to show the wallet.</h2>
+    </header>
+    <aside class="margin m-1"><p class="mnote"><b>Proof of funds letter.</b> A routine instrument in finance: a bank states that a client holds at least a sum, for a counterparty who needs to know the deal can close. Property, acquisitions, OTC trades.</p></aside>
+    <div class="body cols-2">
+      <p>Showing the wallet proves the balance and gives away everything else: the full history, every counterparty, the next move. Traders, funds and people who negotiate deals keep being asked to make that trade.</p>
+      <p>A shielded pool changes the default. Inside a Helius Privacy Ring, amounts and assets are encrypted, so a balance is no longer public, and it can no longer be shown by pointing at it. The question becomes how to prove a fact about it, "at least this much", without reopening the rest.</p>
+    </div>
+    <figure class="table-fig">
+      <table class="cmp">
+        <caption><span class="cap">Table 1</span> What a bank letter does, and what a POF certificate does instead.</caption>
+        <thead><tr><th scope="col"></th><th scope="col">A bank letter</th><th scope="col">A POF certificate</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">What it states</th><td>Holds at least X on a date</td><td>Holds at least a tier, live at the current slot</td></tr>
+          <tr><th scope="row">Who vouches</th><td>The bank</td><td>The Verifier's signature, checked by the program, recorded in a public log</td></tr>
+          <tr><th scope="row">What the reader sees</th><td>The letter</td><td>A chain account anyone can read</td></tr>
+          <tr><th scope="row">When it goes stale</th><td>Silently, the day after</td><td>On chain, at the slot a disclosed note is spent</td></tr>
+          <tr><th scope="row">How a reader checks it</th><td>Calls the bank</td><td>Reads the account, the API or the SDK</td></tr>
+        </tbody>
+      </table>
+    </figure>
+  </div>
+</section>
+
+<!-- ================================================================ 02 Proof -->
+<section class="ch" id="proof" aria-labelledby="h-proof">
+  <div class="g">
+    <p class="ch-n" aria-hidden="true">02</p>
+    <header class="ch-head">
+      <p class="cap">Proof</p>
+      <h2 id="h-proof">A minimum, never an amount. Five parts, one signature you can read.</h2>
+    </header>
+    <aside class="margin m-1"><p class="mnote"><b>Tiers are coarse by design.</b> Powers of ten, 1 to 10,000 SOL and 100 to 1,000,000 USDC, so a tier says little beyond what it is asked to say.</p></aside>
+    <div class="body cols-2">
+      <p>The holder's browser picks the fewest shielded notes that reach the tier and sends their openings to the <b>Verifier</b>. The Verifier recomputes every commitment, checks each one sits in the Rings state tree and is unspent, checks the sum reaches the tier, and signs a fixed 240-byte attestation.</p>
+      <p>The <b>pof program</b> rebuilds those 240 bytes on chain, checks the Verifier's ed25519 signature and writes the certificate. The <b>transparency log</b> records every attestation the Verifier signs. The <b>keeper</b> watches the disclosed nullifiers and revokes the certificate when one appears.</p>
+    </div>
+    <figure class="schem">
+      <svg viewBox="0 0 1000 520" role="img" aria-labelledby="sch-t">
+        <title id="sch-t">The protocol: the holder's browser discloses notes to the Verifier, which signs an attestation; the holder submits it to the pof program, which writes the certificate; the Verifier appends every signature to the transparency log; the keeper watches the Rings program and revokes on spend.</title>
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9" fill="none" stroke="#1b1916" stroke-width="1.2"/></marker><marker id="ahs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9" fill="none" stroke="#f2611d" stroke-width="1.2"/></marker></defs>
+        <g class="grid-l"><path d="M0 40 H1000 M0 480 H1000"/></g>
+        <!-- edges -->
+        <path class="e" d="M138 282 L362 168" marker-end="url(#ah)"/>
+        <path class="e sig" pathLength="1" d="M372 196 L148 306" marker-end="url(#ahs)"/>
+        <path class="e sig" pathLength="1" d="M146 330 C 330 420, 520 420, 660 330" marker-end="url(#ahs)"/>
+        <path class="e sig" pathLength="1" d="M744 300 H858" marker-end="url(#ahs)"/>
+        <path class="e" d="M400 190 V420" marker-end="url(#ah)"/>
+        <path class="e dash" d="M436 128 L858 92"/>
+        <path class="e dash" d="M900 132 L742 434"/>
+        <path class="e" d="M700 420 V346" marker-end="url(#ah)"/>
+        <!-- nodes -->
+        <g class="n"><circle cx="100" cy="300" r="40"/><circle class="in" cx="100" cy="300" r="32"/><text class="nn" x="100" y="305">A</text></g>
+        <g class="n"><circle cx="400" cy="150" r="40"/><circle class="in" cx="400" cy="150" r="32"/><text class="nn" x="400" y="155">B</text></g>
+        <g class="n"><circle class="solid" cx="700" cy="300" r="40"/><path class="chk" d="M684 300 L696 312 L718 290"/></g>
+        <g class="n acct"><rect x="858" y="258" width="84" height="84"/><path d="M858 286 H942 M858 314 H942"/><rect class="sigfill" x="858" y="258" width="4" height="28"/><text class="af" x="868" y="277">tier</text><text class="af" x="868" y="305">status</text><text class="af" x="868" y="333">slot</text></g>
+        <g class="n"><rect x="360" y="428" width="80" height="60"/><path d="M372 476 L384 458 L396 476 M404 476 L416 458 L428 476 M384 458 L400 442 L416 458"/></g>
+        <g class="n"><circle cx="900" cy="92" r="40"/><circle class="in" cx="900" cy="92" r="32"/><circle class="in" cx="900" cy="92" r="24"/><circle class="in" cx="900" cy="92" r="16"/><circle class="sgr" cx="900" cy="92" r="28"/></g>
+        <g class="n"><circle cx="700" cy="460" r="22"/><circle class="in" cx="700" cy="460" r="14"/></g>
+        <!-- labels -->
+        <g class="lb">
+          <text x="100" y="364" text-anchor="middle">Holder's browser</text>
+          <text x="400" y="88" text-anchor="middle">Verifier</text>
+          <text x="700" y="364" text-anchor="middle">pof program</text>
+          <text x="900" y="364" text-anchor="middle">Certificate account</text>
+          <text x="456" y="464">Transparency log</text>
+          <text x="900" y="28" text-anchor="middle">Rings program and state tree</text>
+          <text x="736" y="466">Keeper</text>
+        </g>
+        <g class="lb small">
+          <text x="176" y="250" transform="rotate(-27 176 250)">1  openings of the chosen notes</text>
+          <text x="206" y="300" transform="rotate(-26 206 300)" class="o">2  240 bytes, signed</text>
+          <text x="560" y="414" text-anchor="middle" class="o">3  certify</text>
+          <text x="800" y="290" text-anchor="middle" class="o">4  writes</text>
+          <text x="410" y="290">appends every signature</text>
+          <text x="560" y="98" transform="rotate(-5 560 98)">reads the root and the nullifiers</text>
+          <text x="826" y="250" transform="rotate(-62 826 250)">watches the nullifiers</text>
+          <text x="712" y="396">5  revoke_spent</text>
+        </g>
+      </svg>
+      <figcaption><span class="cap">Fig. 2</span> The protocol. Orange is the path of one certificate: the signed attestation, the <code>certify</code> call, the account it writes. Dashed lines are reads.</figcaption>
+    </figure>
+    <div class="proves">
+      <div>
+        <p class="cap">It proves</p>
+        <ol class="ruled">
+          <li>The disclosed notes exist in the Rings tree and were unspent at the slot it names.</li>
+          <li>Together they reach the tier: at least 1,000 SOL means at least 1,000 SOL.</li>
+          <li>The subject signed for this vault, so the tier is bound to it.</li>
+          <li>It is still true now: a spend revokes it on chain.</li>
+        </ol>
+      </div>
+      <div>
+        <p class="cap">It does not prove</p>
+        <ol class="ruled">
+          <li>How much you hold in total, or anything about the rest of your Ring.</li>
+          <li>That the money was never borrowed. Revocation catches the return, not the loan.</li>
+          <li>Anything about the past. It starts at the slot it was certified.</li>
+          <li>Anonymity. A wallet subject names the wallet; choose a badge to name nobody.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 03 Revocation -->
+<section class="ch" id="revocation" aria-labelledby="h-rev">
+  <div class="g">
+    <p class="ch-n" aria-hidden="true">03</p>
+    <header class="ch-head">
+      <p class="cap">Revocation</p>
+      <h2 id="h-rev">Moving the money is what ends the certificate.</h2>
+    </header>
+    <aside class="margin m-1"><p class="mnote"><b>No PDA has ever been closed.</b> Every Rings spend creates a nullifier account under the pool program. The program checks that account exists, so a spend is proven from Rings' own state, not from our word.</p></aside>
+    <div class="body cols-2">
+      <p>A certificate binds the exact notes it was built from, by salted hashes of their nullifiers. Whoever holds a note's revocation pair can show the spend: the program recomputes the hash, finds the nullifier account on the Rings pool program, and marks the certificate revoked at that slot.</p>
+      <p>The keeper does this for every certificate, and the holder keeps the same pairs, so revocation does not depend on us. The holder can also revoke at any time, and anyone can close a certificate once its expiry slot has passed.</p>
+    </div>
+    <figure class="bigfig">
+      <p class="fig-num">216,000</p>
+      <figcaption><span class="cap">Fig. 3</span> Slots a certificate lives in the launch Config, about a day, unless it is renewed on the same notes or revoked first.</figcaption>
+    </figure>
+    <figure class="schem timeline">
+      <svg viewBox="0 0 1000 210" role="img" aria-labelledby="tl-t">
+        <title id="tl-t">A certificate's life in slots: live from the certify slot until a disclosed note is spent; revoke_spent marks it revoked at that slot; the expiry slot it would have reached is never reached.</title>
+        <path class="axis" d="M20 140 H980"/>
+        <path class="ticks" data-ticks d="M20 140v9M30 140v3M40 140v3M50 140v3M60 140v3M70 140v6M80 140v3M90 140v3M100 140v3M110 140v3M120 140v9M130 140v3M140 140v3M150 140v3M160 140v3M170 140v6M180 140v3M190 140v3M200 140v3M210 140v3M220 140v9M230 140v3M240 140v3M250 140v3M260 140v3M270 140v6M280 140v3M290 140v3M300 140v3M310 140v3M320 140v9M330 140v3M340 140v3M350 140v3M360 140v3M370 140v6M380 140v3M390 140v3M400 140v3M410 140v3M420 140v9M430 140v3M440 140v3M450 140v3M460 140v3M470 140v6M480 140v3M490 140v3M500 140v3M510 140v3M520 140v9M530 140v3M540 140v3M550 140v3M560 140v3M570 140v6M580 140v3M590 140v3M600 140v3M610 140v3M620 140v9M630 140v3M640 140v3M650 140v3M660 140v3M670 140v6M680 140v3M690 140v3M700 140v3M710 140v3M720 140v9M730 140v3M740 140v3M750 140v3M760 140v3M770 140v6M780 140v3M790 140v3M800 140v3M810 140v3M820 140v9M830 140v3M840 140v3M850 140v3M860 140v3M870 140v6M880 140v3M890 140v3M900 140v3M910 140v3M920 140v9M930 140v3M940 140v3M950 140v3M960 140v3M970 140v6M980 140v3"/>
+        <rect class="live-bar" x="120" y="104" width="480" height="10"/>
+        <path class="ink-l" d="M600 109 H668"/>
+        <path class="dash-l" d="M668 109 H930"/>
+        <path class="mk" d="M120 92 V140 M600 92 V140 M668 92 V140 M930 92 V140"/>
+        <circle class="spent" cx="600" cy="109" r="7"/>
+        <path class="x" d="M662 103 L674 115 M674 103 L662 115"/>
+        <g class="lb small">
+          <text x="120" y="84">certify, slot s</text>
+          <text x="600" y="84" text-anchor="middle" class="o">a disclosed note is spent</text>
+          <text x="676" y="70">revoke_spent, status 1</text>
+          <text x="930" y="84" text-anchor="end">expiry, s + 216,000</text>
+          <text x="360" y="172" text-anchor="middle">live: reads as valid in the gate, the SDK and the API</text>
+          <text x="800" y="172" text-anchor="middle">never reached</text>
+        </g>
+      </svg>
+      <figcaption><span class="cap">Fig. 4</span> One certificate, drawn in slots.</figcaption>
+    </figure>
+    <figure class="table-fig">
+      <table class="cmp three">
+        <caption><span class="cap">Table 2</span> The three ways a certificate ends. Each is an instruction anyone can check on chain.</caption>
+        <thead><tr><th scope="col">How</th><th scope="col">Who</th><th scope="col">What becomes public</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>revoke_spent</code></th><td>Anyone holding a disclosed note's salt and nullifier</td><td>That note's salt and nullifier</td></tr>
+          <tr><th scope="row"><code>revoke_by_holder</code></th><td>The certificate's controller, at any time</td><td>Nothing beyond the revocation</td></tr>
+          <tr><th scope="row"><code>expire</code></th><td>Anyone, after the expiry slot</td><td>Nothing; the rent goes back to its payer</td></tr>
+        </tbody>
+      </table>
+    </figure>
+  </div>
+</section>
+
+<!-- ================================================================ 04 Transparency log -->
+<section class="ch" id="log" aria-labelledby="h-log">
+  <div class="g">
+    <p class="ch-n" aria-hidden="true">04</p>
+    <header class="ch-head">
+      <p class="cap">Transparency log</p>
+      <h2 id="h-log">Every signature the Verifier makes is public, ordered and permanent.</h2>
+    </header>
+    <aside class="margin m-1"><p class="mnote"><b>No amounts, no openings, no nullifiers.</b> The attestation carries a salted nullset hash, which cannot be tested against a nullifier without the salts.</p></aside>
+    <div class="body cols-2">
+      <p>The log does not make trust in the Verifier unnecessary. It makes a false attestation impossible to withdraw quietly, and a signature made outside the log stands out.</p>
+      <p>One entry per attestation, appended before the answer leaves the Verifier, in an append-only Merkle log whose signed head is anchored on chain. Your browser can check any entry against it: the leaf, the signature, the trusted key, the path to the root.</p>
+    </div>
+    <figure class="schem leaf">
+      <svg viewBox="0 0 1000 190" role="img" aria-labelledby="lf-t">
+        <title id="lf-t">One log leaf, 377 bytes, drawn to scale: 1 byte version, 240 bytes attestation, 64 bytes signature, 32 bytes Verifier key, 32 bytes bundle hash, 8 bytes slot.</title>
+        <g data-leaf><path class="hl" d="M30 34 V26 H970 V34"/><text class="t" x="500" y="18" text-anchor="middle">377 bytes, one leaf</text><rect class="sigfill" x="630.9" y="44" width="159.58" height="44"/><path class="tk1" d="M32.49 44v5M34.99 44v5M37.48 44v5M39.97 44v5M42.47 44v5M44.96 44v5M47.45 44v5M52.44 44v5M54.93 44v5M57.43 44v5M59.92 44v5M62.41 44v5M64.91 44v5M67.4 44v5M72.39 44v5M74.88 44v5M77.37 44v5M79.87 44v5M82.36 44v5M84.85 44v5M87.35 44v5M92.33 44v5M94.83 44v5M97.32 44v5M99.81 44v5M102.31 44v5M104.8 44v5M107.29 44v5M112.28 44v5M114.77 44v5M117.27 44v5M119.76 44v5M122.25 44v5M124.75 44v5M127.24 44v5M132.23 44v5M134.72 44v5M137.21 44v5M139.71 44v5M142.2 44v5M144.69 44v5M147.19 44v5M152.18 44v5M154.67 44v5M157.16 44v5M159.66 44v5M162.15 44v5M164.64 44v5M167.14 44v5M172.12 44v5M174.62 44v5M177.11 44v5M179.6 44v5M182.1 44v5M184.59 44v5M187.08 44v5M192.07 44v5M194.56 44v5M197.06 44v5M199.55 44v5M202.04 44v5M204.54 44v5M207.03 44v5M212.02 44v5M214.51 44v5M217 44v5M219.5 44v5M221.99 44v5M224.48 44v5M226.98 44v5M231.96 44v5M234.46 44v5M236.95 44v5M239.44 44v5M241.94 44v5M244.43 44v5M246.92 44v5M251.91 44v5M254.4 44v5M256.9 44v5M259.39 44v5M261.88 44v5M264.38 44v5M266.87 44v5M271.86 44v5M274.35 44v5M276.84 44v5M279.34 44v5M281.83 44v5M284.32 44v5M286.82 44v5M291.8 44v5M294.3 44v5M296.79 44v5M299.28 44v5M301.78 44v5M304.27 44v5M306.76 44v5M311.75 44v5M314.24 44v5M316.74 44v5M319.23 44v5M321.72 44v5M324.22 44v5M326.71 44v5M331.7 44v5M334.19 44v5M336.68 44v5M339.18 44v5M341.67 44v5M344.16 44v5M346.66 44v5M351.64 44v5M354.14 44v5M356.63 44v5M359.12 44v5M361.62 44v5M364.11 44v5M366.6 44v5M371.59 44v5M374.08 44v5M376.58 44v5M379.07 44v5M381.56 44v5M384.06 44v5M386.55 44v5M391.54 44v5M394.03 44v5M396.53 44v5M399.02 44v5M401.51 44v5M404.01 44v5M406.5 44v5M411.49 44v5M413.98 44v5M416.47 44v5M418.97 44v5M421.46 44v5M423.95 44v5M426.45 44v5M431.43 44v5M433.93 44v5M436.42 44v5M438.91 44v5M441.41 44v5M443.9 44v5M446.39 44v5M451.38 44v5M453.87 44v5M456.37 44v5M458.86 44v5M461.35 44v5M463.85 44v5M466.34 44v5M471.33 44v5M473.82 44v5M476.31 44v5M478.81 44v5M481.3 44v5M483.79 44v5M486.29 44v5M491.27 44v5M493.77 44v5M496.26 44v5M498.75 44v5M501.25 44v5M503.74 44v5M506.23 44v5M511.22 44v5M513.71 44v5M516.21 44v5M518.7 44v5M521.19 44v5M523.69 44v5M526.18 44v5M531.17 44v5M533.66 44v5M536.15 44v5M538.65 44v5M541.14 44v5M543.63 44v5M546.13 44v5M551.11 44v5M553.61 44v5M556.1 44v5M558.59 44v5M561.09 44v5M563.58 44v5M566.07 44v5M571.06 44v5M573.55 44v5M576.05 44v5M578.54 44v5M581.03 44v5M583.53 44v5M586.02 44v5M591.01 44v5M593.5 44v5M595.99 44v5M598.49 44v5M600.98 44v5M603.47 44v5M605.97 44v5M610.95 44v5M613.45 44v5M615.94 44v5M618.44 44v5M620.93 44v5M623.42 44v5M625.92 44v5M630.9 44v5M633.4 44v5M635.89 44v5M638.38 44v5M640.88 44v5M643.37 44v5M645.86 44v5M650.85 44v5M653.34 44v5M655.84 44v5M658.33 44v5M660.82 44v5M663.32 44v5M665.81 44v5M670.8 44v5M673.29 44v5M675.78 44v5M678.28 44v5M680.77 44v5M683.26 44v5M685.76 44v5M690.74 44v5M693.24 44v5M695.73 44v5M698.22 44v5M700.72 44v5M703.21 44v5M705.7 44v5M710.69 44v5M713.18 44v5M715.68 44v5M718.17 44v5M720.66 44v5M723.16 44v5M725.65 44v5M730.64 44v5M733.13 44v5M735.62 44v5M738.12 44v5M740.61 44v5M743.1 44v5M745.6 44v5M750.58 44v5M753.08 44v5M755.57 44v5M758.06 44v5M760.56 44v5M763.05 44v5M765.54 44v5M770.53 44v5M773.02 44v5M775.52 44v5M778.01 44v5M780.5 44v5M783 44v5M785.49 44v5M790.48 44v5M792.97 44v5M795.46 44v5M797.96 44v5M800.45 44v5M802.94 44v5M805.44 44v5M810.42 44v5M812.92 44v5M815.41 44v5M817.9 44v5M820.4 44v5M822.89 44v5M825.38 44v5M830.37 44v5M832.86 44v5M835.36 44v5M837.85 44v5M840.34 44v5M842.84 44v5M845.33 44v5M850.32 44v5M852.81 44v5M855.31 44v5M857.8 44v5M860.29 44v5M862.79 44v5M865.28 44v5M870.27 44v5M872.76 44v5M875.25 44v5M877.75 44v5M880.24 44v5M882.73 44v5M885.23 44v5M890.21 44v5M892.71 44v5M895.2 44v5M897.69 44v5M900.19 44v5M902.68 44v5M905.17 44v5M910.16 44v5M912.65 44v5M915.15 44v5M917.64 44v5M920.13 44v5M922.63 44v5M925.12 44v5M930.11 44v5M932.6 44v5M935.09 44v5M937.59 44v5M940.08 44v5M942.57 44v5M945.07 44v5M950.05 44v5M952.55 44v5M955.04 44v5M957.53 44v5M960.03 44v5M962.52 44v5M965.01 44v5M970 44v5"/><path class="tk8" d="M49.95 44v11M69.89 44v11M89.84 44v11M129.73 44v11M149.68 44v11M169.63 44v11M209.52 44v11M229.47 44v11M249.42 44v11M289.31 44v11M309.26 44v11M329.2 44v11M369.1 44v11M389.05 44v11M408.99 44v11M448.89 44v11M468.83 44v11M488.78 44v11M528.67 44v11M548.62 44v11M568.57 44v11M608.46 44v11M628.41 44v11M648.36 44v11M688.25 44v11M708.2 44v11M728.14 44v11M768.04 44v11M787.98 44v11M807.93 44v11M847.82 44v11M867.77 44v11M887.72 44v11M927.61 44v11M947.56 44v11M967.51 44v11"/><path class="tk32" d="M30 44v18M109.79 44v18M189.58 44v18M269.36 44v18M349.15 44v18M428.94 44v18M508.73 44v18M588.51 44v18M668.3 44v18M748.09 44v18M827.88 44v18M907.67 44v18"/><rect class="hl" x="30" y="44" width="940" height="44"/><path class="bd" d="M32.49 36 V96"/><path class="bd" d="M630.9 36 V96"/><path class="bd" d="M790.48 36 V96"/><path class="bd" d="M870.27 36 V96"/><path class="bd" d="M950.05 36 V96"/><text class="t off" x="30" y="112" text-anchor="start">0</text><text class="t off" x="630.9" y="112" text-anchor="middle">241</text><text class="t off" x="790.48" y="112" text-anchor="middle">305</text><text class="t off" x="870.27" y="112" text-anchor="middle">337</text><text class="t off" x="970" y="112" text-anchor="end">377</text><text class="t nm" x="331.69" y="140" text-anchor="middle">the attestation</text><text class="t sz" x="331.69" y="157" text-anchor="middle">240 bytes, built and checked by the program</text><text class="t nm o" x="710.69" y="140" text-anchor="middle">signature</text><text class="t sz" x="710.69" y="157" text-anchor="middle">64 bytes</text><text class="t nm" x="830.37" y="140" text-anchor="middle">key</text><text class="t sz" x="830.37" y="157" text-anchor="middle">32</text><text class="t nm" x="910.16" y="140" text-anchor="middle">bundle</text><text class="t sz" x="910.16" y="157" text-anchor="middle">32</text><path class="hl" d="M31.25 92 V176 H44"/><text class="t sz" x="48" y="180">version, 1 byte</text><path class="hl" d="M960.02 120 V176 H930"/><text class="t sz" x="926" y="180" text-anchor="end">slot read at append, 8</text></g></svg>
+      <figcaption><span class="cap">Fig. 5</span> One leaf of the log, 377 bytes, drawn to scale. Each tick is one byte.</figcaption>
+    </figure>
+    <div class="body link-row"><a class="arrow-link" href="/log">Open the transparency log<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5"/></svg></a></div>
+  </div>
+</section>
+
+<!-- ================================================================ 05 For builders -->
+<section class="ch" id="builders" aria-labelledby="h-b">
+  <div class="g">
+    <p class="ch-n" aria-hidden="true">05</p>
+    <header class="ch-head">
+      <p class="cap">For builders</p>
+      <h2 id="h-b">Gate anything with a certificate.</h2>
+    </header>
+    <aside class="margin m-1"><p class="mnote"><b>Surfaces.</b> Rooms on chain, a Telegram gate, Discord roles, an HTTP API, a TypeScript SDK, an MCP server for agents, and one CPI call for your own program.</p></aside>
+    <div class="listings">
+      <figure class="listing">
+        <figcaption><span class="cap">Listing 1</span> TypeScript, @pof/sdk</figcaption>
+<pre><code><span class="ln">1</span>import { PofClient } from "@pof/sdk";
+<span class="ln">2</span>
+<span class="ln">3</span>const pof = new PofClient({ rpc: "https://api.mainnet-beta.solana.com" });
+<span class="ln">4</span>const r = await pof.checkProofOfFunds({ subject: "@anon", asset: "SOL", minTier: 4 });
+<span class="ln">5</span><span class="cm">// r.ok: a live certificate of at least 1,000 SOL, read from chain</span></code></pre>
+      </figure>
+      <figure class="listing">
+        <figcaption><span class="cap">Listing 2</span> Rust, the CPI gate</figcaption>
+<pre><code><span class="ln">1</span>let view = pof::cpi::require_certificate(ctx, subject_hash, 0, 3)?.get();
+<span class="ln">2</span>require_keys_eq!(view.controller, user.key());
+<span class="ln">3</span><span class="cm">// passes only while the certificate is live and at least 100 SOL</span></code></pre>
+      </figure>
+    </div>
+    <div class="body link-row"><a class="arrow-link" href="/developers">Developers<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5"/></svg></a><a class="arrow-link" href="/rooms">Rooms<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5"/></svg></a></div>
+  </div>
+</section>
+
+<!-- ================================================================ 06 Trust points -->
+<section class="ch" id="trust" aria-labelledby="h-t">
+  <div class="g">
+    <p class="ch-n" aria-hidden="true">06</p>
+    <header class="ch-head">
+      <p class="cap">Trust points</p>
+      <h2 id="h-t">Everything POF asks you to trust, stated first and plainly.</h2>
+    </header>
+    <aside class="margin m-1"><p class="mnote"><b>Phase 2.</b> Replaces the Verifier's view with a zero-knowledge proof. Until then, version 1 has one trusted party for privacy, and this list says what it sees.</p></aside>
+    <ol class="trust">
+      <li><a href="/docs/trust"><b>The Verifier sees the notes you disclose</b><span>Amounts and the vault's nullifier key, for one request. It keeps neither.</span></a></li>
+      <li><a href="/docs/trust"><b>The Verifier's signing key and the program admin</b><span>One key at a time, held in the program's Config. A new key takes over only after 216,000 slots, in public.</span></a></li>
+      <li><a href="/docs/trust"><b>Helius: the Rings programs, the tree and the indexer</b><span>POF relies on their programs and state tree; each fact it uses is checked against mainnet reads.</span></a></li>
+      <li><a href="/docs/trust"><b>Revocation on spend depends on whoever holds the revoke kits</b><span>The keeper and the holder both hold the pairs, and certificates are short-lived.</span></a></li>
+      <li><a href="/docs/trust"><b>The X handle check relies on X</b><span>A handle is linked by posting a one-time code, read through a public API. The chain holds only its hash.</span></a></li>
+      <li><a href="/docs/trust"><b>A certificate proves control, not ownership</b><span>Borrowed funds count. Revocation catches the move, not a lender who leaves them in place.</span></a></li>
+      <li><a href="/docs/trust"><b>Timing</b><span>A public deposit and a quick certify can be paired. The Verifier refuses notes younger than 150 slots.</span></a></li>
+      <li><a href="/docs/trust"><b>Screenshots</b><span>A picture of a card proves nothing. The account is the only source of truth.</span></a></li>
+      <li><a href="/docs/trust"><b>Our hosting</b><span>Vercel functions and Vercel Blob. The host sees request metadata, like any host.</span></a></li>
+      <li><a href="/docs/trust"><b>Open findings</b><span>An internal review, each finding listed with a failing test until it passes.</span></a></li>
+    </ol>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">515f4232e10ccbe4aca21bb90884d828972443fc6584f434ab0d167a000d6935</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>
