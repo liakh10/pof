@@ -127,23 +127,42 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
     },
     async revokeSpent(x) {
       const tree = new PublicKey(x.tree);
+      const cert = certPda(x.subjectHash, x.asset);
       const nfPda = pda([Buffer.from('nullifier'), tree.toBuffer(), Buffer.from(x.nullifier)], SPP);
       const pdaLive = await conn.getAccountInfo(nfPda);
-      let membership: any = null;
-      if (!pdaLive) {
-        if (!o.rings || !(o.rings as any).nullifierMembership) throw new PofError('NO_SPEND_PROOF', 'the nullifier PDA is gone and no membership source is configured', 503);
-        membership = await (o.rings as any).nullifierMembership(x.tree, x.nullifier);
+      // the fast path: the nullifier PDA is there, one transaction (CONTRACT §5 path (a))
+      if (pdaLive) {
+        const ix = new TransactionInstruction({ programId: PID, data: ixData('revoke_spent', { index: x.index, salt: x.salt, nullifier: x.nullifier, membership: null }), keys: [
+          meta(payer.publicKey, true, false), meta(CONFIG), meta(TREASURY, false, true), meta(cert, false, true), meta(tree), meta(nfPda)] });
+        return send([ix], 'revoke_spent');
       }
+      if (!o.rings || !(o.rings as any).nullifierMembership) throw new PofError('NO_SPEND_PROOF', 'the nullifier PDA is gone and no membership source is configured', 503);
+      const has = (n: string) => idl.instructions.some((i: any) => i.name === n);
+      if (has('open_path') && has('stage_path') && has('revoke_spent_staged')) {
+        // the PDA is gone: the full 40-level membership path staged into a buffer over two ordinary transactions (path (b))
+        const m = await (o.rings as any).nullifierMembership(x.tree, x.nullifier, { full: true });
+        const buffer = pda([Buffer.from('path'), payer.publicKey.toBuffer(), cert.toBuffer()]);
+        const cut = Math.min(20, m.path.length);
+        const open = new TransactionInstruction({ programId: PID, data: ixData('open_path', { nullifier: x.nullifier, next_value: m.next_value, leaf_index: m.leaf_index, siblings: m.path.slice(0, cut) }), keys: [
+          meta(payer.publicKey, true, true), meta(cert), meta(buffer, false, true), meta(SystemProgram.programId)] });
+        await send([open], 'open_path');
+        const ixs: any[] = [];
+        if (m.path.length > cut) ixs.push(new TransactionInstruction({ programId: PID, data: ixData('stage_path', { offset: cut, siblings: m.path.slice(cut) }), keys: [meta(payer.publicKey, true, false), meta(buffer, false, true)] }));
+        ixs.push(new TransactionInstruction({ programId: PID, data: ixData('revoke_spent_staged', { index: x.index, salt: x.salt }), keys: [
+          meta(payer.publicKey, true, true), meta(CONFIG), meta(TREASURY, false, true), meta(cert, false, true), meta(tree), meta(buffer, false, true)] }));
+        try { return await send(ixs, 'revoke_spent_staged'); }
+        finally {
+          // give the buffer's rent back if the staged revoke left it open
+          if (has('close_path') && await conn.getAccountInfo(buffer)) {
+            await send([new TransactionInstruction({ programId: PID, data: ixData('close_path', {}), keys: [meta(payer.publicKey, true, false), meta(CONFIG), meta(buffer, false, true), meta(payer.publicKey, false, true)] })], 'close_path').catch(() => {});
+          }
+        }
+      }
+      // the older single-transaction membership (a trimmed path; fits while the nullifier tree is small)
+      const membership = await (o.rings as any).nullifierMembership(x.tree, x.nullifier);
       const ix = new TransactionInstruction({ programId: PID, data: ixData('revoke_spent', { index: x.index, salt: x.salt, nullifier: x.nullifier, membership }), keys: [
-        meta(payer.publicKey, true, false), meta(CONFIG), meta(TREASURY, false, true), meta(certPda(x.subjectHash, x.asset), false, true), meta(tree),
-        pdaLive ? meta(nfPda) : meta(PID),
-      ] });
+        meta(payer.publicKey, true, false), meta(CONFIG), meta(TREASURY, false, true), meta(cert, false, true), meta(tree), meta(PID)] });
       return send([ix], 'revoke_spent');
-    },
-    async anchorLog(size, root) {
-      const msg = sthBytes(fromB58(o.programId), size, root);
-      const ix = new TransactionInstruction({ programId: PID, data: ixData('anchor_log', { size: BigInt(size), head: root }), keys: [meta(payer.publicKey, true, false), meta(CONFIG), meta(TREASURY, false, true), meta(SYSVAR_INSTRUCTIONS_PUBKEY)] });
-      return send([edIx(msg, o.verifier.sign(msg)), ix], 'anchor_log');
     },
     async relayerBalance() { return BigInt(await conn.getBalance(payer.publicKey)); },
     async incoming(sinceSlot, reference) {

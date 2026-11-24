@@ -1,7 +1,7 @@
 {
   "bundle": "dist/pof-verifier.mjs",
-  "sha256": "58ed1a63b1e533487e2331bd587c52bb72d915978faa88104aebd4a9b355d9b2",
-  "bytes": 9793331,
+  "sha256": "d36cb4c68f0317caeb66bb7b9b1fd83a0dd4258226a037e22732eaff7ad30757",
+  "bytes": 9795234,
   "esbuild": "0.28.2",
   "node": "v20",
   "lockfileSha256": "9430500324f9bc92396bc6a464bf88d994b8840508a04eacd12ce1ee61ed4c3a",
@@ -24,9 +24,9 @@
     "src/locks.ts": "88bad6bda3b7eab1b28e077b1bba116ae6741bd81b628901aef09dcb820098b2",
     "src/log.ts": "b607c8a8a1f2fd0fcb11da5192ba9000032dee09705301ff2aed25d977170971",
     "src/merkle.ts": "d98bfbf65d7590cdf8297760ea0014b5c2c7108fa6ac7fa20969788ca77621e0",
-    "src/program.ts": "d05c39186e4378c02b6a043539f24271af483accce8a0cf8a2ee427300dee559",
+    "src/program.ts": "20b7b6345bf163c7c56694ece946d23086c5b52f36f1a723a147f82d9e2a7f85",
     "src/relayer.ts": "20884e919a8a251446adec71ab34afaae35608c78a6a7b7068fa584ede7b864f",
-    "src/rings.ts": "949167070d03d1d234736514766f61389f90834dec11677eceebd9a3f5a0040a",
+    "src/rings.ts": "fac35d20bf363936e72e32c6b665a4cd9f5e002c3491b92a7aa9e38f2de2273e",
     "src/store.ts": "b95cbbadfe71f5e75ac65d657f401f6628d8a297e9e0ec0e4ad6622dfa4bab6e",
     "src/verify.ts": "e4621ea9b7ba91b47d502f15ce4838594a6c3fd23d465b220dc928cc69e0a7cc"
   }

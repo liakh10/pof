@@ -133,7 +133,7 @@ export class HeliusRings implements RingsSource {
 
   /** CONTRACT §5 path (b): the membership of a spent nullifier in the folded nullifier tree, from the indexer's non-inclusion
    *  proof for nf + 1 (whose low element is nf), re-hashed here, with the trailing empty-subtree siblings left out */
-  async nullifierMembership(tree: string, nf: Uint8Array) {
+  async nullifierMembership(tree: string, nf: Uint8Array, { full = false } = {}) {
     const c = await this.client();
     const { poseidon } = await import('@heliuslabs/spr/internal') as any;
     const plus = (BigInt('0x' + Buffer.from(nf).toString('hex')) + 1n).toString(16).padStart(64, '0');
@@ -145,7 +145,7 @@ export class HeliusRings implements RingsSource {
     if (Buffer.compare(Buffer.from(h), Buffer.from(p.root))) throw new PofError('NULLIFIER_UNPROVEN', 'the membership path does not hash to its root', 502);
     const zeros = [new Uint8Array(32)]; for (let i = 0; i < 40; i++) zeros.push(poseidon([zeros[i], zeros[i]]));
     let keep = p.path.length;
-    while (keep > 0 && Buffer.compare(Buffer.from(p.path[keep - 1]), Buffer.from(zeros[keep - 1])) === 0) keep--;
+    while (!full && keep > 0 && Buffer.compare(Buffer.from(p.path[keep - 1]), Buffer.from(zeros[keep - 1])) === 0) keep--;
     return { leaf_index: BigInt(p.lowElementIndex), next_value: new Uint8Array(p.highElement), path: p.path.slice(0, keep).map((x: Uint8Array) => new Uint8Array(x)) };
   }
 
