@@ -68,10 +68,13 @@ POF certifies notes held in Helius Privacy Rings, so it inherits their trust:
 
 ## 4. Revocation on spend depends on whoever holds the revoke kits
 
-`revoke_spent` is open to anyone on chain, but it needs a disclosed note's secret salt and its nullifier. Today only two
-parties hold them: the **holder** (in the local kit) and POF's **keeper** (sealed in Blob). A holder has no reason to
-revoke their own certificate, so in practice "the certificate dies when the money moves" depends on the keeper: its scan,
-its store and its seal key (internal review finding POF-01).
+`revoke_spent` is open to anyone on chain, but it needs a disclosed note's secret salt and its nullifier. They are held
+by the **holder** (in the local kit) and by the **keepers** registered in `verifier/keepers.json`: the Verifier seals
+every kit to each registered keeper's X25519 key and publishes the envelopes at `GET /api/keeper/escrow`; each keeper opens
+only its own. A holder has no reason to revoke their own certificate, so "the certificate dies when the money moves"
+depends on at least one registered keeper running (internal review finding POF-01). Today one keeper is registered, the
+project's own; `verifier/scripts/witness-keeper.mjs` is a complete independent keeper in one file, and adding an operator
+is a reviewed commit to `keepers.json`, which the published bundle hash pins.
 
 A certificate does not watch the chain by itself. When a disclosed note is spent, the certificate stays live until
 somebody shows the spend with `revoke_spent`. Between the spend and the revocation there is a window: the keeper's scan
@@ -79,11 +82,11 @@ interval plus one transaction. If the keeper stopped, a spent certificate would 
 **Before launch the keeper is off.**
 
 What limits this:
-- every certificate expires: at most `validity_slots` after the Verifier signed (6,480,000 slots in the launch Config;
-  a shorter default with a cheap `renew` is being added, see the [changelog](https://github.com/liakh10/pof/blob/main/CHANGELOG.md));
-- the kits are to be held by more than one keeper, each copy encrypted to that keeper, so one stopped operator does not
-  keep spent certificates alive (in progress; this page will say when it lands);
-- the [status page](status) publishes the keeper's last run in slots, so a stopped keeper is visible.
+- certificates are short-lived: the Verifier issues them for 216,000 slots by default (the program allows up to
+  `validity_slots`, 6,480,000 in the launch Config), and `renew` on the same notes re-checks them and extends them;
+- the kits are escrowed to every registered keeper, so one stopped operator does not keep spent certificates alive once
+  a second keeper is registered;
+- the [status page](status) publishes our keeper's last run in slots, so a stopped keeper is visible.
 
 A consumer that needs more than "live, and no spend shown yet" should ask for a recently issued or renewed certificate.
 

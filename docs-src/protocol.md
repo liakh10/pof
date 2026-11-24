@@ -161,7 +161,7 @@ Then it signs, with ed25519, exactly these bytes (CONTRACT §3):
 | 111 | 1 | note count |
 | 112 | 32 | `nullset_hash` |
 | 144 | 8 | issued slot (the slot the Verifier read) |
-| 152 | 8 | expiry slot (issued + 6,480,000) |
+| 152 | 8 | expiry slot (issued + 216,000 by default; the program accepts at most `validity_slots`, 6,480,000) |
 | 160 | 32 | payer |
 | 192 | 32 | controller |
 | 224 | 16 | random nonce |

@@ -55,8 +55,9 @@ its expiry slot.
 - **The Verifier sees the disclosed amounts and the vault's nullifier key** for one request, and can link subject, vault
   and funding wallet. The code keeps none of it; every signature is in the public log with the hash of the code that
   made it. A false attestation is detectable, not impossible.
-- **Revocation on spend needs the salts.** Only the holder and the keeper have them, so in practice it depends on the
-  keeper running. Expiry bounds the damage; the status page shows the keeper's last run.
+- **Revocation on spend needs the salts.** Only the holder and the registered keepers (each sent its own sealed copy)
+  have them, so it depends on a keeper running. Certificates are issued for 216,000 slots by default and renewed on the
+  same notes, which bounds the damage; the status page shows the keeper's last run.
 - **The admin** can pause, rotate the Verifier key after a delay counted in slots, set the fee under a hard cap, and, as
   upgrade authority, upgrade the program.
 - **Helius**: the Rings programs, the tree, and the indexer (its paths are re-checked against on-chain roots; note

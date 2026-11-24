@@ -34,8 +34,8 @@ from the vault for an X handle.
 **Indexer.** Helius's service for Rings data: Merkle paths, non-inclusion paths, transactions. The Verifier re-checks its
 paths against on-chain roots.
 
-**Keeper.** The service that holds the sealed revoke pairs, watches the disclosed nullifiers and calls `revoke_spent`;
-also anchors the log.
+**Keeper.** A service that holds the revoke pairs (escrowed to its X25519 key), watches the disclosed nullifiers and calls
+`revoke_spent`. Registered keepers are listed in `verifier/keepers.json`; the project's keeper also anchors the log.
 
 **Kit (revoke kit).** For one certificate: each disclosed note's salt and nullifier, plus sealed openings. Kept by the
 holder and the keeper.

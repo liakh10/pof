@@ -28,8 +28,9 @@ No. `revoke_spent` needs a salted nullifier that matches one stored on the certi
 accounts that it is spent. Only the controller can revoke it otherwise.
 
 **How long does a certificate last?**
-Until it is revoked, or until its expiry slot: at most `validity_slots` after the Verifier signed (6,480,000 slots in the
-launch Config). `renew` extends it on the same notes after a fresh check.
+Until it is revoked, or until its expiry slot: 216,000 slots after the Verifier signed by default (the program allows up to
+6,480,000). `renew` re-checks the same notes and extends it; short validity is what keeps a certificate from outliving
+its money if no keeper is watching.
 
 **Why a separate vault and not my main ring?**
 To prove your notes are unspent, the Verifier must see the nullifier key of the ring they are in. With it, it could see
@@ -37,7 +38,8 @@ when that ring's deposits are spent and read its merge outputs. The vault limits
 certificates.
 
 **I lost my browser data. Is the certificate lost?**
-No. The certificate lives on chain. Signing the vault message again rebuilds the vault and the X controller key. The revoke
+No. The certificate lives on chain. Signing the vault message again rebuilds the vault and the X controller key (if your
+wallet does not sign deterministically, the vault key is in the passphrase-protected backup file instead). The revoke
 kit (salts and nullifiers) is only in the browser and in the file you exported; without it you can still revoke by
 controller, but not by spend.
 

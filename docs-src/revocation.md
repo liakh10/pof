@@ -44,15 +44,21 @@ the Rings program recorded.
 - **The holder.** The Verifier's answer carries every salt and nullifier. The client saves them in the local revoke kit,
   which can be exported to a file. With the kit, the holder can revoke without us, from any wallet (the caller pays only
   the transaction fee).
-- **The keeper.** The Verifier hands the keeper the same pairs, sealed with AES-256-GCM (the Blob key name is the
-  associated data). Each scan opens every kit, reads its certificate, drops kits whose certificate is gone, revoked,
+- **The registered keepers.** The Verifier seals the same pairs to each keeper listed in `verifier/keepers.json`
+  (ephemeral X25519, HKDF-SHA256, AES-256-GCM) and publishes the envelopes at `GET /api/keeper/escrow`; each keeper opens
+  only its own. An independent keeper needs nothing from our servers but that listing (a mirror works):
+  `verifier/scripts/witness-keeper.mjs` reads it, checks each nullifier PDA on its own RPC and sends `revoke_spent` with its
+  own key.
+- **The project's keeper** also keeps its own sealed copy (AES-256-GCM, the Blob key name as associated data). Each scan opens every kit, reads its certificate, drops kits whose certificate is gone, revoked,
   replaced or long expired, and for each live one checks whether any disclosed nullifier is spent: first the PDA, then the
   indexer's answer re-checked against the on-chain nullifier roots. The first spent note is shown to `revoke_spent`. At most
   10 revocations per scan, so a burst is spread over a few scans.
 
 Nobody else can revoke a live certificate by spend, because nobody else knows a salt. That is deliberate: if salts were
 public, anyone could link a certificate to the later spend of its notes even after the holder revoked it first (see below).
-The cost is that revocation on spend depends on the keeper in practice ([Trust points](trust), item 4).
+The cost is that revocation on spend depends on at least one registered keeper running ([Trust points](trust), item 4).
+Each registered keeper sees every disclosed nullifier and so could link a certificate to a later spend; a keeper is
+trusted with that and with nothing else (it cannot revoke an unspent certificate).
 
 **Before launch the keeper cron is off.** Its health (last run, in slots) is on the [status page](status).
 
