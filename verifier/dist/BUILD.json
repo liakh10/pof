@@ -1,0 +1,26 @@
+{
+  "bundle": "dist/pof-verifier.mjs",
+  "sha256": "0070c900b3be56f622fc2179dba835e6ddbd09379aacfd80cad557e045ab6fcb",
+  "bytes": 8842917,
+  "esbuild": "0.28.2",
+  "node": "v20",
+  "lockfileSha256": "a3247f577aa0a07a799cff38ff9a360bd8e288c1c9b808f0fdfb6e4a93c19676",
+  "sources": {
+    "app.ts": "bc8a801a29b59dc65bc336eb800e0d1c629daf31b3a0d557776415e7214e9fcb",
+    "chain.ts": "8e678a5baeea1fb905494e095dc25cd5f2a3b7157fad87e97db3e2ca734c4dda",
+    "codec.ts": "2f2cbc844e2806d0ed957024cb8dcea0511ce955825d46b110f01740cd8c39bd",
+    "contract.ts": "2184c65bc5561c8e68b7bfeb9f499dcc7731818a272168f4c1e640e9b2eb1fc0",
+    "index.ts": "0a4fe962b34c8a5c41d2d246b97dd94aded87cca3760a9953da9443a80b1a595",
+    "keeper.ts": "e47c7813e1e7673e0c1cf8e696d092eb3696c198cbeb6d3eeead76a3e6fbbb12",
+    "keys.ts": "be8cefee811df1b821f0bf423bf63b549cf9c2c04737fe15a9b5e6327780e29d",
+    "limits.ts": "5235b88bec2b6d70584f1288c59e3d7e06f978452866bef8878240e92e1afef7",
+    "linker.ts": "82073899703ffd3075c0eec5cd493ecb84e5bc6a0200a703d0850ae72d770866",
+    "locks.ts": "94ba244c669c3bdc8217f624869cc68b7fcaad0b2799c062bed6706fce8f7456",
+    "log.ts": "ae5eb5e8d201d8aeecc0ea0172b02f9157ac0be48ae6974ddbadd97337e99c1a",
+    "merkle.ts": "d98bfbf65d7590cdf8297760ea0014b5c2c7108fa6ac7fa20969788ca77621e0",
+    "relayer.ts": "f9c1bb3a60b0552e52248be791624a52a16026336f3a39517afecfe9d98b1ce5",
+    "rings.ts": "565097dfb506527331eb41bd05cd13c0cfab2e1e1c4484aad56fea9c8cde7669",
+    "store.ts": "b95cbbadfe71f5e75ac65d657f401f6628d8a297e9e0ec0e4ad6622dfa4bab6e",
+    "verify.ts": "25aa52faa5f21d04dc8371d8117c10c01208b9ec4f43277550f46ed1bd216378"
+  }
+}

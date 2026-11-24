@@ -1,0 +1,26 @@
+{
+  "name": "@pof/verifier",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proof of Funds Verifier: checks a Privacy Rings disclosure, signs the CONTRACT §3 attestation, appends the transparency log; plus the relayer, the keeper and the X-handle linker.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:check": "node scripts/build.mjs --check",
+    "test": "node --test test/*.test.mjs",
+    "keys": "node scripts/keys.mjs"
+  },
+  "dependencies": {
+    "@heliuslabs/spr": "0.9.0-alpha",
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.2.0",
+    "@solana/kit": "8.3.0",
+    "@solana/web3.js": "1.98.4",
+    "@vercel/blob": "2.9.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}
