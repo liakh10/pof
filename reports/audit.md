@@ -1,6 +1,6 @@
 # Proof of Funds: internal security review
 
-Status: **round 1, open**. This report is updated as fixes land; every row of the findings table carries its status.
+Status: **round 2** (2026-11-25). The four High findings of round 1 are fixed and re-tested. New findings from round 2 are in §4b. This report is updated as fixes land; every row of the findings table carries its status.
 Reviewer: the POF `audit` agent. It did not write any of the code reviewed here and edits none of it; fixes are made by the owners of each part.
 
 ## 1. Scope
@@ -13,10 +13,24 @@ Reviewer: the POF `audit` agent. It did not write any of the code reviewed here 
 | public read API, SDK, MCP, bots | `api/v1/*`, `sdk/src/*`, `mcp/*`, `api/mcp.js`, `bots/*`, `api/bots.js` | `82a06d2`, `7402298`, `4b00ca8`, `ec99afb` |
 | shared contract | `CONTRACT.md` §1 to §7, `RINGS.md` | `457d9a3`, `ec99afb` |
 
-Repository head at the end of this round: `cf763b5` (the audit's own proof tests).
+Repository head at the end of round 1: `cf763b5` (the audit's own proof tests).
+
+**Round 2** re-reviewed the fix commits below. It re-ran the round 1 proofs and added `audit/test/round2.test.mjs`. That file has positive controls and v2-package re-tests, so a refusal is proven to happen for the right reason.
+
+| part | commits re-reviewed |
+|---|---|
+| Verifier fixes and CONTRACT §4 v2 | `d84df76`, `0387b66` |
+| client fixes | `d9bec9f`; proxies `084ea11` |
+| devx fixes (SDK, `/v1`, MCP, bots), log witness, CONTRACT §8 | `39e02d9`, `5906c78` |
+| `/api/status` | `c51636c` |
+| docs paper and litepaper (only the claims that touch findings) | `c0fd4df` |
+| program fixes for POF-07, POF-17 and POF-22 | **uncommitted** working-tree diff of `program/programs/pof/src/lib.rs`, read only |
+
+Repository head at the end of round 2: `5906c78`.
 
 **Not covered in this round** (stated so that nobody reads silence as a pass):
-- the `zk/` folder and `api/status/`, which were not yet committed during the review;
+- the `zk/` folder: still not committed at the end of round 2, so not reviewed. `api/status/` was reviewed in round 2;
+- `witness/` (CONTRACT §8): skimmed in round 2 only (key file mode 600, keys checked against Config), not audited;
 - the public site, `/docs` and the film (not built yet);
 - `launch.mjs`, `preflight`, `wind-down.mjs`, `program/ops.mjs` and the deploy and key scripts;
 - the soundness of Helius Privacy Rings itself (its Groth16 circuits, the prover TEE, the forester, the indexer). POF treats these as trusted. Section 6 lists the assumptions.
@@ -33,13 +47,17 @@ Repository head at the end of this round: `cf763b5` (the audit's own proof tests
 
 ## 3. Summary
 
-| severity | count |
-|---|---|
-| Critical | 0 |
-| High | 4 |
-| Medium | 10 |
-| Low | 7 |
-| Informational | 4 |
+| severity | round 1 | of those still open after round 2 | new in round 2 |
+|---|---|---|---|
+| Critical | 0 | 0 | 0 |
+| High | 4 | 0 | 0 |
+| Medium | 10 | 4 open or partly fixed (POF-01, POF-11, POF-12, POF-14); POF-07 fix uncommitted | 1 (POF-27) |
+| Low | 7 | 3 open (POF-16, POF-19, POF-20 residual); POF-17 fix uncommitted | 2 (POF-26, POF-28) |
+| Informational | 4 | 2 open (POF-23, POF-25); POF-22 partly fixed in the uncommitted diff | 1 (POF-29) |
+
+Proof tests at `5906c78`:
+- `audit/test/verifier-services.test.mjs`: 9 of 9 pass (was 0 of 9).
+- `audit/test/round2.test.mjs`: 7 of 8 pass. The open one is POF-26.
 
 No finding lets anyone mint a certificate without real, unspent funds in a Privacy Ring, or move anyone's money. The program's signature check, PDA derivations, spent-nullifier proofs and fee rules held up under review. The serious problems are all off chain:
 - whose funds may back whose certificate (POF-02, POF-03);
@@ -50,31 +68,35 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 
 | id | severity | title | where | status |
 |---|---|---|---|---|
-| POF-01 | Medium | Spend-revocation is custodial in practice | design: CONTRACT §5, `verifier/src/keeper.ts` | open |
-| POF-02 | **High** | The ring owner never consents; nk + openings certify any subject | `verifier/src/verify.ts:128-136` | open, test |
-| POF-03 | **High** | X-handle code redeemable by whoever reads the post first | `verifier/src/linker.ts:29-50`, `verify.ts:82-89` | open, test |
-| POF-04 | **High** | Note-lock race: one note behind several live certificates | `verifier/src/locks.ts:26-34` | open, test |
-| POF-05 | **High** | Keeper deletes the kit of a later attestation; spent certificate stays live | `verifier/src/keeper.ts:42-47` | open, test |
-| POF-06 | Medium | Dead kits kept 30 days; the keeper scan can be flooded past its 60 s limit | `verifier/src/keeper.ts:44`, `vercel.json` | open, test |
-| POF-07 | Medium | Remaking a certificate pays the prior payer every lamport in the PDA | `program/programs/pof/src/lib.rs:621-629` | open |
-| POF-08 | Medium | The relayer burns a payment when it refuses for cap or balance | `verifier/src/relayer.ts:64-79` | open, test |
-| POF-09 | Medium | Anyone can cancel or lock out another person's pending X code | `verifier/src/linker.ts:20-26,37,42` | open, test |
-| POF-10 | Medium | The client seals kits (badge secret, amounts) under a key derived from nk, which the Verifier sees | `client/pof-client.js:68,85,266` | open |
-| POF-11 | Medium | The vault spending key comes from a phishable signMessage, and is lost with a non-deterministic signer | `client/pof-client.js:19,60-62` | open |
-| POF-12 | Medium | Privacy: wallet, vault and handle are linkable on chain and by the operator | `client/pof-client.js:126,291-296,301`; design | open |
-| POF-13 | Medium | `/v1` "verified" log answers trust the key the log itself names | `api/v1/_lib.js:180-182`, `sdk/src/log.ts:142,207` | open |
-| POF-14 | Medium | Paid upstreams (Helius indexer and prover, RPC) behind open, unauthenticated endpoints | `client/server/spr-proxy.js`, `mcp/core.js:61`, `api/mcp.js` | open, a per-instance limit is in progress (uncommitted) |
-| POF-15 | Low | Bot sweep re-checks only the first 500 grants and members | `bots/sweep.js:17,37` | open |
+| POF-01 | Medium | Spend-revocation is custodial in practice | design: CONTRACT §5, `verifier/src/keeper.ts` | partly mitigated: stated as a trust point in the litepaper; shorter validity and a multi-keeper escrow are pending |
+| POF-02 | **High** | The ring owner never consents; nk + openings certify any subject | `verifier/src/verify.ts:128-136` | **fixed** `d84df76` + `0387b66` (ring.proof over the v2 message); re-tested |
+| POF-03 | **High** | X-handle code redeemable by whoever reads the post first | `verifier/src/linker.ts:29-50`, `verify.ts:82-89` | **fixed** `d84df76` (start secret, link id bound to the controller), `39e02d9` (bots check the controller signature); re-tested; see POF-26 |
+| POF-04 | **High** | Note-lock race: one note behind several live certificates | `verifier/src/locks.ts:26-34` | **fixed** `d84df76` (create-if-absent generations); re-tested; see POF-28 |
+| POF-05 | **High** | Keeper deletes the kit of a later attestation; spent certificate stays live | `verifier/src/keeper.ts:42-47` | **fixed** `d84df76`; re-tested |
+| POF-06 | Medium | Dead kits kept 30 days; the keeper scan can be flooded past its 60 s limit | `verifier/src/keeper.ts:44`, `vercel.json` | **fixed** `d84df76` (dropped after max_attest_age); residual: the scan has no time budget or cursor |
+| POF-07 | Medium | Remaking a certificate pays the prior payer every lamport in the PDA | `program/programs/pof/src/lib.rs:621-629` | fix in the working tree (surplus to the treasury, prior payer gets the rent-exempt minimum), reviewed, **not committed** |
+| POF-08 | Medium | The relayer burns a payment when it refuses for cap or balance | `verifier/src/relayer.ts:64-79` | **fixed** `d84df76`; re-tested; see POF-28 |
+| POF-09 | Medium | Anyone can cancel or lock out another person's pending X code | `verifier/src/linker.ts:20-26,37,42` | **fixed** `d84df76` (a record per start, tries per code); re-tested |
+| POF-10 | Medium | The client seals kits (badge secret, amounts) under a key derived from nk, which the Verifier sees | `client/pof-client.js:68,85,266` | **fixed** `d9bec9f` (kitKey from the vault seed; old kits re-sealed) |
+| POF-11 | Medium | The vault spending key comes from a phishable signMessage, and is lost with a non-deterministic signer | `client/pof-client.js:19,60-62` | partly fixed `d9bec9f` (domain-separated message, double-sign determinism check, random key with a passphrase backup); residual: the domain is a constant string, so phishing the message stays possible; see POF-27 |
+| POF-12 | Medium | Privacy: wallet, vault and handle are linkable on chain and by the operator | `client/pof-client.js:126,291-296,301`; design | partly fixed `d9bec9f` (X and badge certificates go through the relayer; a wallet payer needs consent); **still linkable**, see the round 2 note |
+| POF-13 | Medium | `/v1` "verified" log answers trust the key the log itself names | `api/v1/_lib.js:180-182`, `sdk/src/log.ts:142,207` | **fixed** `39e02d9` (keys from Config and VerifierSet history, `keyTrusted`) |
+| POF-14 | Medium | Paid upstreams (Helius indexer and prover, RPC) behind open, unauthenticated endpoints | `client/server/spr-proxy.js`, `mcp/core.js:61`, `api/mcp.js` | partly fixed: MCP batch, size and IP caps `39e02d9`; `api/spr` per-instance window only `084ea11`; `/api/status` uncached query strings (round 2) |
+| POF-15 | Low | Bot sweep re-checks only the first 500 grants and members | `bots/sweep.js:17,37` | **fixed** `39e02d9` (cursor), diff read |
 | POF-16 | Low | Relayer: an attestation can be replayed for 30 days, and payments are found in the last 60 signatures only | `verifier/src/relayer.ts:57`, `verifier/src/program.ts` `incoming` | open |
-| POF-17 | Low | The verifier rotation delay can be cut to 9,000 slots without delay | `lib.rs:530-536,565-576` | open |
-| POF-18 | Low | `log_index` is not signed; the certificate stores what the submitter says | `lib.rs:599,652` | open |
+| POF-17 | Low | The verifier rotation delay can be cut to 9,000 slots without delay | `lib.rs:530-536,565-576` | fix in the working tree (a lowered delay is held for the old delay), reviewed, **not committed** |
+| POF-18 | Low | `log_index` is not signed; the certificate stores what the submitter says | `lib.rs:599,652` | **fixed** `39e02d9` (SDK matches the certificate to its leaf by signed bytes), diff read |
 | POF-19 | Low | Non-inclusion accepted against any of the last 100 nullifier roots | `verifier/src/rings.ts:117,181-189` | open |
-| POF-20 | Low | Service URLs derived from the Host header when env is unset | `api/bots.js:19,34`, `api/v1/index.js:10`, `api/v1/_lib.js:160-163` | open |
-| POF-21 | Low | Discord `/pof-setup` lets a Manage Roles user hand out roles above their own | `bots/discord.js:88-95` | open |
-| POF-22 | Info | `renew` is unreachable, and accepts an expired certificate | `lib.rs:680-713`; no Verifier path | open |
-| POF-23 | Info | Revocation latency is the keeper's cron period, not "seconds" | `RINGS.md` §3, keeper cron | open |
-| POF-24 | Info | Creator-chosen room names flow into MCP answers and Discord messages | `mcp/tools.js:201,208`, `bots/*` | open |
+| POF-20 | Low | Service URLs derived from the Host header when env is unset | `api/bots.js:19,34`, `api/v1/index.js:10`, `api/v1/_lib.js:160-163` | mostly fixed `39e02d9` (`POF_LOG_URL` required in production; bots no longer call the link URL); residual: `/api/status` uses the Host header unless `POF_STATUS_ORIGIN` is set |
+| POF-21 | Low | Discord `/pof-setup` lets a Manage Roles user hand out roles above their own | `bots/discord.js:88-95` | **fixed** `39e02d9` (role position check) |
+| POF-22 | Info | `renew` is unreachable, and accepts an expired certificate | `lib.rs:680-713`; no Verifier path | partly fixed in the uncommitted diff (`renew` refuses past expiry); still unreachable |
+| POF-23 | Info | Revocation latency is the keeper's cron period, not "seconds" | `RINGS.md` §3, keeper cron | open (the litepaper now points to the keeper's last run on /status) |
+| POF-24 | Info | Creator-chosen room names flow into MCP answers and Discord messages | `mcp/tools.js:201,208`, `bots/*` | **fixed** `39e02d9` (MCP quotes names as untrusted text) |
 | POF-25 | Info | The signed `tree_root` is the current head, not the root the notes were found at | `verifier/src/verify.ts:199` | open |
+| POF-26 | Low | X subjects: nobody proves control of the controller key, so a leaked bound link id certifies the handle with a stranger's funds | `verifier/src/verify.ts` (kind 1 branch), CONTRACT §4 v2 | open, test |
+| POF-27 | Medium | A random vault seed (non-deterministic wallets) rests in plain text in localStorage | `client/pof-client.js` `deriveVault` (`pof:vaultseed:v2:<wallet>`) | open |
+| POF-28 | Low | Lock generations are walked one Blob read at a time; a payment is released after a certify that may have landed | `verifier/src/locks.ts` `newest`, `verifier/src/relayer.ts` catch | open |
+| POF-29 | Info | The uncommitted Config layout change (held_delay, held_until) must ship with `pof_gate`, the IDLs and the SDK together | `lib.rs` Config, `pof_gate` `read_pof_config` | open |
 
 ### POF-01 · Medium · Spend-revocation is custodial in practice
 `revoke_spent` is permissionless on chain, but it needs a note's secret `salt` and its `nullifier`. Only two parties hold them:
@@ -279,6 +301,70 @@ Room names are creator-chosen bytes. They go into MCP tool output that agents re
 ### POF-25 · Info · Signed root
 CONTRACT §3 says `tree_root` is "the root at which every disclosed note was found". The Verifier signs the current head, which also contains every note because the tree is append-only. Harmless. Align the contract text.
 
+## 4b. Round 2: re-review of the fixes, and new findings
+
+**How the fixes were re-tested.** The round 1 proofs (`audit/test/verifier-services.test.mjs`) now pass 9 of 9. A refusal-type test can pass for the wrong reason, for example when a field layout changes. So `audit/test/round2.test.mjs` re-states them with the v2 package:
+- a positive control: an honest v2 package is still attested;
+- POF-02 must fail with exactly `BAD_RING_PROOF`, and a ring.proof cannot be moved to another tier;
+- POF-03 must fail with exactly `LINK_OTHER_CONTROLLER` and `LINK_UNBOUND`;
+- POF-08: a failed certify gives the payment back, and the payment then works exactly once;
+- POF-09: five wrong tries by a griefer do not lock the holder's code.
+
+All of these pass.
+
+**What the new code was checked for:**
+- **ring.proof domain and replay.** The v2 disclosure message starts with its own line (`Proof of Funds: disclosure v2`), distinct from the vault message, the bots' link message and the Rings derivation message. It binds the program, subject, ring, controller, asset, tier, payer and a slot within 1,500 slots. Capturing a package lets a replayer re-attest the same subject, controller and payer within about 10 minutes. That gives them nothing, since the controller is the holder's. No issue.
+- **Link secret storage.** 128-bit secret, kept in the starter's tab (`sessionStorage`). Only `sha256(secret)` is stored server side, as part of the Blob path. No issue.
+- **Note locks.** The race is closed by create-if-absent generations, and the rollback on failure is sound. See POF-28 for the cost.
+- **Keeper.** A kit is never dropped for a sibling attestation, and is dropped once it can no longer land. Correct. The scan still has no time budget (residual of POF-06).
+- **Relayer.** All checks now run before the payment is touched. See POF-28 for the release path.
+- **Program diff (uncommitted):**
+  - POF-07: the surplus goes to the treasury after the CPIs, and the prior payer gets exactly the rent-exempt minimum. Correct.
+  - POF-17: lowering `rotation_delay` is held for the old delay. A proposal inside that window waits at least the old delay, and the lowering is visible as a `ConfigSet` event. Correct.
+  - POF-22: `renew` now refuses past expiry.
+- **`/api/status`.** Errors are scrubbed of URLs and `api-key`, the cron route needs the secret, and the answers are CDN cached. Residuals are listed under POF-14 and POF-20.
+- **The SVG badge** escapes every interpolated field. Serving it with `content-security-policy: default-src 'none'` would make that a second line of defence.
+
+**POF-12 is still linkable, after the fix.**
+1. The vault is funded by a public transfer from the wallet (`fundVault`), and each shield is a public deposit from the wallet whose view tag is the vault address (RINGS §6).
+2. The relay fee is now paid by a vault withdrawal signed by the vault key, as fee payer, for the quote's exact amount. That amount carries a unique tag of up to 99,999 lamports, and it reaches the relayer seconds before the relayer certifies the handle.
+
+So an observer still links handle to vault to wallet. The `payer` field no longer names the wallet, but the chain does.
+**Fix options:**
+- Pay the relayer by a Rings private transfer to a relayer ring, matched by an encrypted memo;
+- or let the relayer front the fee, and take it later from a pool that cannot be linked;
+- and, in both cases, fund the vault only through Rings, never by a plain transfer.
+
+Until then, /docs should say that vault mode isolates `nk`, not identity.
+
+### POF-26 · Low · The controller of an X certificate never signs
+For kind 1, the link id binds a controller, and the ring owner signs the disclosure message. Nothing proves that the party asking holds the controller's key. A bound link id is a bearer value for its hour (`/api/link?id=` verifies it publicly). Whoever obtains one can certify the handle with **their own funds** and the victim's controller.
+
+The victim's controller can `revoke_by_holder` it, so the damage is limited to two things:
+- a false "@victim holds ≥ X" statement;
+- a squat of the PDA until the victim notices.
+
+- **Proof:** `round2.test.mjs`, test POF-26 (fails).
+- **Fix:** for kind 1, require the controller's signature over the disclosure message, and move the link id to its own field.
+
+### POF-27 · Medium · Random vault seed in plain text in localStorage
+When a wallet does not sign deterministically, `deriveVault` makes a random vault key and stores it as hex at `pof:vaultseed:v2:<wallet>` in `localStorage`. That key is the spending key of the vault. Any script running on the POF origin can read it and withdraw the vault:
+- an XSS anywhere on the domain (the site, `/link`, `/lab`, `/docs` and the API all share it);
+- a compromised dependency;
+- a malicious extension with page access.
+
+**Fix:**
+- Keep the stored seed encrypted under a key the wallet must re-derive (for example, from a second signature), or as a non-extractable WebCrypto key.
+- Ship a strict Content-Security-Policy on every page of the origin.
+- Serve `/lab` from another origin, or not at all, in production.
+
+### POF-28 · Low · Two costs of the round 1 fixes
+- **Lock generations.** `NoteLocks.newest` reads generations one by one, up to 1,000, on every take and for every note. Re-attesting one subject's notes adds a generation each time, so a holder's own retries slowly make every later attest on those notes slower (and fail closed after 1,000). **Fix:** keep a head pointer, or delete stale generations once they can no longer bind.
+- **Payment release.** The relayer releases a payment when `chain.certify` throws. A confirmation timeout can throw after the transaction actually landed, and the released payment could then pay for a second relay within the quote's 30-minute life. **Fix:** before releasing, look up the signature's status.
+
+### POF-29 · Info · A Config layout change ships as a set
+The uncommitted program diff adds `held_delay` and `held_until` to `Config`. `pof_gate` deserializes `pof::Config` from the crate (`read_pof_config`), and the SDK and API decode it from the IDL. Rebuild `pof_gate`, re-export both IDLs, and run `sdk` `sync-idl` in the same change. Re-run the local-validator suite (`sdk` integration, `program/test`) before deploy.
+
 ## 5. What held up
 These were checked specifically and found sound at the reviewed commits:
 - `ext::signed_before` reads the instruction at `current - 1`, requires exactly one signature, and requires all three instruction indexes to be `u16::MAX` (data inside the Ed25519 instruction itself). The pubkey and message are read from the offsets the precompile verified.
@@ -301,3 +387,4 @@ These were checked specifically and found sound at the reviewed commits:
 
 ## 7. Changes
 - 2026-11-25 · audit · round 1: 25 findings, 9 failing proof tests (`cf763b5`). High findings posted on `_x/pof/BOARD.md` and sent to the lead.
+- 2026-11-25 · audit · round 2: all 4 High fixed and re-tested (9/9 plus round 2 controls). Statuses updated; 4 new findings (POF-26 to POF-29); POF-07 and POF-17 fixes reviewed in the working tree, not yet committed.
