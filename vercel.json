@@ -106,7 +106,7 @@
   "buildCommand": "npm --prefix verifier ci && npm --prefix verifier run build:verify",
   "headers": [
     {
-      "source": "/((?!embed/|lab/|link$).*)",
+      "source": "/((?!embed/|lab/).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
@@ -139,5 +139,6 @@
         }
       ]
     }
-  ]
+  ],
+  "outputDirectory": "."
 }
