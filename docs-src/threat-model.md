@@ -45,9 +45,10 @@ The process writes only these, to a private Vercel Blob store:
 
 | prefix | content | at rest |
 |---|---|---|
-| `log/e/<i>` | the 377-byte §7 leaf: the §3 bytes, the signature, the key, the bundle hash, the slot | public by design (the log) |
+| `log/pending/<id>` | the signed leaf of an attestation that has not landed | private; deleted when it can no longer land |
+| `log/e/<i>` | the 377-byte §7 leaf of a **certified** attestation: the §3 bytes, the signature, the key, the bundle hash, the slot | public by design (the log); an attestation that never lands is never published (audit A2-06) |
 | `keeper/kits/<subject>-<asset>/<attestation hash>` | per disclosed note: the salted hash, the salt, the nullifier | AES-256-GCM, key `POF_SEAL_KEY`, the blob name as associated data |
-| `escrow/<subject>-<asset>/<attestation hash>.json` | the same kit, sealed to each registered keeper's X25519 key | X25519 + HKDF + AES-256-GCM per keeper |
+| `escrow/<subject>-<asset>/<attestation hash>.json` | the same kit, sealed to each registered keeper's X25519 key, published once the certificate lands, removed when it is revoked or expires | X25519 + HKDF + AES-256-GCM per keeper |
 | `notes/<HMAC(nf)>/<gen>` | which subject and asset a note currently backs, and until which slot | the name is a keyed hash of the nullifier; no amount |
 | `link/<h(handle)>/<h(secret)>` | the hash of a pending X code, its time, tries and controller | hashes only, 30 minutes |
 | `relay/paid/<payment signature>`, `relay/spend.json` | which payment paid which attestation; the relayer's spend in the last 24 hours | |
@@ -84,7 +85,7 @@ reference id and a stack with RPC keys scrubbed.
 | cancel a victim's pending code by starting again, or by wrong tries | each start is its own record, tries count per record | POF-09 |
 | drain the relayer | it serves only paid, signed attestations for X and badge subjects; a rolling 24-hour cap and a balance floor; a payment is used once and given back only when the certify surely did not land | `relayer.ts` (POF-08, POF-28) |
 | flood the Verifier | a per-instance token bucket per client and route, a store-backed cap per 10 minutes per client, a 16 KB body cap; the expensive checks run after the cheap ones | `limits.ts`, `app.ts` |
-| read someone's holdings from the log or the escrow | the log holds the §3 bytes (subject hash, tier, salted nullset); the escrow holds sealed envelopes | §7, `escrow.ts` |
+| read someone's holdings from the log or the escrow | the log holds the §3 bytes of certified attestations only (subject hash, tier, salted nullset); the escrow holds sealed envelopes of live certificates only | §7, `escrow.ts` |
 | test whether a known nullifier backs a certificate | the certificate stores `sha256("pof:null:" ‖ salt ‖ nf)` with a 32-byte random salt; the lock index is an HMAC | CONTRACT §5 |
 
 ### A source that lies
@@ -115,6 +116,12 @@ reference id and a stack with RPC keys scrubbed.
   launch (POF-01). `revoke_spent` is permissionless; it needs only the salt and the nullifier.
 
 ## What is left
+
+- **An X handle's subject hash is reversible by dictionary.** It is `sha256("pof:x:" ‖ handle)`: anyone can hash a list of
+  handles and find which ones hold a certificate, and the log keeps every tier a handle was certified at, through renews,
+  after the certificate is gone. A salted subject hash is not possible on chain: a reader must find the certificate from the
+  handle alone (`["cert", subject_hash, asset]`), which is what /verify, the bots and the CPI gate do. A badge subject has no
+  such link; it is the private choice.
 
 - The Verifier sees the amounts of the disclosed notes and the ring's `nk`, and can link subject, vault and funding wallet.
 - The minimum age relies on the indexer's slot for the creating transaction.

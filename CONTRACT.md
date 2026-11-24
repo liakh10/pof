@@ -130,7 +130,8 @@ the minimum age (150 slots); the sum ≥ the tier (never returned); `root_slot` 
 certificate (a keyed index of nullifiers, no amounts, taken by an atomic create: POF-04). `relay: true` requires `payer` = the relayer.
 
 **The answer**: `{ attestation: hex240, signature: hex64, verifierKey, salts: [hex32], nullifiers: [hex32] (same order as
-notes), hashes: [hex32] (sorted, the certificate's list), logIndex, subjectHash, controller, issuedSlot, expirySlot,
+notes), hashes: [hex32] (sorted, the certificate's list), logIndex: null (the log publishes only certified attestations;
+the relayer answers the index, or find the entry by the bytes), attestationId: sha256 hex of the 240 bytes, subjectHash, controller, issuedSlot, expirySlot,
 bundleHash, certificate: { seeds } }`. The salts and nullifiers are the holder's own revoke kit: the client saves them.
 **Errors**: `{ error: { code, message, details? } }` with the HTTP status; codes are listed in `verifier/README.md`.
 `certify` must land within `max_attest_age` (300 slots) of `issued_slot`: pay the relayer before attesting.
@@ -247,7 +248,11 @@ offset size field
 - **Anchor on chain**: `anchor_log(size, head)` after an Ed25519 instruction over the 80-byte signed head; the program keeps
   the newest head in the Treasury (`log_size`, `log_head`, `log_slot`) and emits `LogAnchored`. The keeper anchors when the
   log grew (cron, off before launch). Anyone can match a head to a slot and check any entry against it.
-- **Entry id**: the leaf index (u64, from 0). `logIndex` in the §4 answer and on the Certificate is this index.
+- **Entry id**: the leaf index (u64, from 0). **Only certified attestations are published** (audit A2-06): the Verifier
+  holds each signed leaf privately; the relayer publishes it when its certify lands, the keeper when it sees the certificate
+  on chain. `certify` therefore carries `log_index` = u64::MAX (unknown) and readers match the leaf by the attestation
+  bytes (POF-18).
+2026-11-25 (verifier): publish-on-landing (A2-06); the §4 answer's `logIndex` is null.
 - HTTP (served by `pof/api/attest/log*`, devx may proxy under `/v1/log/*`): `GET /api/attest/log?head` → STH JSON;
   `GET /api/attest/log?entry=<i>` → `{ index, leaf: hex377, leafHash, attestation, signature, verifierKey, bundleHash, loggedSlot }`; `GET /api/attest/log?proof=<i>&size=<n>` →
   `{ index, treeSize, rootHash, leafHash, path: [hex] }`; `GET /api/attest/log?consistency=<m>&size=<n>` →
