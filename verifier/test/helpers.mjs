@@ -66,7 +66,7 @@ export class FakeChain {
   async certify(x) {
     const a = V.decodeAttestation(x.attestation);
     this.certs.set(hex(a.subjectHash) + ':' + a.asset, { address: 'Cert' + hex(a.subjectHash).slice(0, 8), status: 0, tier: a.tier, expirySlot: a.expirySlot, hashes: x.hashes.map(hex), payer: V.toB58(a.payer) });
-    this.sent.push({ kind: 'certify', memo: x.memo, logIndex: x.logIndex }); this.balance -= 2_500_000n; return { signature: 'sigCertify' + this.sent.length, lamports: 2_500_000n };
+    this.sent.push({ kind: 'certify', logIndex: x.logIndex }); this.balance -= 2_500_000n; return { signature: 'sigCertify' + this.sent.length, lamports: 2_500_000n };
   }
   async revokeSpent(x) {
     const c = this.certs.get(hex(x.subjectHash) + ':' + x.asset);
@@ -75,7 +75,7 @@ export class FakeChain {
     if (!this.rings.spentSet.has(hex(x.nullifier))) throw new Error('revoke: not spent');
     c.status = 1; this.sent.push({ kind: 'revoke', index: x.index }); return { signature: 'sigRevoke' + this.sent.length, lamports: 5000n };
   }
-  async memo(t) { this.sent.push({ kind: 'memo', t }); return { signature: 'sigMemo', lamports: 5000n }; }
+  async anchorLog(size, root) { this.sent.push({ kind: 'anchor', size, root: hex(root) }); return { signature: 'sigAnchor', lamports: 5000n }; }
   async relayerBalance() { return this.balance; }
   async incoming() { return this.inbox; }
   async quoteLamports() { return { fee: 10_000_000n, rent: 3_000_000n, network: 10_000n }; }
@@ -102,11 +102,13 @@ export function makeCtx({ relayFree = false, env = {} } = {}) {
 }
 
 /** a §4 package for these notes */
-export function pkg(ctx, r, notes, { kind = 0, value, asset = 0, tier = 1, relay = false, proof, slot } = {}) {
+export function pkg(ctx, r, notes, { kind = 0, value, asset = 0, tier = 1, relay = false, proof, slot, controller } = {}) {
   const payer = relay ? ctx.relayerSigner.address : r.owner;
   const v = value ?? (kind === 0 ? r.owner : undefined);
   const s = slot ?? ctx.rings.slotNow - 10n;
   let pr = proof;
   if (pr === undefined && kind === 0) pr = hex(r.wallet.sign(V.subjectMessage({ programId: V.toB58(ctx.programId), kind, value: v, ring: r.owner, asset, tier, payer, slot: s })));
-  return { v: 1, subject: { kind, value: v, proof: pr, slot: String(s) }, asset, tier, ring: { owner: r.owner, nk: hex(r.nk) }, notes: notes.map(n => n.opening), payer, relay };
+  const out = { v: 1, subject: { kind, value: v, proof: pr, slot: String(s) }, asset, tier, ring: { owner: r.owner, nk: hex(r.nk) }, notes: notes.map(n => n.opening), payer, relay };
+  if (kind === 1 && controller !== null) out.controller = controller || r.owner;
+  return out;
 }

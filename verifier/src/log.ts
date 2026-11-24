@@ -1,4 +1,4 @@
-/* The transparency log (CONTRACT §7). Entries are 345-byte leaves at log/e/<index>; each append is a create-if-absent of the
+/* The transparency log (CONTRACT §7). Entries are 377-byte leaves at log/e/<index>; each append is a create-if-absent of the
    next index, so two function instances never write the same index and the log never has a gap. log/hashes caches the leaf
    hashes (a prefix of the true log: if it is behind, the next read probes forward and catches up). Nothing is ever
    rewritten or deleted. */

@@ -26,7 +26,7 @@ export function unhex(s: unknown, len?: number, field = 'value'): Uint8Array {
 }
 
 export function fromB58(s: unknown, len = 32, field = 'address'): Uint8Array {
-  if (typeof s !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{1,64}$/.test(s)) throw new PofError('BAD_BASE58', `${field} must be base58`);
+  if (typeof s !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{1,128}$/.test(s)) throw new PofError('BAD_BASE58', `${field} must be base58`);
   let b: Uint8Array;
   try { b = new Uint8Array(b58enc.encode(s)); } catch { throw new PofError('BAD_BASE58', `${field} must be base58`); }
   if (b.length !== len) throw new PofError('BAD_LENGTH', `${field} must decode to ${len} bytes`);

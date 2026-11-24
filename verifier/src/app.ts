@@ -19,6 +19,7 @@ import { Linker } from './linker.js';
 import { NoteLocks } from './locks.js';
 import { bucket, windowCap } from './limits.js';
 import type { PofChain } from './chain.js';
+import { makeProgramChain } from './program.js';
 
 export const VERSION = '0.1.0';
 
@@ -66,15 +67,19 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
   const rpc = jsonRpc(rpcUrls);
   const rings = overrides.rings || new HeliusRings(rpc, { url: env.HELIUS_SPR_URL || 'https://mainnet.helius-rpc.com/v1/spr', apiKey: env.HELIUS_API_KEY }, rpcUrls[0]);
   const base = { env, programId, signer, relayerSigner, store, rings, sealKey };
-  const chain = overrides.chain !== undefined ? overrides.chain : chainFactory ? await chainFactory(base as any) : null;
+  let chain: PofChain | null = overrides.chain !== undefined ? overrides.chain : chainFactory ? await chainFactory(base as any) : null;
+  if (overrides.chain === undefined && !chainFactory && relayerSigner) {
+    const web3 = await import('@solana/web3.js');
+    chain = await makeProgramChain({ web3, rpcUrl: rpcUrls[0], programId: pid, relayer: relayerSigner, verifier: signer, rings });
+  }
   const log = new TransparencyLog(store, signer, programId);
   const keeper = new Keeper(store, sealKey, rings, chain);
-  const certifyWindow = BigInt(env.POF_CERTIFY_WINDOW_SLOTS || 9_000);
+  const certifyWindow = BigInt(env.POF_CERTIFY_WINDOW_SLOTS || 300); // the program's max_attest_age
   const locks = new NoteLocks(store, sha256(text('pof:locks:'), sealKey), certifyWindow, chain);
   const mints: Record<number, string> = { 0: ASSETS[0].mint, 1: env.POF_USDC_MINT || ASSETS[1].mint };
   const verifier = new Verifier({
     programId, minAgeSlots: BigInt(env.POF_MIN_AGE_SLOTS ?? 150), validitySlots: BigInt(env.POF_VALIDITY_SLOTS ?? 6_480_000),
-    subjectProofSlots: BigInt(env.POF_SUBJECT_PROOF_SLOTS ?? 1_500), maxRootAgeSlots: 150n,
+    subjectProofSlots: BigInt(env.POF_SUBJECT_PROOF_SLOTS ?? 1_500), maxRootAgeSlots: 150n, maxRootLagSlots: BigInt(env.POF_MAX_ROOT_LAG_SLOTS ?? 9_000),
     relayer: relayerSigner?.address ?? null, mints, bundleHash: bundleHash(),
   }, signer, rings, log, keeper, locks);
   const relayer = relayerSigner && chain ? new Relayer({
@@ -174,6 +179,16 @@ export const routes = {
     return json(await c.linker.start(b.handle));
   }),
 
+  /** GET /api/link?id=<link id> → { verified, handle, expiresAt } (the bots and /verify read it) */
+  linkVerify: wrap(async (req) => {
+    const c = await context();
+    bucket(`linkverify:${clientOf(req)}`, 60, 30);
+    const id = new URL(req.url).searchParams.get('id') || '';
+    const handle = id.split('.')[0] || '';
+    try { c.verifier.checkLinkToken(handle, id); const exp = Number(id.split('.')[1]); return json({ verified: true, handle, expiresAt: exp }); }
+    catch (e: any) { if (e?.code === 'BAD_HANDLE' || e?.code === 'BAD_SUBJECT_PROOF' || e?.code === 'LINK_EXPIRED') return json({ verified: false, handle: handle || null, reason: e.code }); throw e; }
+  }),
+
   linkCheck: wrap(async (req) => {
     const c = await context();
     if (req.method !== 'POST') throw new PofError('METHOD', 'POST', 405);
@@ -190,7 +205,7 @@ export const routes = {
     return json(await c.keeper.scan());
   }),
 
-  /** cron: anchors the log head with a memo when it changed since the last anchor */
+  /** cron: anchors the log head on chain (anchor_log, the §7 signed head) when the log grew since the last anchor */
   keeperAnchor: wrap(async (req) => {
     const c = await context();
     cronOk(req, c.env);
@@ -199,9 +214,8 @@ export const routes = {
     const head = await c.log.head();
     const last = await c.store.get('log/anchored');
     const mark = `${head.treeSize}:${head.rootHash}`;
-    if (last && Buffer.from(last).toString() === mark) return json({ ok: true, anchored: false, head: mark });
-    const { anchorMemo } = await import('./contract.js');
-    const r = await c.chain.memo(anchorMemo(head.treeSize, unhex(head.rootHash, 32)));
+    if (!head.treeSize || (last && Buffer.from(last).toString() === mark)) return json({ ok: true, anchored: false, head: mark });
+    const r = await c.chain.anchorLog(head.treeSize, unhex(head.rootHash, 32));
     await c.store.put('log/anchored', text(mark));
     return json({ ok: true, anchored: true, head: mark, signature: r.signature });
   }),

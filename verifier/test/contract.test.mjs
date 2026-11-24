@@ -19,15 +19,15 @@ test('§2 tier table', () => {
 
 test('§3 bytes: every field at its offset, round trip', () => {
   const r = (n) => new Uint8Array(crypto.randomBytes(n));
-  const a = { programId: r(32), subjectKind: 1, subjectHash: r(32), asset: 1, tier: 4, treeRoot: r(32), rootSlot: 473505086n, noteCount: 3, nullsetHash: r(32), issuedSlot: 473505100n, expirySlot: 479985100n, payer: r(32), nonce: r(16) };
+  const a = { programId: r(32), subjectKind: 1, subjectHash: r(32), asset: 1, tier: 4, treeRoot: r(32), rootSlot: 473505086n, noteCount: 3, nullsetHash: r(32), issuedSlot: 473505100n, expirySlot: 479985100n, payer: r(32), controller: r(32), nonce: r(16) };
   const b = V.encodeAttestation(a);
-  assert.equal(b.length, 208);
+  assert.equal(b.length, 240);
   assert.equal(Buffer.from(b.subarray(0, 4)).toString(), 'POF1');
   assert.equal(hex(b.subarray(4, 36)), hex(a.programId)); assert.equal(b[36], 1); assert.equal(hex(b.subarray(37, 69)), hex(a.subjectHash));
   assert.equal(b[69], 1); assert.equal(b[70], 4); assert.equal(hex(b.subarray(71, 103)), hex(a.treeRoot));
   assert.equal(Buffer.from(b).readBigUInt64LE(103), a.rootSlot); assert.equal(b[111], 3); assert.equal(hex(b.subarray(112, 144)), hex(a.nullsetHash));
   assert.equal(Buffer.from(b).readBigUInt64LE(144), a.issuedSlot); assert.equal(Buffer.from(b).readBigUInt64LE(152), a.expirySlot);
-  assert.equal(hex(b.subarray(160, 192)), hex(a.payer)); assert.equal(hex(b.subarray(192, 208)), hex(a.nonce));
+  assert.equal(hex(b.subarray(160, 192)), hex(a.payer)); assert.equal(hex(b.subarray(192, 224)), hex(a.controller)); assert.equal(hex(b.subarray(224, 240)), hex(a.nonce));
   assert.deepEqual(V.decodeAttestation(b), a);
   assert.throws(() => V.decodeAttestation(b.subarray(1)), { code: 'BAD_ATTESTATION' });
 });
@@ -42,8 +42,8 @@ test('§5 salted nullifiers and the nullset hash', () => {
 });
 
 test('§7 leaf, signed tree head, memo', () => {
-  const l = V.logLeaf(new Uint8Array(208).fill(1), new Uint8Array(64).fill(2), new Uint8Array(32).fill(3), new Uint8Array(32).fill(4), 77n);
-  assert.equal(l.length, 345); assert.equal(l[0], 1); assert.equal(l[209], 2); assert.equal(l[273], 3); assert.equal(l[305], 4); assert.equal(Buffer.from(l).readBigUInt64LE(337), 77n);
+  const l = V.logLeaf(new Uint8Array(240).fill(1), new Uint8Array(64).fill(2), new Uint8Array(32).fill(3), new Uint8Array(32).fill(4), 77n);
+  assert.equal(l.length, 377); assert.equal(l[0], 1); assert.equal(l[241], 2); assert.equal(l[305], 3); assert.equal(l[337], 4); assert.equal(Buffer.from(l).readBigUInt64LE(369), 77n);
   assert.equal(V.sthBytes(new Uint8Array(32), 5, new Uint8Array(32)).length, 80);
   assert.equal(V.anchorMemo(5, new Uint8Array(32).fill(0xab)), 'pof:log:5:' + 'ab'.repeat(32));
 });
@@ -72,7 +72,7 @@ test('log: 40 concurrent appends from 4 instances land at 40 distinct, gap-free 
   const signer = V.signerFromSeed(new Uint8Array(crypto.randomBytes(32)));
   const pid = new Uint8Array(32).fill(5);
   const logs = Array.from({ length: 4 }, () => new V.TransparencyLog(new V.FsStore(dir), signer, pid));
-  const leaf = (i) => V.logLeaf(new Uint8Array(208).fill(i), new Uint8Array(64), signer.publicKey, new Uint8Array(32), BigInt(i));
+  const leaf = (i) => V.logLeaf(new Uint8Array(240).fill(i), new Uint8Array(64), signer.publicKey, new Uint8Array(32), BigInt(i));
   const idx = await Promise.all(Array.from({ length: 40 }, (_, i) => logs[i % 4].append(leaf(i))));
   assert.deepEqual([...idx].sort((a, b) => a - b), Array.from({ length: 40 }, (_, i) => i));
   const fresh = new V.TransparencyLog(new V.FsStore(dir), signer, pid);
@@ -95,4 +95,17 @@ test('the bundle hash is the published BUILD.json hash', async () => {
   const fs = await import('node:fs');
   const b = JSON.parse(fs.readFileSync(new URL('../dist/BUILD.json', import.meta.url)));
   assert.equal(hex(V.bundleHash()), b.sha256);
+});
+
+test('signatures in §4 pass as base58 (up to 88 chars) or hex', async () => {
+  const s = V.signerFromSeed(new Uint8Array(crypto.randomBytes(32)));
+  for (let i = 0; i < 20; i++) {
+    const sig = s.sign(new Uint8Array(crypto.randomBytes(16)));
+    const b58 = V.toB58(sig);
+    assert.equal(hex(V.fromB58(b58, 64, 'sig')), hex(sig));
+  }
+  const tiny = new Uint8Array(64); tiny[63] = 1;
+  assert.equal(hex(V.fromB58(V.toB58(tiny), 64)), hex(tiny));
+  assert.throws(() => V.fromB58('1'.repeat(129), 64), { code: 'BAD_BASE58' });
+  assert.throws(() => V.fromB58(V.toB58(new Uint8Array(32).fill(1)), 64), { code: 'BAD_LENGTH' });
 });

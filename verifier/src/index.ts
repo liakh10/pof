@@ -14,4 +14,5 @@ export * from './linker.js';
 export * from './locks.js';
 export * from './limits.js';
 export * from './chain.js';
+export * from './program.js';
 export * from './app.js';

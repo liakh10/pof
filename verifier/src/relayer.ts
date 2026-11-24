@@ -2,11 +2,11 @@
    1. quote: the fee, the certificate rent and the network fee, plus a few unique lamports that tag the payment;
    2. the holder pays that exact amount to the relayer from anywhere (a Ring withdrawal keeps the source private);
    3. certify: the relayer finds that payment, marks it used (create-if-absent), checks its rolling 24-hour spend cap and its
-      balance floor, and sends ed25519 + certify + the log anchor memo in one transaction.
+      balance floor, and sends ed25519 + certify in one transaction (the log head is anchored by anchor_log, keeper cron).
    Quotes are sealed into the quote id itself (HMAC), so nothing is stored until a payment is used. */
 import crypto from 'node:crypto';
 import { PofError, fromB58, hex, unhex } from './codec.js';
-import { anchorMemo, decodeAttestation, nullsetHash, sortHashes } from './contract.js';
+import { ATTESTATION_LEN, decodeAttestation, nullsetHash, sortHashes } from './contract.js';
 import { verifySig } from './keys.js';
 import { getJson, putJson, type Store } from './store.js';
 import type { PofChain } from './chain.js';
@@ -46,7 +46,7 @@ export class Relayer {
   private async spend(): Promise<[number, string][]> { const now = Date.now() / 1000; return ((await getJson<[number, string][]>(this.store, 'relay/spend.json')) || []).filter(([t]) => t > now - 86_400); }
 
   async certify(input: { attestation: unknown; signature: unknown; logIndex: unknown; quote: unknown; hashes: unknown }) {
-    const att = unhex(input.attestation, 208, 'attestation');
+    const att = unhex(input.attestation, ATTESTATION_LEN, 'attestation');
     const sig = unhex(input.signature, 64, 'signature');
     const a = decodeAttestation(att);
     if (Buffer.compare(Buffer.from(a.programId), Buffer.from(this.cfg.programId))) throw new PofError('WRONG_PROGRAM', 'that attestation is for another deployment');
@@ -78,11 +78,10 @@ export class Relayer {
     if (used + cost > this.cfg.dailyCapLamports) throw new PofError('RELAY_CAP', 'the relayer reached its spend cap for the last 24 hours; your payment stays valid, try later or certify from your own wallet', 429);
     if ((await this.chain.relayerBalance()) < cost + this.cfg.balanceFloorLamports) throw new PofError('RELAY_LOW', 'the relayer is low on SOL; your payment stays valid, try later', 503);
 
-    const head = await this.log.head();
-    const r = await this.chain.certify({ attestation: att, signature: sig, verifierKey: this.cfg.verifierKey, logIndex, memo: anchorMemo(head.treeSize, unhex(head.rootHash, 32)), hashes: sortHashes(hashes) });
+    const r = await this.chain.certify({ attestation: att, signature: sig, verifierKey: this.cfg.verifierKey, logIndex, hashes: sortHashes(hashes) });
     spend.push([Math.floor(Date.now() / 1000), String(r.lamports)]);
     await putJson(this.store, 'relay/spend.json', spend);
-    return { signature: r.signature, payment: paid, anchored: { treeSize: head.treeSize, rootHash: head.rootHash } };
+    return { signature: r.signature, payment: paid, certificate: (await this.chain.certificate(a.subjectHash, a.asset))?.address ?? null };
   }
 
 }

@@ -6,10 +6,11 @@ export interface CertificateView {
 export interface PofChain {
   slot(): Promise<bigint>;
   certificate(subjectHash: Uint8Array, asset: number): Promise<CertificateView | null>;
-  /** the ed25519 instruction, certify, and a Memo with the log anchor, in one transaction paid by the relayer */
-  certify(input: { attestation: Uint8Array; signature: Uint8Array; verifierKey: Uint8Array; logIndex: number; memo: string; hashes: Uint8Array[] }): Promise<{ signature: string; lamports: bigint }>;
+  /** the ed25519 instruction and certify in one transaction paid by the relayer */
+  certify(input: { attestation: Uint8Array; signature: Uint8Array; verifierKey: Uint8Array; logIndex: number; hashes: Uint8Array[] }): Promise<{ signature: string; lamports: bigint }>;
   revokeSpent(input: { subjectHash: Uint8Array; asset: number; index: number; salt: Uint8Array; nullifier: Uint8Array; tree: string }): Promise<{ signature: string; lamports: bigint }>;
-  memo(text: string): Promise<{ signature: string; lamports: bigint }>;
+  /** the ed25519 instruction over the §7 signed head and anchor_log (the program keeps the latest head in the treasury) */
+  anchorLog(size: number, root: Uint8Array): Promise<{ signature: string; lamports: bigint }>;
   relayerBalance(): Promise<bigint>;
   /** incoming SOL transfers to the relayer since a slot: [{ signature, slot, lamports }] */
   incoming(sinceSlot: bigint): Promise<{ signature: string; slot: bigint; lamports: bigint }[]>;

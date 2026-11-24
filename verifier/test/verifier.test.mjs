@@ -10,7 +10,7 @@ test('happy path: two notes reach tier 2, the answer carries no amount and the s
   const a = c.rings.note(r, 6n * SOL), b = c.rings.note(r, 4n * SOL);
   const out = await c.verifier.attest(pkg(c, r, [a, b], { tier: 2 }));
   const att = Buffer.from(out.attestation, 'hex');
-  assert.equal(att.length, 208);
+  assert.equal(att.length, 240); assert.equal(V.toB58(V.decodeAttestation(new Uint8Array(att)).controller), r.owner);
   assert.ok(V.verifySig(Buffer.from(out.signature, 'hex'), att, c.signer.publicKey));
   const d = V.decodeAttestation(new Uint8Array(att));
   assert.equal(d.tier, 2); assert.equal(d.asset, 0); assert.equal(d.noteCount, 2); assert.equal(d.subjectKind, 0);
@@ -38,7 +38,7 @@ test('the log entry is the §7 leaf of exactly this attestation', async () => {
   const e = await c.log.entry(out.logIndex);
   assert.equal(e.attestation, out.attestation); assert.equal(e.signature, out.signature);
   assert.equal(e.verifierKey, hex(c.signer.publicKey)); assert.equal(e.bundleHash, hex(V.bundleHash()));
-  assert.equal(e.leaf.length, 345 * 2);
+  assert.equal(e.leaf.length, 377 * 2);
   const p = await c.log.proof(out.logIndex);
   assert.ok(V.merkle.verifyInclusion(Buffer.from(e.leafHash, 'hex'), p.index, p.treeSize, p.path.map(x => Buffer.from(x, 'hex')), Buffer.from(p.rootHash, 'hex')));
 });
@@ -129,7 +129,10 @@ test('X handle subject: a link id from the Verifier, case-insensitive, expiry en
   const c = makeCtx(); const r = ring(); c.rings.register(r);
   const n = c.rings.note(r, 2n * SOL);
   const link = c.verifier.linkToken('@SomeAnon', Math.floor(Date.now() / 1000) + 600);
-  const out = await c.verifier.attest(pkg(c, r, [n], { kind: 1, value: '@someanon', proof: link, relay: true }));
+  const ctl = ring();
+  await code(c.verifier.attest(pkg(c, r, [n], { kind: 1, value: '@someanon', proof: link, relay: true, controller: null })), 'BAD_BASE58');
+  const out = await c.verifier.attest(pkg(c, r, [n], { kind: 1, value: '@someanon', proof: link, relay: true, controller: ctl.owner }));
+  assert.equal(out.controller, ctl.owner);
   assert.equal(out.subjectHash, hex(V.subjectHash(1, 'someanon')));
   assert.equal(V.toB58(V.decodeAttestation(Buffer.from(out.attestation, 'hex')).payer), c.relayerSigner.address);
   const m = c.rings.note(r, 2n * SOL);
@@ -168,4 +171,13 @@ test('USDC tiers use 6 decimals and the USDC mint', async () => {
   const out = await c.verifier.attest(pkg(c, r, [n], { asset: 1, tier: 2 }));
   assert.equal(V.decodeAttestation(Buffer.from(out.attestation, 'hex')).asset, 1);
   await code(c.verifier.attest(pkg(c, r, [c.rings.note(r, 999n * 1_000_000n, { asset: V.ASSETS[1].mint })], { asset: 1, tier: 2 })), 'BELOW_TIER');
+});
+
+test('the wallet subject signature passes as base58 too', async () => {
+  const c = makeCtx(); const r = ring(); c.rings.register(r);
+  const p = pkg(c, r, [c.rings.note(r, 2n * SOL)]);
+  p.subject.proof = V.toB58(Buffer.from(p.subject.proof, 'hex'));
+  assert.ok(p.subject.proof.length > 64);
+  const out = await c.verifier.attest(p);
+  assert.equal(out.subjectHash, hex(V.subjectHash(0, r.owner)));
 });

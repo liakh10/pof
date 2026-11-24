@@ -21,6 +21,7 @@ export interface VerifierConfig {
   validitySlots: bigint;        // expiry = issued + validity; equals the program Config
   subjectProofSlots: bigint;    // a subject signature names a slot at most this old
   maxRootAgeSlots: bigint;      // the tree head read must be this fresh (always true for a live read; guards a stale source)
+  maxRootLagSlots: bigint;      // issued_slot - root_slot the program accepts (Config max_root_lag)
   relayer: string | null;       // the relayer's address: payer when relay is true
   mints: Record<number, string>;// asset → mint (USDC differs on a local validator)
   bundleHash: Uint8Array;
@@ -58,11 +59,13 @@ export interface Disclosure {
   ring: { owner: string; nk: string };
   notes: { tree: string; leafIndex: string; asset: string; amount: string; blinding: string; sig: string; dataHash?: string; ringDataHash?: string; ringProgramId?: string }[];
   payer: string; relay?: boolean;
+  /** kind 1 only: the key the holder's client keeps to revoke the certificate and join rooms with it */
+  controller?: string;
 }
 
 export interface AttestResult {
   attestation: string; signature: string; verifierKey: string; salts: string[]; nullifiers: string[]; hashes: string[];
-  logIndex: number; subjectHash: string; certificate: { seeds: string[] }; issuedSlot: number; expirySlot: number; bundleHash: string;
+  logIndex: number; subjectHash: string; certificate: { seeds: string[] }; issuedSlot: number; expirySlot: number; bundleHash: string; controller: string;
 }
 
 export class Verifier {
@@ -98,6 +101,14 @@ export class Verifier {
     const owner = String(field(ring, 'owner') ?? '');
     const ownerBytes = fromB58(owner, 32, 'ring.owner');
     const payerBytes = fromB58(p.payer, 32, 'payer');
+    let controller: Uint8Array;
+    if (kind === SUBJECT.x) {
+      controller = fromB58(p.controller, 32, 'controller');
+      if (controller.every(x => x === 0)) throw new PofError('BAD_CONTROLLER', 'an X certificate needs a controller key (not the default key)');
+    } else {
+      if (p.controller !== undefined && p.controller !== value) throw new PofError('BAD_CONTROLLER', 'for a wallet or badge subject the controller is the subject key itself');
+      controller = fromB58(value, 32, 'subject');
+    }
     if (p.relay) {
       if (!this.cfg.relayer) throw new PofError('RELAY_OFF', 'the relayer is not configured; submit certify from your own wallet (relay: false)');
       if (p.payer !== this.cfg.relayer) throw new PofError('BAD_PAYER', `with relay: true the payer is the relayer ${this.cfg.relayer}`);
@@ -129,6 +140,7 @@ export class Verifier {
       fromB58(tree, 32, 'notes[0].tree');
       const head = await this.rings.treeHead(tree);
       if (slot > head.slot + this.cfg.maxRootAgeSlots) throw new PofError('STALE_ROOT', 'the tree read is too old; try again', 503);
+      if (head.headSlot > slot || slot - head.headSlot > this.cfg.maxRootLagSlots) throw new PofError('ROOT_TOO_OLD', `the Rings tree has not changed for more than ${this.cfg.maxRootLagSlots} slots, which the program refuses; try again after the next Rings transaction`, 503);
       const mint = this.cfg.mints[asset];
       const notes = p.notes.map((n, i) => {
         if (n.tree !== tree) throw new PofError('MIXED_TREES', 'all disclosed notes must be in one tree');
@@ -186,7 +198,7 @@ export class Verifier {
       const att = encodeAttestation({
         programId: this.cfg.programId, subjectKind: kind, subjectHash: sHash, asset, tier, treeRoot: head.head, rootSlot: head.headSlot,
         noteCount: notes.length, nullsetHash: nullsetHash(sorted), issuedSlot: slot, expirySlot: slot + this.cfg.validitySlots,
-        payer: payerBytes, nonce: new Uint8Array(crypto.randomBytes(16)),
+        payer: payerBytes, controller, nonce: new Uint8Array(crypto.randomBytes(16)),
       });
       const sig = this.signer.sign(att);
       const logIndex = await this.log.append(logLeaf(att, sig, this.signer.publicKey, this.cfg.bundleHash, slot));
@@ -196,6 +208,7 @@ export class Verifier {
         salts: salts.map(hex), nullifiers: nullifiers.map(hex), hashes: sorted.map(hex), logIndex,
         subjectHash: hex(sHash), certificate: { seeds: ['cert', hex(sHash), String(asset)] },
         issuedSlot: Number(slot), expirySlot: Number(slot + this.cfg.validitySlots), bundleHash: hex(this.cfg.bundleHash),
+        controller: toB58(controller),
       };
     } finally {
       try { nk?.destroy(); } catch {}

@@ -33,18 +33,18 @@ export function tierMinimum(asset: number, tier: number): bigint {
   return a.tiers[tier - 1];
 }
 
-/* §3: 208 bytes */
-export const ATTESTATION_LEN = 208;
+/* §3: 240 bytes */
+export const ATTESTATION_LEN = 240;
 export const DOMAIN = text('POF1');
 export interface Attestation {
   programId: Uint8Array; subjectKind: number; subjectHash: Uint8Array; asset: number; tier: number;
   treeRoot: Uint8Array; rootSlot: bigint; noteCount: number; nullsetHash: Uint8Array;
-  issuedSlot: bigint; expirySlot: bigint; payer: Uint8Array; nonce: Uint8Array;
+  issuedSlot: bigint; expirySlot: bigint; payer: Uint8Array; controller: Uint8Array; nonce: Uint8Array;
 }
 
 export function encodeAttestation(a: Attestation): Uint8Array {
   const b = concat(DOMAIN, a.programId, Uint8Array.of(a.subjectKind), a.subjectHash, Uint8Array.of(a.asset), Uint8Array.of(a.tier),
-    a.treeRoot, u64le(a.rootSlot), Uint8Array.of(a.noteCount), a.nullsetHash, u64le(a.issuedSlot), u64le(a.expirySlot), a.payer, a.nonce);
+    a.treeRoot, u64le(a.rootSlot), Uint8Array.of(a.noteCount), a.nullsetHash, u64le(a.issuedSlot), u64le(a.expirySlot), a.payer, a.controller, a.nonce);
   if (b.length !== ATTESTATION_LEN) throw new PofError('INTERNAL', `attestation is ${b.length} bytes`, 500);
   return b;
 }
@@ -54,7 +54,7 @@ export function decodeAttestation(b: Uint8Array): Attestation {
   return {
     programId: b.slice(4, 36), subjectKind: b[36], subjectHash: b.slice(37, 69), asset: b[69], tier: b[70],
     treeRoot: b.slice(71, 103), rootSlot: readU64le(b, 103), noteCount: b[111], nullsetHash: b.slice(112, 144),
-    issuedSlot: readU64le(b, 144), expirySlot: readU64le(b, 152), payer: b.slice(160, 192), nonce: b.slice(192, 208),
+    issuedSlot: readU64le(b, 144), expirySlot: readU64le(b, 152), payer: b.slice(160, 192), controller: b.slice(192, 224), nonce: b.slice(224, 240),
   };
 }
 
@@ -66,7 +66,7 @@ export function sortHashes(hs: Uint8Array[]): Uint8Array[] {
 export const nullsetHash = (sorted: Uint8Array[]): Uint8Array => sha256(...sorted);
 
 /* §7 */
-export const LEAF_LEN = 345;
+export const LEAF_LEN = 1 + ATTESTATION_LEN + 64 + 32 + 32 + 8; // 377
 export function logLeaf(att: Uint8Array, sig: Uint8Array, verifierKey: Uint8Array, bundleHash: Uint8Array, loggedSlot: bigint): Uint8Array {
   const b = concat(Uint8Array.of(1), att, sig, verifierKey, bundleHash, u64le(loggedSlot));
   if (b.length !== LEAF_LEN) throw new PofError('INTERNAL', 'leaf length', 500);
@@ -74,7 +74,8 @@ export function logLeaf(att: Uint8Array, sig: Uint8Array, verifierKey: Uint8Arra
 }
 export function decodeLeaf(b: Uint8Array) {
   if (b.length !== LEAF_LEN || b[0] !== 1) throw new PofError('BAD_LEAF', 'not a v1 log leaf');
-  return { attestation: b.slice(1, 209), signature: b.slice(209, 273), verifierKey: b.slice(273, 305), bundleHash: b.slice(305, 337), loggedSlot: readU64le(b, 337) };
+  const A = 1 + ATTESTATION_LEN;
+  return { attestation: b.slice(1, A), signature: b.slice(A, A + 64), verifierKey: b.slice(A + 64, A + 96), bundleHash: b.slice(A + 96, A + 128), loggedSlot: readU64le(b, A + 128) };
 }
 export const sthBytes = (programId: Uint8Array, size: bigint | number, root: Uint8Array): Uint8Array => concat(text('POF-STH1'), programId, u64le(size), root);
 export const anchorMemo = (size: bigint | number, root: Uint8Array): string => `pof:log:${String(size)}:${Buffer.from(root).toString('hex')}`;
