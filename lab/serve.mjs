@@ -6,6 +6,7 @@
 //   ANY  /api/spr-prover/<route>?net=           the Rings prover proxy (same file), for withdrawals
 //   POST /api/attest                           the real Verifier (verifier/dist) over LocalRings on the local clone, with a
 //                                              throwaway signing key made at start; local network only
+//   POST /api/link/start|check                 the real Linker; POST /lab/x-post simulates posting the code from the handle
 //   GET  /lab/cloned-tree                      the tree account bytes the local validator was started with (base64)
 // Local use only: it binds 127.0.0.1.
 import http from 'node:http';
@@ -25,7 +26,8 @@ const clonedFile = path.join(here, 'rings-local/.run/cloned-tree.b64');
 
 /* the Verifier, built once, for the local network */
 globalThis.isSecureContext ??= true;
-let verifier = null;
+let verifier = null, linker = null;
+const xPost = { handle: '', text: '' };
 async function localVerifier() {
   if (verifier) return verifier;
   const V = await import('../verifier/dist/pof-verifier.mjs');
@@ -38,7 +40,9 @@ async function localVerifier() {
   const cloned = fs.existsSync(clonedFile) ? new Uint8Array(Buffer.from(fs.readFileSync(clonedFile, 'utf8'), 'base64')) : null;
   const rings = new LocalRings(jsonRpc(LOCAL), { cloned });
   const minAge = BigInt(process.env.POF_MIN_AGE_SLOTS || 0);
-  verifier = new V.Verifier({ programId, minAgeSlots: minAge, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 1_000_000n, relayer: null, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, new V.TransparencyLog(new V.FsStore(dir), signer, programId), null, null);
+  verifier = new V.Verifier({ programId, minAgeSlots: minAge, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 1_000_000n, maxRootLagSlots: 1_000_000n, relayer: null, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, new V.TransparencyLog(new V.FsStore(dir), signer, programId), null, null);
+  // the real Linker; X itself is simulated: POST /lab/x-post stands in for posting the code from the handle
+  linker = new V.Linker(new V.FsStore(dir), (h, exp, ctl) => verifier.linkToken(h, exp, ctl), async () => new Response(JSON.stringify({ tweet: { author: { screen_name: xPost.handle }, text: xPost.text, created_timestamp: Math.floor(Date.now() / 1000) } }), { status: 200 }));
   console.log('lab verifier key', signer.address, '· min note age', String(minAge), 'slots');
   return verifier;
 }
@@ -68,6 +72,11 @@ http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/spr/')) {
       const r = await sprProxy(new Request(url.href, { method: req.method, headers: { 'content-type': 'application/json' }, body: req.method === 'POST' ? body : undefined }), { keys });
       return send(r.status, await r.text());
+    }
+    if (url.pathname === '/lab/x-post' && req.method === 'POST') { const j = JSON.parse(body); xPost.handle = String(j.handle || ''); xPost.text = String(j.text || ''); return send(200, '{"ok":true}'); }
+    if ((url.pathname === '/api/link/start' || url.pathname === '/api/link/check') && req.method === 'POST') {
+      try { await localVerifier(); const j = JSON.parse(body); const r = url.pathname.endsWith('start') ? await linker.start(j.handle, j.controller) : await linker.check(j.handle, j.post, j.secret, j.controller); return send(200, JSON.stringify(r)); }
+      catch (e) { return send(e.status || 400, JSON.stringify({ error: { code: e.code || 'ERROR', message: String(e.message || e) } })); }
     }
     if (url.pathname === '/api/attest' && req.method === 'GET') { const v = await localVerifier(); return send(200, JSON.stringify({ verifierKey: v.key, program: PROGRAM, relayer: null, minAgeSlots: Number(v.cfg.minAgeSlots), note: 'the lab Verifier: local clone only, no relayer' })); }
     if (url.pathname === '/api/attest' && req.method === 'POST') {

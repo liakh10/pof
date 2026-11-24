@@ -49,6 +49,13 @@ try {
   await page.waitForFunction(() => (document.getElementById('log').textContent.match(/attested ·/g) || []).length >= 2, null, { timeout: 60_000 }).catch(() => {});
   const secondLog = await logText();
   ok(/attested ·[\s\S]*attested ·/.test(secondLog) || /NOTE_LOCKED|already backs|LOCKED/i.test(secondLog), 'a badge subject is attested too (or refused because the note already backs a live certificate)', secondLog.split('\n').slice(0, 2).join(' | '));
+  // an X handle: the real Linker, the post simulated, the controller key signs (POF-26)
+  await page.selectOption('#kind', '1'); await page.fill('#handle', '@lab_handle');
+  const before = (await logText()).match(/attested ·/g)?.length || 0;
+  await page.click('#certify');
+  await page.waitForFunction(n => (document.getElementById('log').textContent.match(/attested ·/g) || []).length > n || /NOTE_IN_USE/.test(document.getElementById('log').textContent), before, { timeout: 60_000 }).catch(() => {});
+  const xl = await logText();
+  ok(/link: ok, bound to controller \w+/.test(xl) && ((xl.match(/attested ·/g) || []).length > before || /NOTE_IN_USE/.test(xl)), 'an X subject links (secret kept in the tab, bound controller) and is attested with the controller signature', xl.split('\n').slice(0, 3).join(' | '));
   await page.click('#kits');
   const kits = await page.$$eval('#kitlist tr', r => r.length - 1);
   ok(kits >= 1, 'the revoke kit is kept locally: ' + kits);

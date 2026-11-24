@@ -165,7 +165,7 @@ export function disclosurePackage({ subject, asset, tier, ring, notes, payer, re
   const tree = notes[0].tree;
   return {
     v: 1,
-    subject: { kind: subject.kind, value: subject.value, proof: subject.proof, ...(subject.slot !== undefined ? { slot: String(subject.slot) } : {}) },
+    subject: { kind: subject.kind, value: subject.value, proof: subject.proof, ...(subject.slot !== undefined ? { slot: String(subject.slot) } : {}), ...(subject.controllerProof ? { controllerProof: subject.controllerProof } : {}) },
     asset, tier,
     ring: { owner: ring.owner, nk: hex(ring.nk), ...(ring.proof ? { proof: ring.proof } : {}) },
     notes: notes.map(n => {

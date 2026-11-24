@@ -35,6 +35,7 @@ const T = {
   SUBJECT_PROOF_STALE: ['The subject signature is too old.', 'Sign again; it takes a fresh slot.', true],
   BAD_SUBJECT_PROOF: ['The subject signature did not check out.', 'Sign again with the wallet you are certifying.', true],
   BAD_CONTROLLER: ['The certificate key is missing or wrong.', 'Start again from the subject step.', true],
+  BAD_CONTROLLER_PROOF: ['The certificate key did not sign.', 'Start again from the subject step on the device that made the vault.', true],
   LINK_EXPIRED: ['The X link expired.', 'Post a fresh code from the handle and link again.', true],
   BAD_HANDLE: ['That is not an X handle.', 'A handle is 1 to 15 letters, digits or underscores.', false],
   X_UNAVAILABLE: ['X did not answer the handle check.', 'Try again in a moment.', true],
@@ -46,6 +47,10 @@ const T = {
   BAD_PASSPHRASE: ['That passphrase does not open the backup.', 'Try again with the passphrase you chose.', true],
   RELAY_NEEDED: ['The relayer is off right now.', 'Paying from your wallet would link it to this subject in public. Wait for the relayer, or confirm that you accept the link.', true],
   PAYER_LINKS_WALLET: ['Paying from your wallet links it to this subject in public.', 'Use the relayer, or confirm that you accept the link.', false],
+  VAULT_LOCKED: ['Your vault key is locked on this device.', 'Enter its passphrase to open it.', true],
+  CREDITS_NEEDED: ['No relay credit left.', 'Buy credits ahead of time (a private transfer from the vault), so nothing is paid next to the certificate; or pay now and accept that the payment sits next to it in time.', false],
+  BAD_BUNDLE: ['Credits come in fixed bundles.', 'Pick one of the bundle sizes offered.', false],
+  CREDIT_USED: ['That relay credit was already used.', 'Use another credit, or buy a new bundle.', false],
   // the relayer
   RELAY_OFF: ['The relayer is off right now.', 'Submit the certificate from your own wallet.', false],
   RELAY_CAP: ['The relayer reached its spending cap for now.', 'Submit from your own wallet, or try later.', true],

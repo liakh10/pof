@@ -1,0 +1,172 @@
+{
+ "at": "2026-11-24T22:55:58.107Z",
+ "rows": [
+  {
+   "wallet": "Phantom (injected)",
+   "seen": [
+    "Phantom"
+   ],
+   "connected": "Phantom",
+   "vault": "signature",
+   "ring": "ok 0de938fa",
+   "calls": [
+    "phantom:utf8",
+    "phantom:utf8",
+    "phantom:hex"
+   ],
+   "ok": true,
+   "errors": []
+  },
+  {
+   "wallet": "Solflare (injected)",
+   "seen": [
+    "Solflare"
+   ],
+   "connected": "Solflare",
+   "vault": "signature",
+   "ring": "ok 269bd9c4",
+   "calls": [
+    "solflare:utf8",
+    "solflare:utf8",
+    "solflare:hex"
+   ],
+   "ok": true,
+   "errors": []
+  },
+  {
+   "wallet": "Backpack (injected)",
+   "seen": [
+    "Backpack"
+   ],
+   "connected": "Backpack",
+   "vault": "signature",
+   "ring": "ok 06365531",
+   "calls": [
+    "backpack",
+    "backpack",
+    "backpack"
+   ],
+   "ok": true,
+   "errors": []
+  },
+  {
+   "wallet": "Wallet Standard",
+   "seen": [
+    "Standard Wallet"
+   ],
+   "connected": "Standard Wallet",
+   "vault": "signature",
+   "ring": "ok 2e6b0aad",
+   "calls": [
+    "standard",
+    "standard",
+    "standard"
+   ],
+   "ok": true,
+   "errors": []
+  },
+  {
+   "wallet": "MPC-style (non-deterministic)",
+   "seen": [
+    "MPC Wallet"
+   ],
+   "connected": "MPC Wallet",
+   "vault": "PASSPHRASE_NEEDED → random (backup required)",
+   "ring": "ok 125002d3",
+   "calls": [
+    "mpc",
+    "mpc",
+    "mpc"
+   ],
+   "ok": true,
+   "errors": []
+  },
+  {
+   "wallet": "Phantom + Solflare + Standard (picker)",
+   "seen": [
+    "Phantom",
+    "Solflare",
+    "Standard Wallet"
+   ],
+   "picker": [
+    "Phantom",
+    "Solflare",
+    "Standard Wallet"
+   ],
+   "connected": "Solflare",
+   "vault": "signature",
+   "ring": "ok 269bd9c4",
+   "calls": [
+    "solflare:utf8",
+    "solflare:utf8",
+    "solflare:hex"
+   ],
+   "ok": true,
+   "errors": []
+  },
+  {
+   "wallet": "Phantom in-app browser (iOS, injected)",
+   "seen": [
+    "Phantom"
+   ],
+   "connected": "Phantom",
+   "vault": "signature",
+   "ring": "ok 0de938fa",
+   "calls": [
+    "phantom:utf8",
+    "phantom:utf8",
+    "phantom:hex"
+   ],
+   "ok": true,
+   "errors": []
+  },
+  {
+   "wallet": "Phone, no wallet (deep links)",
+   "seen": [],
+   "links": [
+    [
+     "PhantomOpen",
+     "https://phantom.app/ul/browse/http%3A%2F%2Flocalhost%3A5491%2Flab%2F?ref=http%3A%2F%2Flocalhost%3A5491"
+    ],
+    [
+     "SolflareOpen",
+     "https://solflare.com/ul/v1/browse/http%3A%2F%2Flocalhost%3A5491%2Flab%2F?ref=http%3A%2F%2Flocalhost%3A5491"
+    ],
+    [
+     "BackpackOpen",
+     "https://backpack.app/ul/v1/browse/http%3A%2F%2Flocalhost%3A5491%2Flab%2F?ref=http%3A%2F%2Flocalhost%3A5491"
+    ]
+   ],
+   "ok": true,
+   "errors": []
+  },
+  {
+   "wallet": "Desktop, no wallet (install links)",
+   "seen": [],
+   "links": [
+    [
+     "PhantomInstall",
+     "https://phantom.com/download"
+    ],
+    [
+     "SolflareInstall",
+     "https://solflare.com/download"
+    ],
+    [
+     "BackpackInstall",
+     "https://backpack.app/downloads"
+    ],
+    [
+     "Coinbase WalletInstall",
+     "https://www.coinbase.com/wallet/downloads"
+    ],
+    [
+     "Magic EdenInstall",
+     "https://wallet.magiceden.io/download"
+    ]
+   ],
+   "ok": true,
+   "errors": []
+  }
+ ]
+}

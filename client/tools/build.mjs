@@ -10,7 +10,11 @@ const dist = path.join(root, 'dist');
 fs.mkdirSync(dist, { recursive: true });
 const shim = path.join(root, 'src/hasher-shim.js');
 const hasherAlias = { name: 'hasher-shim', setup(b) { b.onResolve({ filter: /^@lightprotocol\/hasher\.rs$/ }, a => (a.importer === shim ? undefined : { path: shim })); } };
-const common = { bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true, legalComments: 'none', define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning' };
+const H0 = path.join(root, 'node_modules/@lightprotocol/hasher.rs/dist');
+const crypto = await import('node:crypto');
+const shaOf = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(H0, f))).digest('hex');
+const WASM_SHA = { simd: shaOf('hasher_wasm_simd_bg.wasm'), sisd: shaOf('light_wasm_hasher_bg.wasm') };
+const common = { bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true, legalComments: 'none', define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __POF_WASM_SHA256__: JSON.stringify(WASM_SHA) }, logLevel: 'warning' };
 for (const f of fs.readdirSync(dist)) if (/^chunk-.*\.js$/.test(f)) fs.rmSync(path.join(dist, f));
 const spr = await esbuild.build({ ...common, entryPoints: { spr: path.join(root, 'src/spr-entry.js'), 'spr-spend': path.join(root, 'src/spend-entry.js') }, outdir: dist, splitting: true, chunkNames: 'chunk-[hash]', plugins: [hasherAlias], metafile: true });
 await esbuild.build({ ...common, entryPoints: [path.join(root, 'src/web3-entry.js')], outfile: path.join(dist, 'web3.js') });
@@ -27,7 +31,7 @@ for (const [f, max] of Object.entries(BUDGET)) {
   rows.push(`${f.padEnd(18)} ${String(b.length).padStart(9)} B  gzip ${String(gz).padStart(8)} B  budget ${max}`);
   if (gz > max) over = true;
 }
-fs.writeFileSync(path.join(dist, 'SIZES.txt'), rows.join('\n') + '\n');
+fs.writeFileSync(path.join(dist, 'SIZES.txt'), rows.join('\n') + '\n' + `sha256 hasher-simd.wasm ${WASM_SHA.simd}\nsha256 hasher.wasm ${WASM_SHA.sisd}\n`);
 console.log(rows.join('\n'));
 if (process.argv.includes('--why')) { const ins = Object.entries(spr.metafile.outputs).find(([k]) => k.endsWith('spr.js'))[1].inputs; const by = {}; for (const [k, v] of Object.entries(ins)) { const m = k.match(/node_modules\/((@[^/]+\/)?[^/]+)/); const key = m ? m[1] : k; by[key] = (by[key] || 0) + v.bytesInOutput; } console.log(Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 25)); }
 if (over) { console.error('a file is over its budget'); process.exit(1); }

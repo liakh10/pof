@@ -66,7 +66,8 @@
 <h2>5 · certify</h2>
 <div class="row">
   <label>tier <select id="tier"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-  <label>subject <select id="kind"><option value="0">this wallet</option><option value="2">a fresh badge</option></select></label>
+  <label>subject <select id="kind"><option value="0">this wallet</option><option value="2">a fresh badge</option><option value="1">an X handle (post simulated)</option></select></label>
+  <input id="handle" value="@lab_handle" aria-label="X handle">
   <label title="X and badge certificates go through the relayer; the lab has none, so paying from the wallet links it to the subject in public"><input type="checkbox" id="walletpay" style="width:auto"> pay from the wallet (links it to the subject)</label>
   <button id="pick">Pick notes</button>
   <button id="certify">Certify</button>
@@ -101,7 +102,7 @@ $('boot').onclick = run(async () => {
     if (s.step === 'hasher') {
       const pct = s.total ? Math.round(100 * s.loaded / s.total) : (s.phase === 'ready' ? 100 : 0);
       $('hbar').style.width = pct + '%';
-      $('hstate').textContent = `hasher: ${s.phase}${s.total ? ` ${Math.round(s.loaded / 1024)} / ${Math.round(s.total / 1024)} KB` : ''}${s.phase === 'ready' ? ` in ${s.ms} ms (${s.simd ? 'SIMD' : 'no SIMD'})` : ''}${s.error ? ' · ' + s.error : ''}`;
+      $('hstate').textContent = `hasher: ${s.phase}${s.total ? ` ${Math.round(s.loaded / 1024)} / ${Math.round(s.total / 1024)} KB` : ''}${s.phase === 'ready' ? ` in ${s.ms} ms (${s.simd ? 'SIMD' : 'no SIMD'}${s.fromCache ? ', from cache' : ''})` : ''}${s.error ? ' · ' + s.error : ''}`;
     } else log(`${s.step}: ${s.phase || ''}${s.signature ? ' ' + s.signature : ''}${s.owner ? ' ' + s.owner : ''}${s.count !== undefined ? ' ' + s.count + ' notes' : ''}${s.code ? ' ' + s.code : ''}`, 'mute');
   });
   await pof.ready();
@@ -152,7 +153,15 @@ $('pick').onclick = run(async () => {
 });
 $('certify').onclick = run(async () => {
   const asset = Number($('asset').value), tier = Number($('tier').value), kind = Number($('kind').value);
-  const r = await pof.certify({ asset, tier, subjectKind: kind, from: 'vault', allowWalletPayer: $('walletpay').checked });
+  let linkId;
+  if (kind === 1) {
+    const st = await pof.linkStart({ handle: $('handle').value });
+    log('link: post this from @' + st.handle + ' → ' + st.post, 'mute');
+    await fetch('/lab/x-post', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handle: st.handle, text: st.post }) });
+    const lk = await pof.linkCheck({ handle: st.handle, post: `https://x.com/${st.handle}/status/1234567890123` });
+    linkId = lk.linkId; log('link: ok, bound to controller ' + lk.controller, 'ok');
+  }
+  const r = await pof.certify({ asset, tier, subjectKind: kind, handle: $('handle').value, linkId, from: 'vault', allowWalletPayer: $('walletpay').checked });
   log(`attested · log index ${r.logIndex} · subject ${r.subjectHash.slice(0, 16)}… · expiry slot ${r.expirySlot} · controller ${r.controller}\nattestation ${r.attestation}`, 'ok');
 });
 const showKits = () => { const k = pof.kits.list(); $('kitlist').innerHTML = k.length ? `<table><tr><th>subject</th><th>asset</th><th>tier</th><th>log</th><th>expiry slot</th><th>revoke pairs</th></tr>${k.map(x => `<tr><td>${['wallet', 'x', 'badge'][x.subject.kind]} ${x.subject.value.slice(0, 10)}…</td><td>${C.ASSETS[x.asset].name}</td><td>${x.tier}</td><td>${x.logIndex}</td><td>${x.expirySlot}</td><td>${x.revoke.length}</td></tr>`).join('')}</table>` : '<span class="mute">no kits</span>'; };

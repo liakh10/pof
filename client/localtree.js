@@ -57,6 +57,13 @@ export class LocalRings {
 
   /* replay every local Rings write since the clone and check the rebuilt root against the tree account */
   async refresh() {
+    // a deposit can land between the signature list and the tree read: replay again (the seen set keeps the earlier work)
+    for (let i = 0; ; i++) {
+      try { return await this.refreshOnce(); }
+      catch (e) { if (i >= 5 || !e.racing) throw e; await new Promise(r => setTimeout(r, 300)); }
+    }
+  }
+  async refreshOnce() {
     await C.ready();
     const head = await this.treeAccount();
     if (!this.base) {
@@ -105,6 +112,9 @@ export class LocalRings {
     }
     this.memo.clear();
     const root = this.node(32, 0n);
+    const fresh = await this.treeAccount();
+    if (fresh.nextIndex !== head.nextIndex) throw Object.assign(Error('the tree moved during the replay'), { racing: true });
+    if (head.nextIndex > this.base.nextIndex + BigInt(this.leaves.length)) throw Object.assign(Error('a deposit landed after the signature list was read'), { racing: true });
     if (!C.eq(root, head.root)) throw Error('the rebuilt tree does not reach the tree account root: the local chain has a Rings write LocalRings did not replay');
     if (head.nextIndex !== this.base.nextIndex + BigInt(this.leaves.length)) throw Error('leaf count mismatch');
     this.head = head;

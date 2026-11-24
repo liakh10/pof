@@ -1,9 +1,11 @@
-spr.js                  9578 B  gzip     3603 B  budget 200000
-spr-spend.js          673946 B  gzip   201786 B  budget 260000
-chunk-AEG4S227.js     446939 B  gzip   134727 B  budget 200000
-chunk-BN2N37T5.js         72 B  gzip       82 B  budget 200000
-chunk-REJ4SE35.js         83 B  gzip       87 B  budget 200000
-chunk-YVSA2ZOB.js        780 B  gzip      446 B  budget 200000
-web3.js               266187 B  gzip    81621 B  budget 110000
+spr.js                  9614 B  gzip     3612 B  budget 200000
+spr-spend.js          676465 B  gzip   202289 B  budget 260000
+chunk-45BUF4Y5.js     449540 B  gzip   135502 B  budget 200000
+chunk-DSWBML4U.js         77 B  gzip       90 B  budget 200000
+chunk-NGSRCXRD.js         83 B  gzip       87 B  budget 200000
+chunk-OILJDWNH.js        959 B  gzip      580 B  budget 200000
+web3.js               266512 B  gzip    81720 B  budget 110000
 hasher-simd.wasm     1282379 B  gzip   420485 B  budget 440000
 hasher.wasm          1990996 B  gzip   559535 B  budget 580000
+sha256 hasher-simd.wasm e4fd61543f3d35a5f913d65bbb181fafee833415b8c0cfa8c4390314ee8df431
+sha256 hasher.wasm f845fad50c34b4630e72521712335c309f760c10bdf91db49016ee310b25d5f0

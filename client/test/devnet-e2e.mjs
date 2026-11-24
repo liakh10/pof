@@ -45,7 +45,7 @@ try {
   const signer = V.signerFromSeed(new Uint8Array(crypto.randomBytes(32)));
   const programId = V.fromB58(PROGRAM, 32, 'program');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pof-devnet-'));
-  const verifier = new V.Verifier({ programId, minAgeSlots: 0n, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 1_000_000n, relayer: null, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, new V.TransparencyLog(new V.FsStore(dir), signer, programId), null, null);
+  const verifier = new V.Verifier({ programId, minAgeSlots: 0n, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 1_000_000n, maxRootLagSlots: 1_000_000n, relayer: null, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, new V.TransparencyLog(new V.FsStore(dir), signer, programId), null, null);
   const payer = lab.publicKey.toBase58();
   const subj = await pof.subject({ kind: 0, asset: 0, tier: 1, payer, from: 'vault' });
   const pkg = JSON.parse(JSON.stringify(pof.disclose({ subject: subj, asset: 0, tier: 1, notes: pick.notes, payer, from: 'vault' })));

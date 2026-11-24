@@ -57,7 +57,7 @@ test('local: vault → shield → sync → pick → §4 → the real Verifier si
   const programId = V.fromB58(PROGRAM, 32, 'program');
   const rings = new LocalRings(jsonRpc(RPC), { cloned });
   const log = new V.TransparencyLog(store, signer, programId);
-  const verifier = new V.Verifier({ programId, minAgeSlots: 0n, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 1_000_000n, relayer: null, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, log, null, null);
+  const verifier = new V.Verifier({ programId, minAgeSlots: 0n, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 1_000_000n, maxRootLagSlots: 1_000_000n, relayer: null, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, log, null, null);
 
   const payer = W.state().address;
   const subj = await pof.subject({ kind: 0, asset: 0, tier: 1, payer, from: 'vault' });

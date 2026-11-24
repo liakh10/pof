@@ -1,0 +1,36 @@
+{
+ "at": "2026-11-24T22:55:52.381Z",
+ "note": "local Rings clone; sync and pick read the local chain (LocalRings), not the Helius indexer",
+ "results": [
+  {
+   "cpu": "4x",
+   "viewport": "375x812",
+   "network": "150 ms, 6.4 Mbit/s",
+   "hasherColdMs": 2229,
+   "cold": "hasher: ready in 1746 ms (SIMD)",
+   "hasherWarmMs": 462,
+   "warm": "hasher: ready 1252 / 1252 KB in 17 ms (SIMD, from cache)",
+   "vaultMs": 265,
+   "syncMs": 13962,
+   "pickMs": 1054,
+   "picked": "ready: 1 note(s), leaves 64273, excess 1000000000",
+   "overflowX": false,
+   "errors": []
+  },
+  {
+   "cpu": "6x",
+   "viewport": "375x812",
+   "network": "150 ms, 6.4 Mbit/s",
+   "hasherColdMs": 2245,
+   "cold": "hasher: ready in 1736 ms (SIMD)",
+   "hasherWarmMs": 512,
+   "warm": "hasher: ready 1252 / 1252 KB in 16 ms (SIMD, from cache)",
+   "vaultMs": 315,
+   "syncMs": 14565,
+   "pickMs": 1051,
+   "picked": "ready: 1 note(s), leaves 64275, excess 1000000000",
+   "overflowX": false,
+   "errors": []
+  }
+ ]
+}
