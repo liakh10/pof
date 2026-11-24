@@ -30,7 +30,7 @@ POF keeps the useful properties of that letter and removes the weak ones:
 | What it states | holds at least X on a date | holds at least a tier, live at the current slot |
 | Who vouches | the bank | the Verifier's signature, checked by the program, recorded in a public log |
 | What the reader sees | the letter | a chain account anyone can read |
-| When it goes stale | silently, the day after | on chain, at the slot a disclosed note is spent (once the spend is shown) |
+| When it goes stale | silently, the day after | on chain, at the slot a disclosed note is spent (once the spend is shown), and at its expiry slot: 216,000 slots after issue at launch (about a day), renewable, never more than 1,512,000 |
 | How a reader checks it | calls the bank | reads the account, or the API, or the SDK |
 | Forgery | a convincing letter | a picture of a card; the account is the only source of truth |
 
