@@ -75,10 +75,17 @@ function drawWall() {
   if (!lastList.length) return emptyWall({ title: 'No certificates yet.', body: 'The first certificate appears here the moment it lands on chain, and turns over the moment its funds move.' });
   if (!list.length) return emptyWall({ title: filter === 'live' ? 'No live certificates right now.' : 'Nothing revoked yet.', body: 'Switch the filter to see the rest of the wall.' });
   if (wall.querySelector('.empty')) wall.replaceChildren();
-  const flipped = syncCards(wall, list, { limit: 48 });
+  const flipped = syncCards(wall, list, { limit: showAll ? 48 : PHONE.matches ? 8 : 24 });
+  more.hidden = showAll || list.length <= (PHONE.matches ? 8 : 24);
   if (flipped.length) breakSeal();
   window.dispatchEvent(new Event('pof:content'));
 }
+const PHONE = matchMedia('(max-width: 560px)');
+let showAll = false;
+const more = Object.assign(document.createElement('button'), { type: 'button', className: 'btn ghost', textContent: 'Show more certificates', hidden: true });
+more.style.marginTop = 'var(--s5)';
+wall.after(more);
+more.addEventListener('click', () => { showAll = true; drawWall(); });
 async function readWall() {
   const r = await src.list({ status: 'any', limit: 500 });
   const before = new Set(lastList.map(c => c.address));
