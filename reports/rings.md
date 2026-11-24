@@ -234,9 +234,12 @@ Network: 150 ms latency, 6.4 Mbit/s (`lab/test/mobile-perf.mjs`, raw results in 
   must be registered for the relayer key (owner step at launch).
 
 ### The relayed revoke (X and badge certificates)
-- **The bytes.** `pof.revokeRelayed(kit)` has the certificate's controller sign the 148 `POF-REVOKE1` bytes: domain,
-  program id, certificate address, subject hash, asset, nullset hash and the certificate's issued slot, so the signature
-  dies with that certificate. The bytes are built from the kit's attestation and the certificate PDA.
+- **The bytes** (156 since audit2 A2-01). `pof.revokeRelayed(kit)` has the certificate's controller sign the `POF-REVOKE1`
+  bytes: domain, program id, certificate address, subject hash, asset, nullset hash, the certificate's issued slot (so the
+  signature dies with that certificate) and `valid_until` (the current slot + 1,500). The client posts `validUntil` with
+  the signature. The bytes are built from the kit's attestation and the certificate PDA, and match the shared vector
+  `client/test/vectors/revoke-v2.json`, which equals the Verifier's `revokeBytesV2` (`audit2/test/revoke-bytes.test.mjs`
+  passes).
 - **The submit.** The client posts them to `/api/relay/revoke`. The relayer submits `[ed25519(controller, bytes),
   revoke_signed()]`, so no wallet pays and none appears. It answers `PROGRAM_NOT_READY` until the deployed program has
   `revoke_signed` (it is in the IDL now).
@@ -272,6 +275,19 @@ Network: 150 ms latency, 6.4 Mbit/s (`lab/test/mobile-perf.mjs`, raw results in 
   - no inline script.
 - **An X subject** now also carries `subject.controllerProof`, the X controller key's signature over the disclosure
   message (POF-26). The lab links a handle through the real Linker, with a simulated post, and the Verifier attests it.
+
+### Audit2 fixes (client)
+- **Kits at rest.** The whole kit list of a vault is one AES-GCM box under its kit key, so the device's storage shows no
+  salt, nullifier, handle or vault (tested). The export file is sealed the same way and opens only in the same vault;
+  `export({ plain: true })` writes a clear file on request. Kits stored in clear by older builds are moved into the box on
+  first open.
+- **A random delay before certify is on by default** off the lab: 75 to 750 slots, shown as `status('delay')`. The site
+  can pass `delaySlots` to change it.
+- **The Rings proxy rebuilds every upstream answer** (A2-10): status, allowlisted headers, text scrubbed of key-bearing
+  URLs, binary prover envelopes copied as bytes. A key-bearing upstream body, a foreign CORS header and set-cookie are all
+  tested.
+- **The build reads the credit pins as committed** (`git show HEAD:verifier/lib/credit-pins.json`), so an uncommitted key
+  change in the working tree never reaches `client/dist`. Devnet now has its own key, kid 6923cb77 (A2-05).
 
 ## Trust points this part carries (for /docs)
 
