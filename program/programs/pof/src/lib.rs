@@ -177,6 +177,9 @@ pub struct Config {
     pub paused: bool,
     pub closing: bool,
     pub launch_slot: u64,
+    /// A lowered rotation delay takes effect only after the old one has run: until held_until, set_verifier waits at least held_delay.
+    pub held_delay: u64,
+    pub held_until: u64,
     pub bump: u8,
     pub treasury_bump: u8,
 }
@@ -529,7 +532,14 @@ pub mod pof {
     /// Every parameter at once, within the bounds (the fee at most FEE_CAP).
     pub fn set_params(ctx: Context<AdminOnly>, params: Params) -> Result<()> {
         params.check()?;
+        let slot = Clock::get()?.slot;
         let c = &mut ctx.accounts.config;
+        // lowering the rotation delay is itself delayed: for the old delay's length, proposals still wait at least the old delay
+        if params.rotation_delay < c.params.rotation_delay {
+            let held = if slot < c.held_until { c.held_delay.max(c.params.rotation_delay) } else { c.params.rotation_delay };
+            c.held_delay = held;
+            c.held_until = add(slot, held)?;
+        }
         c.params = params;
         emit!(ConfigSet { admin: c.admin, dev: c.dev, relayer: c.relayer, root_mint: c.root_mint, params });
         Ok(())
@@ -570,7 +580,8 @@ pub mod pof {
             c.verifier = c.next_verifier;
         }
         c.next_verifier = next;
-        c.next_verifier_slot = if next == Pubkey::default() { 0 } else { add(slot, c.params.rotation_delay)? };
+        let delay = if slot < c.held_until { c.params.rotation_delay.max(c.held_delay) } else { c.params.rotation_delay };
+        c.next_verifier_slot = if next == Pubkey::default() { 0 } else { add(slot, delay)? };
         emit!(VerifierSet { verifier: c.verifier, next_verifier: c.next_verifier, next_verifier_slot: c.next_verifier_slot });
         Ok(())
     }
@@ -608,6 +619,7 @@ pub mod pof {
         let tinfo = a.treasury.to_account_info();
         let t = &mut a.treasury;
         let cert = &mut a.certificate;
+        let mut surplus = 0u64;
         if cert.payer == Pubkey::default() {
             t.open = add(t.open, 1)?;
         } else {
@@ -618,10 +630,15 @@ pub mod pof {
                 unlive(c, t, cert);
                 t.expired += 1;
             }
+            // the account's rent is its old payer's: the new payer buys it out at exactly the rent-exempt minimum. Anything above
+            // it (lamports anyone may send to a PDA) goes to the treasury, so a donation can never make a remake cost more.
+            // (the surplus moves after every CPI below: a direct lamport change must not precede a CPI it is not part of)
+            let info = cert.to_account_info();
+            let rent = Rent::get()?.minimum_balance(info.data_len());
+            surplus = info.lamports().saturating_sub(rent);
             if cert.payer != payer {
                 let prior = a.prior_payer.as_ref().ok_or(error!(PofError::PriorPayerMissing))?;
                 require_keys_eq!(prior.key(), cert.payer, PofError::PriorPayerMissing);
-                let rent = cert.to_account_info().lamports();
                 system_program::transfer(
                     CpiContext::new(a.system_program.key(), system_program::Transfer { from: a.payer.to_account_info(), to: prior.to_account_info() }),
                     rent,
@@ -629,6 +646,10 @@ pub mod pof {
             }
         }
         let fee = take_fee(c, t, &a.payer, &tinfo, &a.holder_token, &a.system_program)?;
+        if surplus > 0 {
+            ext::shift(&cert.to_account_info(), &tinfo, surplus)?;
+            t.fees_in = add(t.fees_in, surplus)?;
+        }
         let n = att.null_hashes.len();
         cert.subject_kind = att.subject_kind;
         cert.subject_hash = att.subject_hash;
@@ -690,6 +711,7 @@ pub mod pof {
         let t = &mut a.treasury;
         let cert = &mut a.certificate;
         require!(cert.status == STATUS_LIVE, PofError::NotLive);
+        require!(slot <= cert.expiry_slot, PofError::CertificateExpired);
         let n = att.null_hashes.len();
         require!(
             cert.subject_kind == att.subject_kind && cert.controller == att.controller && n == cert.note_count as usize && cert.null_hashes[..n] == att.null_hashes[..],
@@ -1125,6 +1147,8 @@ mod tests {
             paused: false,
             closing: false,
             launch_slot: 0,
+            held_delay: 0,
+            held_until: 0,
             bump: 0,
             treasury_bump: 0,
         };

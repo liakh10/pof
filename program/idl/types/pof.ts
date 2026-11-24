@@ -2130,6 +2130,17 @@ export type Pof = {
             "type": "u64"
           },
           {
+            "name": "heldDelay",
+            "docs": [
+              "A lowered rotation delay takes effect only after the old one has run: until held_until, set_verifier waits at least held_delay."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "heldUntil",
+            "type": "u64"
+          },
+          {
             "name": "bump",
             "type": "u8"
           },
