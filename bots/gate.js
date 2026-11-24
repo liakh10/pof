@@ -22,6 +22,8 @@ export async function evaluate(client, roomInfo, linkRec) {
     revoked_spent: `The certificate was revoked at slot ${c?.revokedSlot}: the certified funds moved. Certify again to enter.`,
     revoked_by_holder: `The certificate was revoked by its holder at slot ${c?.revokedSlot}.`,
     expired: `The certificate expired at slot ${c?.expirySlot}. Renew it to enter.`,
+    voided: "The certificate is void: the verifier key that signed it was revoked. Certify again to enter.",
+    settling: `The certificate becomes live at slot ${c?.issuedSlot}. Try again then.`,
   }[r.reason];
   return { ok: r.ok, reason: r.reason, text, certificate: c, room: roomInfo, slot: r.slot };
 }

@@ -69,7 +69,7 @@ export async function joinRoomInstruction(args) {
     const payer = toAddress(args.payer);
     const controller = toAddress(args.controller ?? args.payer);
     const idl = POF_GATE_IDL;
-    const keys = resolveAccounts(idl, "join", { ...c, room, member, payer, controller, ...args.extra });
+    const keys = resolveAccounts(idl, "join", { ...c, pof_config: c.config, room, member, payer, controller, ...args.extra });
     const ixArgs = { subject_hash: c.hash, asset, subject_kind: args.subject instanceof Uint8Array ? 0 : args.subject.kind };
     const data = encodeInstruction(idl, "join", ixArgs);
     return { programId: gateProgramId, keys, data, member, certificate: c.certificate };
@@ -81,4 +81,15 @@ export function toWeb3Instruction(ix, web3) {
         keys: ix.keys.map((k) => ({ pubkey: new web3.PublicKey(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable })),
         data: globalThis.Buffer ? globalThis.Buffer.from(ix.data) : ix.data,
     });
+}
+/** A `pof_gate.evict` instruction: anyone may evict a member whose certificate no longer passes the room's gate. */
+export async function evictMemberInstruction(args) {
+    const programId = toAddress(args.programId ?? POF_PROGRAM_ID);
+    const gateProgramId = toAddress(args.gateProgramId ?? POF_GATE_PROGRAM_ID);
+    const [config] = await configAddress(programId);
+    const idl = POF_GATE_IDL;
+    const keys = resolveAccounts(idl, "evict", {
+        caller: args.caller, room: args.room, member: args.member, payer: args.payer, certificate: args.certificate, pof_config: config,
+    });
+    return { programId: gateProgramId, keys, data: encodeInstruction(idl, "evict", {}) };
 }

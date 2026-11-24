@@ -15,13 +15,16 @@ export const ASSETS = {
     1: { id: 1, symbol: "USDC", decimals: 6, tiers: { 1: 100, 2: 1_000, 3: 10_000, 4: 100_000, 5: 1_000_000 } },
 };
 /** §6 certificate status as stored on chain. */
-export const CertStatus = { Live: 0, RevokedSpent: 1, RevokedByHolder: 2, Expired: 3 };
+export const CertStatus = { Live: 0, RevokedSpent: 1, RevokedByHolder: 2, Expired: 3, Voided: 4 };
 export const CERT_STATUS_NAMES = {
     0: "live",
     1: "revoked_spent",
     2: "revoked_by_holder",
     3: "expired",
+    4: "voided",
 };
+/** zk certificates name the zk config PDA as their verifier (program/programs/pof/src/zk.rs ZK_CONFIG) */
+export const ZK_CONFIG = "6q7PxLzgUtLHMfCDDHzkU4Ho54rC6b21VZmSFsD6Tsv1";
 export function assetInfo(asset) {
     const a = ASSETS[asset];
     if (!a)

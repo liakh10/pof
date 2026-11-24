@@ -44,7 +44,7 @@ async function certify({ kind, value, controller, asset = 0, tier, payer }) {
   const hs = [crypto.randomBytes(32), crypto.randomBytes(32)].sort(Buffer.compare);
   const att = {
     subject_kind: kind, subject_hash: subjectHash, asset, tier, tree_root: crypto.randomBytes(32), root_slot: BigInt(slot - 5),
-    null_hashes: hs, issued_slot: BigInt(slot), expiry_slot: BigInt(slot + 500_000), controller: new PublicKey(controller), nonce: crypto.randomBytes(16),
+    null_hashes: hs, issued_slot: BigInt(slot), expiry_slot: BigInt(slot + 200_000), controller: new PublicKey(controller), nonce: crypto.randomBytes(16),
   };
   const bytes = X.attestationBytes(att, payer.publicKey);
   const sig = crypto.sign(null, bytes, crypto.createPrivateKey({ key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), verifier.secretKey.subarray(0, 32)]), format: "der", type: "pkcs8" }));
@@ -181,7 +181,8 @@ test("revoke_by_holder flips the status everywhere; anyone can then evict the me
   let r = await client.getRoomWithMembers(room.toBase58());
   const m = r.members.find((x) => !x.live);
   assert.equal(m.certificateStatus, "revoked_by_holder");
-  await send([X.G.ix("evict", {}, { caller: smallHolder.publicKey, room, member: new PublicKey(m.address), payer: holder.publicKey, certificate: new PublicKey(cert) })], [smallHolder]);
+  const ev = await sdk.evictMemberInstruction({ room: room.toBase58(), member: m.address, payer: holder.publicKey.toBase58(), certificate: cert, caller: smallHolder.publicKey.toBase58() });
+  await send([sdk.toWeb3Instruction(ev, web3)], [smallHolder]);
   r = await client.getRoomWithMembers(room.toBase58());
   assert.equal(r.members.length, 1);
   const s = await client.stats();
@@ -242,4 +243,30 @@ test("the /v1 API, the MCP tools and the bots' gate read the same local chain", 
   assert.equal(ok.ok, true);
   const no = await evaluate(client, roomInfo, { kind: 0, value: holder.publicKey.toBase58() });
   assert.equal(no.reason, "revoked_by_holder");
+});
+
+test("revoke_verifier_key: the SDK reads every certificate it signed as voided at once; void_by_key writes status 4", { skip }, async () => {
+  const fresh = Keypair.generate();
+  await airdrop(fresh.publicKey);
+  const c = await certify({ kind: 0, value: fresh.publicKey.toBase58(), controller: fresh.publicKey, tier: 2, payer: fresh });
+  assert.equal((await client.checkProofOfFunds({ subject: fresh.publicKey.toBase58(), asset: 0, minTier: 1 })).ok, true);
+  await send([X.P.ix("revoke_verifier_key", { key: verifier.publicKey }, { admin: admin.publicKey })], [admin]);
+  const cfg = await client.getConfig();
+  assert.ok(cfg.revokedKeys.includes(verifier.publicKey.toBase58()));
+  let r = await client.checkProofOfFunds({ subject: fresh.publicKey.toBase58(), asset: 0, minTier: 1 });
+  assert.equal(r.reason, "voided", "voided before anyone calls void_by_key");
+  assert.equal(r.certificate.statusName, "live");
+  // the program agrees: require_certificate refuses it
+  const req = await sdk.requireCertificateAccounts({ subject: sdk.walletSubject(fresh.publicKey.toBase58()), asset: 0, minTier: 1 });
+  const ix = new web3.TransactionInstruction({ programId: new PublicKey(req.programId), data: Buffer.from(req.data), keys: req.accounts.slice(0, -1).map((k) => ({ pubkey: new PublicKey(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable })) });
+  const sim = await send([ix], [fresh], { simulateOnly: true });
+  assert.match(X.reason(sim.value.logs), /KeyRevoked/);
+  await send([X.P.ix("void_by_key", {}, { caller: fresh.publicKey, certificate: new PublicKey(c.certificate) })], [fresh]);
+  r = await client.checkProofOfFunds({ subject: fresh.publicKey.toBase58(), asset: 0, minTier: 1 });
+  assert.equal(r.certificate.statusName, "voided");
+  const k = await client.verifierKeys({ history: true, fromCertificates: true });
+  assert.equal(k.all.includes(verifier.publicKey.toBase58()), false);
+  assert.equal(k.active, null, "the revoked key is still the Config's verifier, and signs nothing");
+  const s = await client.stats();
+  assert.ok(s.voided >= 1);
 });

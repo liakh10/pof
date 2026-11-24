@@ -31,9 +31,12 @@ export declare const CertStatus: {
     readonly RevokedSpent: 1;
     readonly RevokedByHolder: 2;
     readonly Expired: 3;
+    readonly Voided: 4;
 };
 export type CertStatus = (typeof CertStatus)[keyof typeof CertStatus];
-export declare const CERT_STATUS_NAMES: Record<number, "live" | "revoked_spent" | "revoked_by_holder" | "expired">;
+export declare const CERT_STATUS_NAMES: Record<number, "live" | "revoked_spent" | "revoked_by_holder" | "expired" | "voided">;
+/** zk certificates name the zk config PDA as their verifier (program/programs/pof/src/zk.rs ZK_CONFIG) */
+export declare const ZK_CONFIG = "6q7PxLzgUtLHMfCDDHzkU4Ho54rC6b21VZmSFsD6Tsv1";
 export declare function assetInfo(asset: number): AssetInfo;
 /** Parse "SOL" / "usdc" / "0" / 1 into the §2 asset id. */
 export declare function parseAsset(v: string | number): number;

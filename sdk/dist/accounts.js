@@ -8,7 +8,7 @@ import { decodeAccount, fieldOffset, Reader } from "./borsh.js";
 import { toHex, u64le } from "./bytes.js";
 import { findProgramAddress } from "./pda.js";
 import { toAddress, toAddressBytes } from "./base58.js";
-import { CERT_STATUS_NAMES, SUBJECT_KIND_NAMES, ASSETS, tierLabel, POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, } from "./constants.js";
+import { CERT_STATUS_NAMES, SUBJECT_KIND_NAMES, ASSETS, tierLabel, POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, ZK_CONFIG, } from "./constants.js";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const pofIdl = POF_IDL;
 const gateIdl = POF_GATE_IDL;
@@ -63,6 +63,7 @@ export function decodeCertificate(address, data) {
         payer: String(pick(r, "payer") ?? ""),
         logIndex: logIndex === 18446744073709552000 ? null : logIndex,
         verifier: String(pick(r, "verifier", "verifier_key", "verifierKey") ?? ""),
+        zk: String(pick(r, "verifier") ?? "") === ZK_CONFIG,
         controller: optKey(pick(r, "controller")),
         issuedSlot: num(pick(r, "issued_slot", "issuedSlot")),
         treeRoot: optHex(pick(r, "tree_root", "treeRoot")),
@@ -130,6 +131,7 @@ export function decodeConfig(data) {
             id, enabled: !!a.enabled, mint: String(a.mint), decimals: Number(a.decimals), mins: (a.mins ?? []).map((m) => String(m)),
         })),
         paused: !!r.paused, closing: !!r.closing, launchSlot: num(r.launch_slot) ?? 0,
+        revokedKeys: (r.revoked_keys ?? []).map((k) => String(k)).filter((k) => k !== DEFAULT_KEY),
         heldDelay: num(r.held_delay) ?? 0,
         heldUntil: num(r.held_until) ?? 0,
         rotationDelayAt(slot) {
@@ -149,19 +151,28 @@ export function decodeTreasury(data) {
     const size = n("log_size");
     return {
         feesIn: String(r.fees_in ?? 0), feesOut: String(r.fees_out ?? 0), certified: n("certified"), renewed: n("renewed"),
-        revokedSpent: n("revoked_spent"), revokedHolder: n("revoked_holder"), expired: n("expired"), live: n("live"),
+        revokedSpent: n("revoked_spent"), revokedHolder: n("revoked_holder"), expired: n("expired"), live: n("live"), voided: n("voided"),
         liveMin: (r.live_min ?? []).map((x) => String(x)), open: n("open"), relayed: n("relayed"), exempt: n("exempt"),
         log: size ? { treeSize: size, rootHash: hex(r.log_head), slot: n("log_slot") } : null,
     };
 }
-/** Live means: status byte live AND `slot <= expiry_slot` (the program's own rule, Certificate::is_live). */
-export function effectiveStatus(c, currentSlot) {
-    if (c.status === 0 && currentSlot > c.expirySlot)
+/**
+ * The program's own gate (pof::gate): live means status byte live, the signing key not revoked, `slot >= issued_slot`
+ * (a zk certificate settles first) and `slot <= expiry_slot`.
+ */
+export function effectiveStatus(c, currentSlot, revokedKeys = []) {
+    if (c.status !== 0)
+        return CERT_STATUS_NAMES[c.status] ?? "voided";
+    if (c.verifier && revokedKeys.includes(c.verifier))
+        return "voided";
+    if (c.issuedSlot && currentSlot < c.issuedSlot)
+        return "settling";
+    if (currentSlot > c.expirySlot)
         return "expired";
-    return CERT_STATUS_NAMES[c.status] ?? "live";
+    return "live";
 }
-export function isLive(c, currentSlot) {
-    return effectiveStatus(c, currentSlot) === "live";
+export function isLive(c, currentSlot, revokedKeys = []) {
+    return effectiveStatus(c, currentSlot, revokedKeys) === "live";
 }
 /* ---------- PDAs (CONTRACT §6) ---------- */
 /** PDAs are pure functions of their seeds; deriving one costs a few SHA-256 and curve checks, so they are remembered. */

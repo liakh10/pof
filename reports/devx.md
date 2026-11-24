@@ -1,25 +1,41 @@
 # Test report: developer surfaces (API, SDK, MCP, bots)
 
-Scope: `sdk/` (`@pof/sdk` 0.2.0), `api/v1/` and `api/openapi.json`, `mcp/` and `api/mcp.js`, `bots/` and `api/bots.js`,
+Scope: `sdk/` (`@pof/sdk` 0.3.0), `api/v1/` and `api/openapi.json`, `mcp/` and `api/mcp.js`, `bots/` and `api/bots.js`,
 `witness/` and `api/witness.js`, `cli/`, `embed/`, `examples/`. Every suite below runs from a clean checkout with the
 commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0 programs built from `program/` at the time of the run
-(the IDL with `held_delay` / `held_until`). Headless Chromium (playwright-core 1.63) for the browser suites.
+(the IDL with `revoked_keys`, status 4 voided, zk certificates, and the Config account in `require_certificate`, `join`
+and `evict`). Headless Chromium (playwright-core 1.63) for the browser suites.
 
 ## Summary
 
 | suite | command | tests | result |
 |---|---|---|---|
-| SDK unit | `cd sdk && npm test` | 21 | pass |
-| SDK on a local validator | `cd sdk && npm run test:local` | 7 | pass |
+| SDK unit | `cd sdk && npm test` | 22 | pass |
+| SDK on a local validator | `cd sdk && npm run test:local` | 8 | pass |
 | OTC desk example on a local validator | `zsh examples/otc-desk/test/run.sh` | 3 | pass |
-| HTTP API | `cd api/v1 && node --test _test/` | 15 | pass |
+| HTTP API | `cd api/v1 && node --test _test/` | 21 | pass |
 | MCP, official client | `cd mcp && npm ci && npm test` | 4 | pass |
 | Bots against mocks | `cd bots && node --test test/` | 12 | pass |
-| Log witness | `cd witness && node --test test/` | 5 | pass |
+| Log witness | `cd witness && node --test test/` | 8 | pass |
 | CLI | `cd cli && node --test test/` | 5 | pass |
 | `<pof-badge>`, iframe, SVG in Chromium | `cd embed && node --test test/` | 3 | pass |
 | Static gated page in Chromium | `cd examples/gated-page && node --test test/` | 1 | pass |
 | Release tarball | fresh project, `npm install <repo tarball URL>`, `tsc --strict` (NodeNext), run | 1 | pass |
+
+## Round 3: audit W-01..W-03, the program's new layout, performance
+
+- **W-01**: the witness monitor finds a certificate's leaf by its signed bytes (the nonce), not by the unsigned
+  `log_index`; a Verifier-signed certificate whose attestation is in no entry after 1,500 slots raises
+  `unlogged_certificate` whatever index it claims (`u64::MAX` included); zk and voided certificates are skipped; a leaf
+  found at another index is noted `misindexed`. **W-02**: a head counts only when signed by the key the Config has active
+  (and not revoked), in the witness, `/v1` and the CLI. **W-03**: witnesses cross-check each other's published documents
+  (`--peer`), and a head no consistency proof joins is `split_view`. Tests: witness 8.
+- **The new program layout** (local validator, 8): `require_certificate` with the Config account, `join` and `evict`
+  with `pof_config` (the SDK's `evictMemberInstruction`), `revoke_verifier_key` makes every certificate the key signed
+  read `voided` at once through the SDK, the program refuses it (`KeyRevoked`), and `void_by_key` writes status 4; the
+  revoked key is dropped from the trusted set. The OTC desk example passes the Config to its CPI and to `pof::gate`
+  (3/3). zk certificates read `settling` until their settle slot (unit test).
+- **Performance**: see `reports/performance.md` (one RPC per read, a log mirror for proofs, single-flight caches).
 
 ## Audit findings fixed in these parts (reports/audit.md, round 1)
 

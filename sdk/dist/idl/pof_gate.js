@@ -226,6 +226,9 @@ export const POF_GATE_IDL = {
                 },
                 {
                     "name": "certificate"
+                },
+                {
+                    "name": "pof_config"
                 }
             ],
             "args": []
@@ -311,6 +314,9 @@ export const POF_GATE_IDL = {
                 },
                 {
                     "name": "certificate"
+                },
+                {
+                    "name": "pof_config"
                 },
                 {
                     "name": "pof_program",

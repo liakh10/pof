@@ -70,16 +70,35 @@ export class PofClient {
     return { slot, accounts };
   }
 
-  private live(c: Certificate, slot: number): LiveCertificate {
-    const s = effectiveStatus(c, slot);
+  private live(c: Certificate, slot: number, revokedKeys: readonly string[] = this.revoked): LiveCertificate {
+    const s = effectiveStatus(c, slot, revokedKeys);
     return { ...c, effectiveStatus: s, live: s === "live" };
+  }
+
+  /** the Config's revoked verifier keys, refreshed with every read that can carry the Config account at no extra call */
+  private revoked: string[] = [];
+  private configAddr: string | null = null;
+  private async cfgAddr() {
+    return (this.configAddr ??= (await configAddress(this.programId))[0]);
+  }
+  /** read `addrs` and the Config in ONE getMultipleAccounts; keeps the revoked keys current */
+  private async withConfig(addrs: string[]) {
+    const cfg = await this.cfgAddr();
+    const { slot, accounts } = await this.accountsAt([...addrs, cfg]);
+    const c = accounts.pop();
+    if (c && c.owner === this.programId) {
+      try {
+        this.revoked = decodeConfig(c.data).revokedKeys;
+      } catch {}
+    }
+    return { slot, accounts };
   }
 
   /** The certificate for one subject and asset, or null. */
   async getCertificate(subject: Subject | Uint8Array, asset: number | string): Promise<LiveCertificate | null> {
     const hash = subject instanceof Uint8Array ? subject : await subjectHash(subject);
     const [addr] = await certificateAddress(hash, parseAsset(asset), this.programId);
-    const { slot, accounts: [acc] } = await this.accountsAt([addr]);
+    const { slot, accounts: [acc] } = await this.withConfig([addr]);
     if (!acc || acc.owner !== this.programId) return null;
     return this.live(decodeCertificate(addr, acc.data), slot);
   }
@@ -96,7 +115,7 @@ export class PofClient {
     const assets = opts.asset === undefined ? Object.keys(ASSETS).map(Number) : [parseAsset(opts.asset)];
     const addrs: string[] = [];
     for (const c of candidates) for (const a of assets) addrs.push((await certificateAddress(fromHex(c.subjectHash), a, this.programId))[0]);
-    const { slot, accounts: accs } = await this.accountsAt(addrs);
+    const { slot, accounts: accs } = await this.withConfig(addrs);
     const certificates: LiveCertificate[] = [];
     accs.forEach((acc) => {
       if (acc && acc.owner === this.programId) certificates.push(this.live(decodeCertificate(acc.address, acc.data), slot));
@@ -125,7 +144,7 @@ export class PofClient {
     if (f.asset !== undefined) filters.push(memcmp(layout.certificate.offset("asset"), Uint8Array.of(parseAsset(f.asset))));
     if (f.tier !== undefined) filters.push(memcmp(layout.certificate.offset("tier"), Uint8Array.of(f.tier)));
     if (f.subjectKind !== undefined) filters.push(memcmp(layout.certificate.offset("subject_kind"), Uint8Array.of(f.subjectKind)));
-    const { slot, accounts: accs } = await this.programAccountsAt(this.programId, filters);
+    const [{ slot, accounts: accs }] = await Promise.all([this.programAccountsAt(this.programId, filters), this.withConfig([])]);
     let certificates = accs.map((a) => this.live(decodeCertificate(a.address, a.data), slot));
     if (f.minTier !== undefined) certificates = certificates.filter((c) => c.tier >= f.minTier!);
     const st = f.status ?? "any";
@@ -140,6 +159,7 @@ export class PofClient {
     const { slot, accounts: [acc] } = await this.accountsAt([addr]);
     if (!acc || acc.owner !== this.programId) return null;
     const c = decodeConfig(acc.data);
+    this.revoked = c.revokedKeys;
     return { ...c, activeVerifier: activeVerifier(c, slot), slot };
   }
 
@@ -152,7 +172,7 @@ export class PofClient {
    * `active` is the one key a log HEAD may be signed with now (audit W-02): a retired key must not sign new heads.
    */
   async verifierKeys(opts: { history?: boolean; fromCertificates?: boolean; maxTransactions?: number } = {}): Promise<{
-    active: string | null; current: string | null; next: string | null; all: string[]; fromHistory: boolean; rpcCalls: number;
+    active: string | null; current: string | null; next: string | null; all: string[]; revoked: string[]; fromHistory: boolean; rpcCalls: number;
   }> {
     let calls = 1;
     const c = await this.getConfig();
@@ -192,8 +212,12 @@ export class PofClient {
       }
       fromHistory = true;
     }
-    const active = c ? activeVerifier(c, c.slot) : null;
-    return { active, current: active, next: c?.nextVerifier ?? null, all: [...keys], fromHistory, rpcCalls: calls };
+    // a revoked key is trusted for nothing: not for old entries, not for heads (the program voids what it signed)
+    const revoked = new Set(c?.revokedKeys ?? []);
+    for (const k of revoked) keys.delete(k);
+    const a = c ? activeVerifier(c, c.slot) : null;
+    const active = a && !revoked.has(a) ? a : null;
+    return { active, current: active, next: c?.nextVerifier ?? null, all: [...keys], revoked: [...revoked], fromHistory, rpcCalls: calls };
   }
 
   /** The Treasury's public counters, and the transparency log head anchored on chain. */
@@ -233,7 +257,7 @@ export class PofClient {
     const certAddrs = await Promise.all(
       members.map(async (m) => m.certificate ?? (await certificateAddress(fromHex(m.subjectHash), room.asset, this.programId))[0]),
     );
-    const { slot, accounts: certs } = await this.accountsAt(certAddrs);
+    const { slot, accounts: certs } = await this.withConfig(certAddrs);
     return {
       slot,
       room,
@@ -259,13 +283,15 @@ export class PofClient {
     revokedSpent: number;
     revokedByHolder: number;
     expired: number;
+    voided: number;
+    settling: number;
     byAsset: Record<string, { live: number; certifiedMinimum: number; byTier: Record<number, number> }>;
     bySubjectKind: Record<string, number>;
     treasury: (Treasury & { address: string }) | null;
   }> {
     const [{ slot, certificates }, treasury] = await Promise.all([opts.list ? Promise.resolve(opts.list) : this.listCertificates(), this.getTreasury()]);
     const out = {
-      slot, total: certificates.length, live: 0, revokedSpent: 0, revokedByHolder: 0, expired: 0, treasury,
+      slot, total: certificates.length, live: 0, revokedSpent: 0, revokedByHolder: 0, expired: 0, voided: 0, settling: 0, treasury,
       byAsset: {} as Record<string, { live: number; certifiedMinimum: number; byTier: Record<number, number> }>,
       bySubjectKind: { wallet: 0, x: 0, badge: 0 } as Record<string, number>,
     };
@@ -274,6 +300,8 @@ export class PofClient {
       if (c.effectiveStatus === "revoked_spent") out.revokedSpent++;
       else if (c.effectiveStatus === "revoked_by_holder") out.revokedByHolder++;
       else if (c.effectiveStatus === "expired") out.expired++;
+      else if (c.effectiveStatus === "voided") out.voided++;
+      else if (c.effectiveStatus === "settling") out.settling++;
       if (!c.live) continue;
       out.live++;
       out.bySubjectKind[c.subjectKindName] = (out.bySubjectKind[c.subjectKindName] ?? 0) + 1;
@@ -288,6 +316,7 @@ export class PofClient {
       out.revokedSpent = treasury.revokedSpent;
       out.revokedByHolder = treasury.revokedHolder;
       out.expired = Math.max(treasury.expired, out.expired);
+      out.voided = Math.max(treasury.voided, out.voided);
     }
     return out;
   }

@@ -54,3 +54,14 @@ export declare function toWeb3Instruction<T>(ix: Instruction, web3: {
     PublicKey: new (s: string) => unknown;
     TransactionInstruction: new (o: any) => T;
 }): T;
+/** A `pof_gate.evict` instruction: anyone may evict a member whose certificate no longer passes the room's gate. */
+export declare function evictMemberInstruction(args: {
+    room: AddressLike;
+    member: AddressLike;
+    /** the member's rent payer (from the Member account) */
+    payer: AddressLike;
+    certificate: AddressLike;
+    caller: AddressLike;
+    programId?: AddressLike;
+    gateProgramId?: AddressLike;
+}): Promise<Instruction>;

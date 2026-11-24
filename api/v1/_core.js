@@ -26,7 +26,7 @@ function json(status, body, cacheControl = "no-store") {
   };
 }
 
-const STATUSES = ["live", "revoked_spent", "revoked_by_holder", "expired", "any"];
+const STATUSES = ["live", "revoked_spent", "revoked_by_holder", "expired", "voided", "settling", "any"];
 const KINDS = { wallet: 0, x: 1, badge: 2 };
 
 /**
@@ -178,6 +178,8 @@ export async function handleV1(req) {
         revokedSpent: s.revokedSpent,
         revokedByHolder: s.revokedByHolder,
         expired: s.expired,
+        voided: s.voided,
+        settling: s.settling,
         solCertified: s.treasury ? Number(BigInt(s.treasury.liveMin[0] ?? 0) / 10n ** 9n) : s.byAsset.SOL?.certifiedMinimum ?? 0,
         usdcCertified: s.treasury ? Number(BigInt(s.treasury.liveMin[1] ?? 0) / 10n ** 6n) : s.byAsset.USDC?.certifiedMinimum ?? 0,
         renewed: s.treasury?.renewed ?? null,

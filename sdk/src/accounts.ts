@@ -9,14 +9,21 @@ import { toHex, u64le } from "./bytes.js";
 import { findProgramAddress } from "./pda.js";
 import { toAddress, toAddressBytes, type AddressLike } from "./base58.js";
 import {
-  CERT_STATUS_NAMES, SUBJECT_KIND_NAMES, ASSETS, tierLabel, POF_PROGRAM_ID, POF_GATE_PROGRAM_ID,
+  CERT_STATUS_NAMES, SUBJECT_KIND_NAMES, ASSETS, tierLabel, POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, ZK_CONFIG,
 } from "./constants.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const pofIdl = POF_IDL as unknown as Idl;
 const gateIdl = POF_GATE_IDL as unknown as Idl;
 
-export type StatusName = "live" | "revoked_spent" | "revoked_by_holder" | "expired";
+/**
+ * What a reader shows. The chain stores 0..4 (live, revoked_spent, revoked_by_holder, expired, voided); a reader also shows
+ * - "expired" for a live byte past expiry_slot,
+ * - "voided" for a live byte signed by a verifier key the Config has revoked (dead for require_certificate already,
+ *   before anyone calls void_by_key),
+ * - "settling" for a zk certificate whose issued_slot (its settle slot) is still ahead.
+ */
+export type StatusName = "live" | "revoked_spent" | "revoked_by_holder" | "expired" | "voided" | "settling";
 
 export interface Certificate {
   address: string;
@@ -41,6 +48,8 @@ export interface Certificate {
   payer: string;
   logIndex: number | null;
   verifier: string;
+  /** a zk certificate (no Verifier signature; verifier = the zk config PDA) */
+  zk: boolean;
   /** the key that may revoke the certificate and join rooms with it (CONTRACT §3) */
   controller: string | null;
   /** the slot the Verifier read when it signed (changes on renew) */
@@ -134,6 +143,7 @@ export function decodeCertificate(address: string, data: Uint8Array): Certificat
     payer: String(pick(r, "payer") ?? ""),
     logIndex: logIndex === 18446744073709552000 ? null : logIndex,
     verifier: String(pick(r, "verifier", "verifier_key", "verifierKey") ?? ""),
+    zk: String(pick(r, "verifier") ?? "") === ZK_CONFIG,
     controller: optKey(pick(r, "controller")),
     issuedSlot: num(pick(r, "issued_slot", "issuedSlot")),
     treeRoot: optHex(pick(r, "tree_root", "treeRoot")),
@@ -205,6 +215,8 @@ export interface PofConfig {
   paused: boolean;
   closing: boolean;
   launchSlot: number;
+  /** verifier keys the admin revoked: every certificate they signed is dead (status 4 once voided) */
+  revokedKeys: string[];
   /** a lowered rotation delay takes effect only after the old one ran: until heldUntil, a new verifier waits heldDelay */
   heldDelay: number;
   heldUntil: number;
@@ -233,6 +245,7 @@ export function decodeConfig(data: Uint8Array): PofConfig {
       id, enabled: !!a.enabled, mint: String(a.mint), decimals: Number(a.decimals), mins: (a.mins ?? []).map((m: any) => String(m)),
     })),
     paused: !!r.paused, closing: !!r.closing, launchSlot: num(r.launch_slot) ?? 0,
+    revokedKeys: (r.revoked_keys ?? []).map((k: any) => String(k)).filter((k: string) => k !== DEFAULT_KEY),
     heldDelay: num(r.held_delay) ?? 0,
     heldUntil: num(r.held_until) ?? 0,
     rotationDelayAt(slot: number) {
@@ -250,7 +263,7 @@ export function activeVerifier(c: PofConfig, slot: number): string {
 
 export interface Treasury {
   feesIn: string; feesOut: string; certified: number; renewed: number; revokedSpent: number; revokedHolder: number;
-  expired: number; live: number;
+  expired: number; live: number; voided: number;
   /** sum of tier minimums of live certificates by POF asset id, base units */
   liveMin: string[];
   open: number; relayed: number; exempt: number;
@@ -264,20 +277,30 @@ export function decodeTreasury(data: Uint8Array): Treasury {
   const size = n("log_size");
   return {
     feesIn: String(r.fees_in ?? 0), feesOut: String(r.fees_out ?? 0), certified: n("certified"), renewed: n("renewed"),
-    revokedSpent: n("revoked_spent"), revokedHolder: n("revoked_holder"), expired: n("expired"), live: n("live"),
+    revokedSpent: n("revoked_spent"), revokedHolder: n("revoked_holder"), expired: n("expired"), live: n("live"), voided: n("voided"),
     liveMin: (r.live_min ?? []).map((x: any) => String(x)), open: n("open"), relayed: n("relayed"), exempt: n("exempt"),
     log: size ? { treeSize: size, rootHash: hex(r.log_head), slot: n("log_slot") } : null,
   };
 }
 
-/** Live means: status byte live AND `slot <= expiry_slot` (the program's own rule, Certificate::is_live). */
-export function effectiveStatus(c: Pick<Certificate, "status" | "expirySlot">, currentSlot: number): StatusName {
-  if (c.status === 0 && currentSlot > c.expirySlot) return "expired";
-  return CERT_STATUS_NAMES[c.status] ?? "live";
+/**
+ * The program's own gate (pof::gate): live means status byte live, the signing key not revoked, `slot >= issued_slot`
+ * (a zk certificate settles first) and `slot <= expiry_slot`.
+ */
+export function effectiveStatus(
+  c: Pick<Certificate, "status" | "expirySlot"> & { issuedSlot?: number | null; verifier?: string },
+  currentSlot: number,
+  revokedKeys: readonly string[] = [],
+): StatusName {
+  if (c.status !== 0) return CERT_STATUS_NAMES[c.status] ?? "voided";
+  if (c.verifier && revokedKeys.includes(c.verifier)) return "voided";
+  if (c.issuedSlot && currentSlot < c.issuedSlot) return "settling";
+  if (currentSlot > c.expirySlot) return "expired";
+  return "live";
 }
 
-export function isLive(c: Pick<Certificate, "status" | "expirySlot">, currentSlot: number): boolean {
-  return effectiveStatus(c, currentSlot) === "live";
+export function isLive(c: Parameters<typeof effectiveStatus>[0], currentSlot: number, revokedKeys: readonly string[] = []): boolean {
+  return effectiveStatus(c, currentSlot, revokedKeys) === "live";
 }
 
 /* ---------- PDAs (CONTRACT §6) ---------- */

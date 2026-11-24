@@ -230,6 +230,136 @@ export const POF_IDL = {
       ]
     },
     {
+      "name": "certify_zk",
+      "docs": [
+        "Phase 2: certify from a Groth16 proof of funds (pof/zk) instead of the Verifier's signature. See zk.rs."
+      ],
+      "discriminator": [
+        96,
+        7,
+        247,
+        175,
+        189,
+        16,
+        188,
+        111
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "controller",
+          "docs": [
+            "The subject key (wallet or badge): it consents by signing; may be the payer."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "zk",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107,
+                  114,
+                  101,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "certificate",
+          "writable": true
+        },
+        {
+          "name": "prior_payer",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "holder_token"
+        },
+        {
+          "name": "tree"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ZkArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "close_begin",
       "docs": [
         "One way: no certify or renew; anyone may `expire` any certificate (rent back to its payer). See wind-down.mjs."
@@ -333,6 +463,134 @@ export const POF_IDL = {
                   117,
                   114,
                   121
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_path",
+      "docs": [
+        "The revoker drops its staged buffer (rent back); during the wind-down anyone may."
+      ],
+      "discriminator": [
+        228,
+        246,
+        66,
+        195,
+        202,
+        252,
+        223,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buffer",
+          "writable": true
+        },
+        {
+          "name": "revoker",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_zk",
+      "docs": [
+        "Wind-down only (audit LW-01): the ZkConfig [\"zk\"] and the owner registry [\"zkreg\"] close, their rent to the admin. Run",
+        "after every certificate expired and every note lock was released, before close_config."
+      ],
+      "discriminator": [
+        186,
+        191,
+        205,
+        32,
+        107,
+        130,
+        198,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "zk",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107,
+                  114,
+                  101,
+                  103
                 ]
               }
             ]
@@ -498,6 +756,200 @@ export const POF_IDL = {
       ]
     },
     {
+      "name": "open_path",
+      "docs": [
+        "Open the revoker's buffer for this certificate (the revoker pays its rent) with the nullifier, its next value, its leaf",
+        "index and the first siblings (from the leaf up); `stage_path` adds the rest. Two transactions carry the full 40 levels."
+      ],
+      "discriminator": [
+        239,
+        145,
+        149,
+        165,
+        39,
+        35,
+        63,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "revoker",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "certificate"
+        },
+        {
+          "name": "buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revoker"
+              },
+              {
+                "kind": "account",
+                "path": "certificate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nullifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "next_value",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "leaf_index",
+          "type": "u64"
+        },
+        {
+          "name": "siblings",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_zk_owner",
+      "docs": [
+        "The ring owner registers its zk owner commitment (the consent certify_zk proves)."
+      ],
+      "discriminator": [
+        202,
+        209,
+        9,
+        250,
+        182,
+        12,
+        179,
+        171
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "docs": [
+            "The ring owner (the vault key): its signature is the consent the circuit later proves."
+          ],
+          "signer": true
+        },
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107,
+                  114,
+                  101,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "release_note_lock",
+      "docs": [
+        "Anyone: close a note lock whose certificate is no longer live."
+      ],
+      "discriminator": [
+        199,
+        220,
+        11,
+        102,
+        53,
+        157,
+        182,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "lock",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  110,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lock.tag",
+                "account": "NoteLock"
+              }
+            ]
+          }
+        },
+        {
+          "name": "certificate"
+        },
+        {
+          "name": "payer",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "renew",
       "docs": [
         "A fresh attestation on the same notes (same salted hashes), subject, asset and controller: new root, slots and tier."
@@ -603,6 +1055,24 @@ export const POF_IDL = {
       "accounts": [
         {
           "name": "certificate"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -695,6 +1165,83 @@ export const POF_IDL = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "revoke_signed",
+      "docs": [
+        "Anyone submits the controller's signed revoke (Ed25519 instruction right before, signed by the certificate's controller",
+        "key over the 156 POF-REVOKE1 bytes, usable until `valid_until`). The holder's wallet never signs or pays: for an X-handle",
+        "or badge certificate the relayer submits it."
+      ],
+      "discriminator": [
+        224,
+        136,
+        97,
+        88,
+        214,
+        203,
+        185,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "certificate",
+          "writable": true
+        },
+        {
+          "name": "instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "valid_until",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "revoke_spent",
@@ -802,6 +1349,168 @@ export const POF_IDL = {
               }
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "revoke_spent_staged",
+      "docs": [
+        "The staged proof: the revoker's buffer for this certificate holds a membership path of its nullifier; the program hashes",
+        "all 40 levels to the root and checks it is one of the 100 nullifier roots the tree account holds NOW, checks the salted",
+        "hash of the disclosed note, revokes, and closes the buffer (rent back to the revoker)."
+      ],
+      "discriminator": [
+        255,
+        103,
+        254,
+        43,
+        147,
+        107,
+        237,
+        146
+      ],
+      "accounts": [
+        {
+          "name": "revoker",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "certificate",
+          "writable": true
+        },
+        {
+          "name": "tree"
+        },
+        {
+          "name": "buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revoker"
+              },
+              {
+                "kind": "account",
+                "path": "certificate"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        },
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "revoke_verifier_key",
+      "docs": [
+        "The admin revokes a Verifier key at once (a leak, or a key retired after rotation): it signs nothing more, and every",
+        "certificate it signed fails require_certificate and Rooms from now on; `void_by_key` marks each of them. At most 4 keys."
+      ],
+      "discriminator": [
+        38,
+        162,
+        12,
+        240,
+        52,
+        250,
+        34,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "key",
+          "type": "pubkey"
         }
       ]
     },
@@ -1132,6 +1841,219 @@ export const POF_IDL = {
       ]
     },
     {
+      "name": "set_zk",
+      "docs": [
+        "Admin: turn certify_zk on or off and set the revocation (escrow) key; records the build's verifying key hash."
+      ],
+      "discriminator": [
+        226,
+        103,
+        224,
+        87,
+        119,
+        167,
+        193,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "zk",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107,
+                  114,
+                  101,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "escrow",
+          "type": {
+            "array": [
+              {
+                "array": [
+                  "u8",
+                  32
+                ]
+              },
+              2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stage_path",
+      "docs": [
+        "Write `siblings` at levels offset.. of the revoker's open buffer (no gap above what is written; a level may be rewritten)."
+      ],
+      "discriminator": [
+        68,
+        97,
+        146,
+        218,
+        201,
+        81,
+        33,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "revoker",
+          "signer": true,
+          "relations": [
+            "buffer"
+          ]
+        },
+        {
+          "name": "buffer",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "offset",
+          "type": "u8"
+        },
+        {
+          "name": "siblings",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "void_by_key",
+      "docs": [
+        "Anyone: a live certificate signed by a revoked Verifier key becomes voided (status 4)."
+      ],
+      "discriminator": [
+        74,
+        62,
+        124,
+        112,
+        58,
+        63,
+        147,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "certificate",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "withdraw_fees",
       "docs": [
         "The treasury's fees to the dev wallet (0: all of them); its rent stays."
@@ -1237,6 +2159,32 @@ export const POF_IDL = {
       ]
     },
     {
+      "name": "NoteLock",
+      "discriminator": [
+        189,
+        43,
+        98,
+        15,
+        18,
+        238,
+        104,
+        64
+      ]
+    },
+    {
+      "name": "PathBuffer",
+      "discriminator": [
+        15,
+        240,
+        22,
+        62,
+        212,
+        197,
+        226,
+        181
+      ]
+    },
+    {
       "name": "Treasury",
       "discriminator": [
         238,
@@ -1247,6 +2195,32 @@ export const POF_IDL = {
         1,
         168,
         253
+      ]
+    },
+    {
+      "name": "ZkConfig",
+      "discriminator": [
+        181,
+        176,
+        242,
+        167,
+        108,
+        219,
+        13,
+        202
+      ]
+    },
+    {
+      "name": "ZkRegistry",
+      "discriminator": [
+        179,
+        149,
+        101,
+        22,
+        34,
+        133,
+        223,
+        52
       ]
     }
   ],
@@ -1343,6 +2317,19 @@ export const POF_IDL = {
       ]
     },
     {
+      "name": "NoteReleased",
+      "discriminator": [
+        147,
+        68,
+        218,
+        190,
+        7,
+        90,
+        172,
+        64
+      ]
+    },
+    {
       "name": "PausedSet",
       "discriminator": [
         171,
@@ -1382,6 +2369,19 @@ export const POF_IDL = {
       ]
     },
     {
+      "name": "VerifierKeyRevoked",
+      "discriminator": [
+        227,
+        104,
+        7,
+        71,
+        203,
+        98,
+        107,
+        98
+      ]
+    },
+    {
       "name": "VerifierSet",
       "discriminator": [
         127,
@@ -1392,6 +2392,45 @@ export const POF_IDL = {
         16,
         199,
         53
+      ]
+    },
+    {
+      "name": "ZkCertified",
+      "discriminator": [
+        196,
+        133,
+        181,
+        152,
+        252,
+        22,
+        235,
+        172
+      ]
+    },
+    {
+      "name": "ZkConfigSet",
+      "discriminator": [
+        223,
+        67,
+        224,
+        100,
+        156,
+        174,
+        146,
+        215
+      ]
+    },
+    {
+      "name": "ZkOwnerRegistered",
+      "discriminator": [
+        170,
+        98,
+        201,
+        235,
+        61,
+        29,
+        165,
+        46
       ]
     }
   ],
@@ -1628,8 +2667,88 @@ export const POF_IDL = {
     },
     {
       "code": 6046,
+      "name": "KeyRevoked",
+      "msg": "the Verifier key that signed this has been revoked"
+    },
+    {
+      "code": 6047,
+      "name": "KeyNotRevoked",
+      "msg": "the certificate's Verifier key is not revoked"
+    },
+    {
+      "code": 6048,
       "name": "Overflow",
       "msg": "arithmetic overflow"
+    },
+    {
+      "code": 6049,
+      "name": "ZkDisabled",
+      "msg": "certify_zk is turned off"
+    },
+    {
+      "code": 6050,
+      "name": "ZkSubjectKind",
+      "msg": "certify_zk takes a wallet or badge subject (its key signs)"
+    },
+    {
+      "code": 6051,
+      "name": "ZkLockMissing",
+      "msg": "pass one writable note lock [\\znote\\, tag] per tag, in order"
+    },
+    {
+      "code": 6052,
+      "name": "ZkStateRootUnknown",
+      "msg": "the state root is not in the Rings tree's root history"
+    },
+    {
+      "code": 6053,
+      "name": "ZkNullRootNotNewest",
+      "msg": "the nullifier root is not the Rings tree's newest nullifier root (prove again against it)"
+    },
+    {
+      "code": 6054,
+      "name": "ZkRegistryRootUnknown",
+      "msg": "the owner registry root is not in its recent history"
+    },
+    {
+      "code": 6055,
+      "name": "ZkRegistryFull",
+      "msg": "the owner registry is full"
+    },
+    {
+      "code": 6056,
+      "name": "ZkBadEscrowKey",
+      "msg": "the revocation key is not a Baby Jubjub point"
+    },
+    {
+      "code": 6057,
+      "name": "ZkNoVerifyingKey",
+      "msg": "this build has no verifying key"
+    },
+    {
+      "code": 6058,
+      "name": "ZkSettling",
+      "msg": "the zk certificate is still settling (its nullifiers may be queued spends)"
+    },
+    {
+      "code": 6059,
+      "name": "ZkInputNotInField",
+      "msg": "a public input is not a canonical field element"
+    },
+    {
+      "code": 6060,
+      "name": "ZkProofInvalid",
+      "msg": "the proof does not verify for this certificate"
+    },
+    {
+      "code": 6061,
+      "name": "ZkNoteLocked",
+      "msg": "a note is already behind another certificate"
+    },
+    {
+      "code": 6062,
+      "name": "ZkNoteStillLive",
+      "msg": "the lock's certificate is still live with this note"
     }
   ],
   "types": [
@@ -2137,6 +3256,19 @@ export const POF_IDL = {
             "type": "u64"
           },
           {
+            "name": "revoked_keys",
+            "docs": [
+              "Verifier keys revoked by the admin (leaked or retired): they sign nothing more, and every certificate they signed is dead",
+              "for require_certificate and Rooms at once, and can be voided by anyone."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                4
+              ]
+            }
+          },
+          {
             "name": "bump",
             "type": "u8"
           },
@@ -2294,6 +3426,93 @@ export const POF_IDL = {
       }
     },
     {
+      "name": "NoteLock",
+      "docs": [
+        "One note behind one live certificate, with what the keeper needs to open the escrow."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "certificate",
+            "type": "pubkey"
+          },
+          {
+            "name": "tag",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "payer",
+            "docs": [
+              "Paid the lock's rent (gets it back at release)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "eph",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "ct",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "escrow_epoch",
+            "type": "u32"
+          },
+          {
+            "name": "locked_slot",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NoteReleased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "certificate",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "Params",
       "type": {
         "kind": "struct",
@@ -2339,6 +3558,87 @@ export const POF_IDL = {
               "Slots between `set_verifier` and the new key taking over."
             ],
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PathBuffer",
+      "docs": [
+        "A membership path staged in parts (`stage_path`) for `revoke_spent_staged`, so the full 40-level path never has to fit one",
+        "transaction. PDA [\"path\", revoker, certificate]: only that revoker writes it, only for that certificate and that nullifier;",
+        "`revoke_spent_staged` hashes it to a nullifier root the tree holds at that moment and closes it (rent back to the revoker)."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "revoker",
+            "type": "pubkey"
+          },
+          {
+            "name": "certificate",
+            "type": "pubkey"
+          },
+          {
+            "name": "nullifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "next_value",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "leaf_index",
+            "type": "u64"
+          },
+          {
+            "name": "path",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                40
+              ]
+            }
+          },
+          {
+            "name": "levels",
+            "docs": [
+              "Siblings written so far from the leaf up (levels above are empty subtrees when consumed)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_pad",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
           }
         ]
       }
@@ -2407,7 +3707,8 @@ export const POF_IDL = {
     {
       "name": "Revoked",
       "docs": [
-        "path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder."
+        "path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder (controller signs the transaction), 4 by the controller's",
+        "signed revoke, 5 voided (its Verifier key revoked)."
       ],
       "type": {
         "kind": "struct",
@@ -2544,6 +3845,13 @@ export const POF_IDL = {
             "type": "u64"
           },
           {
+            "name": "voided",
+            "docs": [
+              "Certificates voided because their Verifier key was revoked."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "log_size",
             "docs": [
               "The transparency log's latest signed head anchored on chain: its size, its root hash, the slot."
@@ -2571,6 +3879,22 @@ export const POF_IDL = {
       }
     },
     {
+      "name": "VerifierKeyRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "key",
+            "type": "pubkey"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "VerifierSet",
       "type": {
         "kind": "struct",
@@ -2586,6 +3910,417 @@ export const POF_IDL = {
           {
             "name": "next_verifier_slot",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ZkArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject_kind",
+            "docs": [
+              "0 wallet or 2 badge: the controller is that key and signs (an X handle needs the linker's proof: not in this version)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "asset",
+            "type": "u8"
+          },
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "nonce",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "proof",
+            "docs": [
+              "-A ‖ B ‖ C, big-endian (js/zk.js proofBytes)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                256
+              ]
+            }
+          },
+          {
+            "name": "state_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "null_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "registry_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "eph",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "tags",
+            "docs": [
+              "One per used note, strictly ascending (distinct notes), 1..=4."
+            ],
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "cts",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ZkCertified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "certificate",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "asset",
+            "type": "u8"
+          },
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "settles_slot",
+            "type": "u64"
+          },
+          {
+            "name": "tags",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "eph",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "cts",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "escrow_epoch",
+            "type": "u32"
+          },
+          {
+            "name": "state_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "null_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ZkConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "docs": [
+              "certify_zk refuses while false. Turning it on, or changing the key, waits Config.params.rotation_delay (ZK-09);",
+              "turning it off is immediate."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "escrow",
+            "docs": [
+              "The revocation key K = k·B8 on Baby Jubjub (x, y, 32-byte big-endian): the keeper holds k. On the curve (checked)."
+            ],
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "escrow_epoch",
+            "docs": [
+              "Counts key changes; each note lock records the epoch it was encrypted under, so the keeper knows which k opens it."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "next_enabled",
+            "docs": [
+              "A change waiting for next_slot (0: none). Takes over by itself at that slot (as the verifier key does)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "next_escrow",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "next_slot",
+            "type": "u64"
+          },
+          {
+            "name": "vk_hash",
+            "docs": [
+              "sha256 of the verifying key compiled into this build (vk::VK_HASH), to match against the ceremony transcript."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "certified",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ZkConfigSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "escrow",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "takes_over_slot",
+            "type": "u64"
+          },
+          {
+            "name": "vk_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ZkOwnerRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u64"
+          },
+          {
+            "name": "leaf",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ZkRegistry",
+      "docs": [
+        "The POF owner registry (ZK-04): an append-only Poseidon Merkle tree (height 20) of Poseidon(ownerId(owner), commitment), each",
+        "appended by register_zk_owner under the ring owner's own signature, with its last 12 roots (Borsh decoding keeps it under the 4 KB frame)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "next_index",
+            "type": "u64"
+          },
+          {
+            "name": "filled",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                20
+              ]
+            }
+          },
+          {
+            "name": "roots",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                12
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

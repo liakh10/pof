@@ -67,6 +67,9 @@
           "relations": [
             "order"
           ]
+        },
+        {
+          "name": "pof_config"
         }
       ],
       "args": []
@@ -94,6 +97,9 @@
         },
         {
           "name": "certificate"
+        },
+        {
+          "name": "pof_config"
         },
         {
           "name": "order",
@@ -221,6 +227,11 @@
       "code": 6002,
       "name": "CertificateStillLive",
       "msg": "the certificate still passes the desk's gate"
+    },
+    {
+      "code": 6003,
+      "name": "BadPofConfig",
+      "msg": "that is not the pof Config account"
     }
   ],
   "types": [

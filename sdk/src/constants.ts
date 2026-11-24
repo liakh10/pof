@@ -30,14 +30,18 @@ export const ASSETS: Record<number, AssetInfo> = {
 };
 
 /** §6 certificate status as stored on chain. */
-export const CertStatus = { Live: 0, RevokedSpent: 1, RevokedByHolder: 2, Expired: 3 } as const;
+export const CertStatus = { Live: 0, RevokedSpent: 1, RevokedByHolder: 2, Expired: 3, Voided: 4 } as const;
 export type CertStatus = (typeof CertStatus)[keyof typeof CertStatus];
-export const CERT_STATUS_NAMES: Record<number, "live" | "revoked_spent" | "revoked_by_holder" | "expired"> = {
+export const CERT_STATUS_NAMES: Record<number, "live" | "revoked_spent" | "revoked_by_holder" | "expired" | "voided"> = {
   0: "live",
   1: "revoked_spent",
   2: "revoked_by_holder",
   3: "expired",
+  4: "voided",
 };
+
+/** zk certificates name the zk config PDA as their verifier (program/programs/pof/src/zk.rs ZK_CONFIG) */
+export const ZK_CONFIG = "6q7PxLzgUtLHMfCDDHzkU4Ho54rC6b21VZmSFsD6Tsv1";
 
 export function assetInfo(asset: number): AssetInfo {
   const a = ASSETS[asset];

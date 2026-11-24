@@ -61,7 +61,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
   const keys = async (c) => (await keySet(c)).all;
   const line = (c) =>
     `${c.assetSymbol.padEnd(4)} ${c.tierLabel.padEnd(16)} ${c.effectiveStatus.toUpperCase().padEnd(17)} ` +
-    (c.live ? `until slot ${c.expirySlot}` : c.revokedSlot ? `at slot ${c.revokedSlot}` : `expired after slot ${c.expirySlot}`) +
+    (c.live ? `until slot ${c.expirySlot}` : c.effectiveStatus === "settling" ? `live from slot ${c.issuedSlot}` : c.effectiveStatus === "voided" ? (c.revokedSlot ? `at slot ${c.revokedSlot} (its verifier key was revoked)` : "its verifier key was revoked") : c.revokedSlot ? `at slot ${c.revokedSlot}` : `expired after slot ${c.expirySlot}`) +
     `  ${c.address}`;
 
   try {

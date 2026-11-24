@@ -125,6 +125,8 @@ export declare const POF_GATE_IDL: {
             readonly writable: true;
         }, {
             readonly name: "certificate";
+        }, {
+            readonly name: "pof_config";
         }];
         readonly args: readonly [];
     }, {
@@ -172,6 +174,8 @@ export declare const POF_GATE_IDL: {
             };
         }, {
             readonly name: "certificate";
+        }, {
+            readonly name: "pof_config";
         }, {
             readonly name: "pof_program";
             readonly address: "pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT";

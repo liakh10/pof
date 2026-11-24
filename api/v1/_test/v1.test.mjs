@@ -351,3 +351,19 @@ test("server-side log reads carry x-pof-internal from env, and only then", async
   const r = await handleV1({ method: "GET", path: "log/head", query: {}, env, fetch: spy });
   assert.equal(r.body.includes("s3cret"), false, "the secret never reaches a response");
 });
+
+test("voided (revoked verifier key) and settling (zk) read through /v1, the badge and the gate check", async () => {
+  const sdk = await import("../../../sdk/dist/index.js");
+  const leaked = rand();
+  const holder = rand();
+  await w.rpc.putCertificate({ subject: sdk.walletSubject(holder), asset: 0, tier: 4, expirySlot: 9000, verifier: leaked });
+  await w.rpc.putConfig({ verifier: log.verifierKey, revoked_keys: [leaked, ...Array(3).fill("11111111111111111111111111111111")] });
+  let r = await get(`certificates/${holder}`, { asset: "SOL", minTier: "1" });
+  assert.equal(r.json.certificates[0].status, "voided");
+  assert.equal(r.json.certificates[0].statusOnChain, "live");
+  assert.equal(r.json.check.reason, "voided");
+  const b = await handleV1({ method: "GET", path: `badge/${holder}.svg`, query: {}, env });
+  assert.match(b.body, />VOIDED</);
+  r = await get("stats");
+  assert.ok(r.json.voided >= 1);
+});

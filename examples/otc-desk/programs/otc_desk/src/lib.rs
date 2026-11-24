@@ -22,7 +22,10 @@ pub mod otc_desk {
         let a = &mut ctx.accounts;
         // The gate: fails unless the certificate is live, unexpired, SOL, and at least MIN_TIER.
         let view = pof::cpi::require_certificate(
-            CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info() }),
+            CpiContext::new(
+                a.pof_program.key(),
+                pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info(), config: a.pof_config.to_account_info() },
+            ),
             subject_hash,
             ASSET_SOL,
             MIN_TIER,
@@ -52,14 +55,28 @@ pub mod otc_desk {
     pub fn expire_order(ctx: Context<ExpireOrder>) -> Result<()> {
         let slot = Clock::get()?.slot;
         let o = &ctx.accounts.order;
-        let still = match pof::read_certificate(&ctx.accounts.certificate.to_account_info(), &o.subject_hash, ASSET_SOL) {
-            Ok(cert) => pof::gate(&cert, ASSET_SOL, MIN_TIER, slot).is_ok() && cert.controller == o.trader,
-            Err(_) => false, // closed or not a certificate any more
+        // the certificate account is pinned by `has_one = certificate`, so a read error means it is gone
+        let still = match (read_pof_config(&ctx.accounts.pof_config)?, pof::read_certificate(&ctx.accounts.certificate.to_account_info(), &o.subject_hash, ASSET_SOL)) {
+            (Some(c), Ok(cert)) => pof::gate(&cert, &c, ASSET_SOL, MIN_TIER, slot).is_ok() && cert.controller == o.trader,
+            _ => false, // closed, voided by a revoked verifier key, or POF wound down
         };
         require!(!still, DeskError::CertificateStillLive);
         emit!(OrderExpired { trader: o.trader, order_id: o.order_id, slot });
         Ok(())
     }
+}
+
+/// POF's Config at its PDA (None once POF has wound down and closed it).
+fn read_pof_config(info: &AccountInfo) -> Result<Option<pof::Config>> {
+    let (want, _) = Pubkey::find_program_address(&[pof::CONFIG_SEED], &pof::ID);
+    require_keys_eq!(info.key(), want, DeskError::BadPofConfig);
+    if info.data_is_empty() {
+        return Ok(None);
+    }
+    require_keys_eq!(*info.owner, pof::ID, DeskError::BadPofConfig);
+    let data = info.try_borrow_data()?;
+    let mut d: &[u8] = &data;
+    Ok(Some(pof::Config::try_deserialize(&mut d).map_err(|_| error!(DeskError::BadPofConfig))?))
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace)]
@@ -91,6 +108,8 @@ pub struct PlaceOrder<'info> {
     pub trader: Signer<'info>,
     /// CHECK: the POF certificate ["cert", subject_hash, [0]]; pof checks owner, PDA, status, expiry, asset and tier in the CPI
     pub certificate: UncheckedAccount<'info>,
+    /// CHECK: the pof Config; pof checks its seeds in the CPI (it holds the revoked verifier keys)
+    pub pof_config: UncheckedAccount<'info>,
     #[account(init, payer = trader, space = 8 + Order::INIT_SPACE, seeds = [b"order", trader.key().as_ref(), &order_id.to_le_bytes()], bump)]
     pub order: Account<'info, Order>,
     pub pof_program: Program<'info, pof::program::Pof>,
@@ -107,6 +126,8 @@ pub struct ExpireOrder<'info> {
     pub trader: UncheckedAccount<'info>,
     /// CHECK: read directly with pof::read_certificate (a closed account fails the gate)
     pub certificate: UncheckedAccount<'info>,
+    /// CHECK: the pof Config, checked by its PDA in read_pof_config
+    pub pof_config: UncheckedAccount<'info>,
 }
 
 #[event]
@@ -134,4 +155,6 @@ pub enum DeskError {
     NotYourCertificate,
     #[msg("the certificate still passes the desk's gate")]
     CertificateStillLive,
+    #[msg("that is not the pof Config account")]
+    BadPofConfig,
 }

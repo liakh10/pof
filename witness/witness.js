@@ -58,7 +58,8 @@ export class Witness {
   async allowedKeys(doc) {
     if (this.trustedKeys) return this.trustedKeys;
     const c = await this.client.getConfig().catch(() => null);
-    if (c) return [c.activeVerifier];
+    // a key the admin revoked signs nothing more, not even while it is still the active one
+    if (c) return c.revokedKeys.includes(c.activeVerifier) ? [] : [c.activeVerifier];
     // before the program is configured: trust on first use, and alarm if the key ever changes
     return doc.firstKey ? [doc.firstKey] : null;
   }
@@ -167,6 +168,7 @@ export class Witness {
     };
     for (const c of certificates) {
       if (c.verifier === ZK_CONFIG) continue;
+      if (c.effectiveStatus === "voided") continue; // signed by a revoked key: dead on chain already
       const id = `${c.address}:${c.nonce}`;
       if (doc.monitored[id] === "ok" || doc.monitored[id] === "mismatch" || n >= this.monitorBatch) continue;
       n++;

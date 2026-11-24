@@ -138,7 +138,9 @@
                             "below_tier",
                             "revoked_spent",
                             "revoked_by_holder",
-                            "expired"
+                            "expired",
+                            "voided",
+                            "settling"
                           ]
                         }
                       }
@@ -204,6 +206,8 @@
                 "revoked_spent",
                 "revoked_by_holder",
                 "expired",
+                "voided",
+                "settling",
                 "any"
               ],
               "default": "any"
@@ -499,6 +503,12 @@
                         "integer",
                         "null"
                       ]
+                    },
+                    "voided": {
+                      "type": "integer"
+                    },
+                    "settling": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -1118,9 +1128,11 @@
               "live",
               "revoked_spent",
               "revoked_by_holder",
-              "expired"
+              "expired",
+              "voided",
+              "settling"
             ],
-            "description": "status at `slot`: a live certificate past its expiry slot reads expired before anyone calls expire"
+            "description": "status at `slot`: a live byte past its expiry reads expired; one signed by a verifier key the Config revoked reads voided (before void_by_key); a zk certificate before its settle slot reads settling"
           },
           "statusOnChain": {
             "type": "string",
@@ -1128,7 +1140,8 @@
               "live",
               "revoked_spent",
               "revoked_by_holder",
-              "expired"
+              "expired",
+              "voided"
             ]
           },
           "live": {
@@ -1198,6 +1211,10 @@
                 "type": "string"
               }
             }
+          },
+          "zk": {
+            "type": "boolean",
+            "description": "a zk certificate (no Verifier signature)"
           }
         }
       },

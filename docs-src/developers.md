@@ -20,7 +20,7 @@ conveniences on top of it, and every one of them can be replaced by a direct rea
 | CLI | `node cli/pof.js` from the repository (`pof check`, `pof watch`, `pof log verify`) |
 | Embed | `<pof-badge>` from `{{ORIGIN}}/embed/pof-badge.js`, `{{ORIGIN}}/embed/frame.html`, `{{ORIGIN}}/v1/badge/{subject}.svg` |
 | Witness | `node witness/run.js`; the project's own at `{{ORIGIN}}/v1/witness` |
-| SDK | `@pof/sdk`, from `https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz` |
+| SDK | `@pof/sdk`, from `https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.0.tgz` |
 | Source | `https://github.com/liakh10/pof` |
 
 ## What a certificate is
@@ -31,7 +31,7 @@ One account per subject and asset, at the PDA `["cert", subject_hash, [asset]]` 
 |---|---|
 | `subject_kind`, `subject_hash` | who: 0 wallet, 1 X handle, 2 badge, and `sha256("pof:<kind>:" ‖ value)` (the value is never stored) |
 | `asset`, `tier` | 0 SOL or 1 USDC, tier 1 to 5 (table below) |
-| `status` | 0 live, 1 revoked because a disclosed note was spent, 2 revoked by its holder |
+| `status` | 0 live, 1 revoked because a disclosed note was spent, 2 revoked by its holder, 4 voided (its verifier key was revoked) |
 | `certified_slot`, `issued_slot`, `expiry_slot`, `revoked_slot` | when. Live means `status == 0` and `slot <= expiry_slot` |
 | `controller` | the key that can revoke it and join rooms with it: the wallet itself, the badge key itself, or a key the holder's client keeps for an X handle |
 | `null_hashes`, `nullset_hash` | salted hashes of the disclosed notes' nullifiers. Anyone holding a salt can call `revoke_spent` once that note is spent |
@@ -93,7 +93,9 @@ curl -s "{{ORIGIN}}/v1/certificates/@anon?asset=SOL&minTier=4"
 }
 ```
 
-`check.reason` is one of `ok`, `no_certificate`, `below_tier`, `revoked_spent`, `revoked_by_holder`, `expired`.
+`check.reason` is one of `ok`, `no_certificate`, `below_tier`, `revoked_spent`, `revoked_by_holder`, `expired`, `voided`,
+`settling`. `voided` covers both status 4 and a live byte signed by a verifier key the Config has revoked (dead for
+`require_certificate` at once, before anyone calls `void_by_key`). `settling` is a zk certificate before its settle slot.
 `status` is the status at `slot`: a certificate whose expiry slot has passed reads `expired` even before anyone calls
 `expire` (which closes the account and returns its rent). `subject` is `null` in lists, because the chain only holds the
 hash.
@@ -103,7 +105,7 @@ The full schema, with every field, is the OpenAPI file. Import it into any clien
 ## SDK
 
 ```sh
-npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz
+npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.0.tgz
 ```
 
 TypeScript, ESM with types, **no runtime dependencies** (WebCrypto for SHA-256 and Ed25519, its own base58, PDAs and
@@ -136,9 +138,9 @@ Any program can ask `pof` before it does something:
 
 ```
 pof::require_certificate(subject_hash: [u8; 32], asset: u8, min_tier: u8)
-accounts: [certificate]   (the PDA ["cert", subject_hash, [asset]])
+accounts: [certificate, config]   (the PDA ["cert", subject_hash, [asset]], and the pof Config ["config"])
 returns:  CertView { subject_kind: u8, tier: u8, expiry_slot: u64, controller: Pubkey }
-fails:    NotLive · CertificateExpired · TierTooLow · AssetMismatch · BadCertificate
+fails:    NotLive · KeyRevoked · ZkSettling · CertificateExpired · TierTooLow · AssetMismatch · BadCertificate
 ```
 
 It checks the account's owner and PDA, the status, the expiry against the current slot, the asset and the tier. It does
@@ -154,13 +156,15 @@ pub struct Enter<'info> {
     pub user: Signer<'info>,
     /// CHECK: pof checks it in the CPI
     pub certificate: UncheckedAccount<'info>,
+    /// CHECK: the pof Config (its PDA is checked in the CPI); it holds the revoked verifier keys
+    pub pof_config: UncheckedAccount<'info>,
     pub pof_program: Program<'info, pof::program::Pof>,
 }
 
 pub fn enter(ctx: Context<Enter>, subject_hash: [u8; 32]) -> Result<()> {
     let a = &ctx.accounts;
     let view = pof::cpi::require_certificate(
-        CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info() }),
+        CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info(), config: a.pof_config.to_account_info() }),
         subject_hash, 0 /* SOL */, 3 /* ≥ 100 SOL */,
     )?.get();
     require_keys_eq!(view.controller, a.user.key());
@@ -168,8 +172,8 @@ pub fn enter(ctx: Context<Enter>, subject_hash: [u8; 32]) -> Result<()> {
 }
 ```
 
-To skip the CPI, `pof::read_certificate(&info, &subject_hash, asset)` and `pof::gate(&cert, asset, min_tier, slot)` apply
-the same rule inside your program.
+To skip the CPI, `pof::read_certificate(&info, &subject_hash, asset)` and `pof::gate(&cert, &config, asset, min_tier, slot)`
+apply the same rule inside your program; read the Config from its PDA, as `examples/otc-desk` does.
 
 The SDK builds the client side:
 

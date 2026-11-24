@@ -48,6 +48,12 @@ export declare class PofClient {
     private accountsAt;
     private programAccountsAt;
     private live;
+    /** the Config's revoked verifier keys, refreshed with every read that can carry the Config account at no extra call */
+    private revoked;
+    private configAddr;
+    private cfgAddr;
+    /** read `addrs` and the Config in ONE getMultipleAccounts; keeps the revoked keys current */
+    private withConfig;
     /** The certificate for one subject and asset, or null. */
     getCertificate(subject: Subject | Uint8Array, asset: number | string): Promise<LiveCertificate | null>;
     /**
@@ -90,6 +96,7 @@ export declare class PofClient {
         current: string | null;
         next: string | null;
         all: string[];
+        revoked: string[];
         fromHistory: boolean;
         rpcCalls: number;
     }>;
@@ -128,6 +135,8 @@ export declare class PofClient {
         revokedSpent: number;
         revokedByHolder: number;
         expired: number;
+        voided: number;
+        settling: number;
         byAsset: Record<string, {
             live: number;
             certifiedMinimum: number;

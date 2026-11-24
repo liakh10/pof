@@ -22,9 +22,11 @@ export function renderBadge(b) {
     revoked: b.revokedSlot ? `REVOKED · slot ${b.revokedSlot}` : "REVOKED",
     expired: "EXPIRED",
     below: "BELOW TIER",
+    voided: "VOIDED",
+    settling: "SETTLING",
     none: "NO CERTIFICATE",
   }[b.state];
-  const color = b.state === "live" ? t.live : b.state === "none" ? t.none : t.revoked;
+  const color = b.state === "live" ? t.live : b.state === "none" || b.state === "settling" ? t.none : t.revoked;
   const middle = [who, b.tierLabel].filter(Boolean).join(" · ");
   const pad = 10;
   const w1 = width(label) + pad * 2;
@@ -55,6 +57,8 @@ export function badgeState(answer, { asset, minTier } = {}) {
   if (!c) return { state: "none", tierLabel: null, revokedSlot: null };
   if (c.status === "revoked_spent" || c.status === "revoked_by_holder") return { state: "revoked", tierLabel: c.tierLabel, revokedSlot: c.revokedSlot };
   if (c.status === "expired") return { state: "expired", tierLabel: c.tierLabel, revokedSlot: null };
+  if (c.status === "voided") return { state: "voided", tierLabel: c.tierLabel, revokedSlot: c.revokedSlot };
+  if (c.status === "settling") return { state: "settling", tierLabel: c.tierLabel, revokedSlot: null };
   if (minTier !== undefined && c.tier < minTier) return { state: "below", tierLabel: c.tierLabel, revokedSlot: null };
   return { state: "live", tierLabel: c.tierLabel, revokedSlot: null };
 }

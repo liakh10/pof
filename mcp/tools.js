@@ -26,7 +26,7 @@ export const TOOLS = [
     title: "Check proof of funds",
     description:
       "Does this subject hold a LIVE Proof of Funds certificate of at least a tier (or an amount) in SOL or USDC? Answers yes or no with the reason " +
-      "(no_certificate, below_tier, revoked_spent, revoked_by_holder, expired). A certificate proves a minimum only, never the exact amount, and it " +
+      "(no_certificate, below_tier, revoked_spent, revoked_by_holder, expired, voided, settling). A certificate proves a minimum only, never the exact amount, and it " +
       `revokes itself when the certified funds move. Tiers: ${tierTable}.`,
     inputSchema: {
       type: "object",
@@ -63,7 +63,7 @@ export const TOOLS = [
         asset: ASSET,
         tier: { type: "integer", minimum: 1, maximum: 5, description: "exact tier" },
         min_tier: { type: "integer", minimum: 1, maximum: 5 },
-        status: { type: "string", enum: ["live", "revoked_spent", "revoked_by_holder", "expired", "any"], default: "live" },
+        status: { type: "string", enum: ["live", "revoked_spent", "revoked_by_holder", "expired", "voided", "settling", "any"], default: "live" },
         kind: { type: "string", enum: ["wallet", "x", "badge"] },
         limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
       },
@@ -171,6 +171,8 @@ export async function callTool(name, args, backend) {
         revoked_spent: `had a certificate ${c?.tierLabel}, revoked at slot ${c?.revokedSlot} because the certified funds moved`,
         revoked_by_holder: `had a certificate ${c?.tierLabel}, revoked by its holder at slot ${c?.revokedSlot}`,
         expired: `had a certificate ${c?.tierLabel}, expired at slot ${c?.expirySlot}`,
+        voided: `had a certificate ${c?.tierLabel}, void because the verifier key that signed it was revoked`,
+        settling: `has a zk certificate ${c?.tierLabel} that becomes live at slot ${c?.issuedSlot}`,
       }[r.check.reason];
       return {
         text: `${r.check.ok ? "YES" : "NO"}: ${subject} ${why} (as of slot ${r.slot}).${c ? `\nCertificate: ${fmtCert(c)}` : ""}`,

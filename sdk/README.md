@@ -16,7 +16,7 @@ Verifier's transparency log, and builds the accounts for gating your own program
 The package is not on npm. Install the release tarball from the repository:
 
 ```sh
-npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz
+npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.0.tgz
 ```
 
 ## Check a subject in three lines
@@ -31,7 +31,7 @@ const r = await pof.checkProofOfFunds({ subject: "@anon", asset: "SOL", minTier:
 ```
 
 `subject` is what a person types: `@handle`, `x:handle`, `wallet:<base58>`, `badge:<base58>`, a bare key (tried as a
-wallet and as a badge), or a 64-hex subject hash. `reason` is one of `ok`, `no_certificate`, `below_tier`,
+wallet and as a badge), or a 64-hex subject hash. `reason` is one of `ok`, `no_certificate`, `below_tier`, `voided`, `settling`,
 `revoked_spent`, `revoked_by_holder`, `expired`.
 
 A certificate proves a **minimum**, never an amount. Tier 4 SOL means "holds at least 1,000 SOL" and nothing more.
@@ -93,13 +93,15 @@ pub struct Enter<'info> {
     pub user: Signer<'info>,
     /// CHECK: pof checks it in the CPI (owner, PDA, status, expiry, asset, tier)
     pub certificate: UncheckedAccount<'info>,
+    /// CHECK: the pof Config (its PDA is checked in the CPI); it holds the revoked verifier keys
+    pub pof_config: UncheckedAccount<'info>,
     pub pof_program: Program<'info, pof::program::Pof>,
 }
 
 pub fn enter(ctx: Context<Enter>, subject_hash: [u8; 32]) -> Result<()> {
     let a = &ctx.accounts;
     let view = pof::cpi::require_certificate(
-        CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info() }),
+        CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info(), config: a.pof_config.to_account_info() }),
         subject_hash,
         0, // SOL
         3, // at least 100 SOL
@@ -110,8 +112,13 @@ pub fn enter(ctx: Context<Enter>, subject_hash: [u8; 32]) -> Result<()> {
 }
 ```
 
-Without a CPI, `pof::read_certificate(&info, &subject_hash, asset)` plus `pof::gate(&cert, asset, min_tier, slot)` do the
-same check in your own program.
+Without a CPI, `pof::read_certificate(&info, &subject_hash, asset)` plus `pof::gate(&cert, &config, asset, min_tier, slot)`
+do the same check in your own program (read the Config from its PDA `["config"]` under the pof program).
+
+A certificate is dead for the gate when it is revoked (status 1 or 2), voided (status 4, or signed by a verifier key the
+Config lists in `revoked_keys`, before anyone calls `void_by_key`), expired, or a zk certificate before its settle slot.
+The SDK reads all of these the same way: `effectiveStatus` is `live`, `revoked_spent`, `revoked_by_holder`, `expired`,
+`voided` or `settling`.
 
 On the client, the SDK gives you the accounts and the subject hash:
 

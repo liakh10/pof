@@ -186,3 +186,49 @@ test("verifierKeys: Config keys, plus every key VerifierSet events ever named (h
   assert.ok(fc.all.includes("11111111111111111111111111111111") === false);
   assert.equal(sdk.decodeEvents([ev(old, cur), "Program data: !!!", "nothing"]).length, 1);
 });
+
+test("status 4 voided, a certificate signed by a revoked verifier key, and a zk certificate still settling", async () => {
+  const { client, rpc, whale } = await world();
+  const leaked = Keypair.generate().publicKey.toBase58();
+  const good = Keypair.generate().publicKey.toBase58();
+  const a = Keypair.generate().publicKey.toBase58();
+  const b = Keypair.generate().publicKey.toBase58();
+  const z = Keypair.generate().publicKey.toBase58();
+  const v = Keypair.generate().publicKey.toBase58();
+  await rpc.putCertificate({ subject: sdk.walletSubject(a), asset: 0, tier: 4, expirySlot: 9000, verifier: leaked });
+  await rpc.putCertificate({ subject: sdk.walletSubject(b), asset: 0, tier: 4, expirySlot: 9000, verifier: good });
+  await rpc.putCertificate({ subject: sdk.walletSubject(v), asset: 0, tier: 4, status: 4, revokedSlot: 4990, expirySlot: 9000, verifier: leaked });
+  // a zk certificate settles at its issued_slot (ahead of now)
+  const [zaddr, bump] = await sdk.certificateAddress(await sdk.subjectHash(sdk.walletSubject(z)), 0);
+  rpc.put(zaddr, sdk.POF_PROGRAM_ID, sdk.encodeAccountPartial(sdk.POF_IDL, "Certificate", {
+    subject_kind: 0, subject_hash: await sdk.subjectHash(sdk.walletSubject(z)), asset: 0, tier: 3, status: 0, certified_slot: 5000, issued_slot: 5100,
+    expiry_slot: 9000, note_count: 1, verifier: sdk.ZK_CONFIG, controller: z, revealed_index: 255, bump,
+  }));
+  await rpc.putConfig({ verifier: good, revoked_keys: [leaked, "11111111111111111111111111111111", "11111111111111111111111111111111", "11111111111111111111111111111111"] });
+  assert.equal((await client.checkProofOfFunds({ subject: a, asset: 0, minTier: 1 })).reason, "voided", "before anyone calls void_by_key");
+  assert.equal((await client.checkProofOfFunds({ subject: b, asset: 0, minTier: 4 })).ok, true);
+  assert.equal((await client.checkProofOfFunds({ subject: v, asset: 0, minTier: 1 })).reason, "voided");
+  const zc = (await client.lookup(z)).certificates[0];
+  assert.equal(zc.zk, true);
+  assert.equal(zc.effectiveStatus, "settling");
+  rpc.slot = 5100;
+  assert.equal((await client.lookup(z)).certificates[0].effectiveStatus, "live");
+  rpc.slot = 5000;
+  assert.equal((await client.getConfig()).revokedKeys.length, 1);
+  const keys = await client.verifierKeys({ fromCertificates: true });
+  assert.equal(keys.all.includes(leaked), false, "a revoked key is trusted for nothing");
+  assert.deepEqual(keys.revoked, [leaked]);
+  const s = await client.stats();
+  assert.ok(s.voided >= 2);
+  assert.equal(s.settling, 1);
+  // pof_gate: join and evict carry the pof Config
+  const [cfg] = await sdk.configAddress();
+  const [room] = await sdk.roomAddress(Keypair.generate().publicKey, 1);
+  const j = await sdk.joinRoomInstruction({ room, asset: 0, subject: sdk.walletSubject(whale), payer: whale });
+  assert.ok(j.keys.some((k) => k.pubkey === cfg));
+  const r = await sdk.requireCertificateAccounts({ subject: sdk.walletSubject(whale), asset: 0, minTier: 1 });
+  assert.equal(r.accounts[1].pubkey, cfg, "require_certificate takes the config account");
+  const e = await sdk.evictMemberInstruction({ room, member: j.member, payer: whale, certificate: j.certificate, caller: whale });
+  assert.equal(e.programId, sdk.POF_GATE_PROGRAM_ID);
+  assert.ok(e.keys.some((k) => k.pubkey === cfg));
+});

@@ -83,6 +83,7 @@ export function certJson(c, subjectValue = null) {
     payer: c.payer,
     verifierKey: c.verifier,
     controller: c.controller,
+    zk: c.zk,
     issuedSlot: c.issuedSlot,
     renewals: c.renewals,
     revealed: c.revealed,

@@ -25,15 +25,15 @@ a { color: inherit; text-decoration: none; }
 .dot { width: .55em; height: .55em; border-radius: 50%; background: currentColor; }
 .slot { font-family: var(--pof-mono, ui-monospace, Menlo, monospace); font-size: .78em; color: var(--pof-muted, #5d6068); }
 :host([data-state="live"]) .status { color: var(--pof-live, #0f6b3a); }
-:host([data-state="revoked"]) .status, :host([data-state="expired"]) .status, :host([data-state="below"]) .status { color: var(--pof-revoked, #9b1c1c); }
-:host([data-state="none"]) .status, :host([data-state="error"]) .status, :host([data-state="checking"]) .status { color: var(--pof-muted, #5d6068); }
+:host([data-state="revoked"]) .status, :host([data-state="expired"]) .status, :host([data-state="voided"]) .status, :host([data-state="below"]) .status { color: var(--pof-revoked, #9b1c1c); }
+:host([data-state="none"]) .status, :host([data-state="error"]) .status, :host([data-state="checking"]) .status, :host([data-state="settling"]) .status { color: var(--pof-muted, #5d6068); }
 :host([data-state="checking"]) .dot { animation: pof-pulse 1.2s ease-in-out infinite; }
 :host([compact]) .label, :host([compact]) .slot { display: none; }
 @keyframes pof-pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { :host([data-state="checking"]) .dot { animation: none; } }
 `;
 
-const STATE_TEXT = { live: "LIVE", revoked: "REVOKED", expired: "EXPIRED", below: "BELOW TIER", none: "NO CERTIFICATE", error: "UNAVAILABLE", checking: "CHECKING" };
+const STATE_TEXT = { live: "LIVE", revoked: "REVOKED", expired: "EXPIRED", voided: "VOIDED", settling: "SETTLING", below: "BELOW TIER", none: "NO CERTIFICATE", error: "UNAVAILABLE", checking: "CHECKING" };
 const ASSET_ID = { SOL: 0, USDC: 1, 0: 0, 1: 1 };
 
 export class PofBadge extends HTMLElement {
@@ -112,6 +112,8 @@ export class PofBadge extends HTMLElement {
       if (!c) state = "none";
       else if (c.status === "revoked_spent" || c.status === "revoked_by_holder") state = "revoked";
       else if (c.status === "expired") state = "expired";
+      else if (c.status === "voided") state = "voided";
+      else if (c.status === "settling") state = "settling";
       else if (j.check && !j.check.ok) state = "below";
       else state = "live";
     } catch (e) {

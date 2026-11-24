@@ -41,7 +41,7 @@ async function certifyWallet(kp, tier) {
   const slot = await conn.getSlot("confirmed");
   const att = {
     subject_kind: 0, subject_hash: subjectHash, asset: 0, tier, tree_root: crypto.randomBytes(32), root_slot: BigInt(slot - 5),
-    null_hashes: [crypto.randomBytes(32)], issued_slot: BigInt(slot), expiry_slot: BigInt(slot + 500_000), controller: kp.publicKey, nonce: crypto.randomBytes(16),
+    null_hashes: [crypto.randomBytes(32)], issued_slot: BigInt(slot), expiry_slot: BigInt(slot + 200_000), controller: kp.publicKey, nonce: crypto.randomBytes(16),
   };
   const bytes = X.attestationBytes(att, kp.publicKey);
   void secretDer;
@@ -55,7 +55,8 @@ async function placeOrder(trader, subjectOwner, orderId, side = "Buy") {
   const { certificate } = await sdk.requireCertificateAccounts({ subject: subjectHash, asset: "SOL", minTier: 3 });
   const id = Buffer.alloc(8); id.writeBigUInt64LE(BigInt(orderId));
   const [order] = PublicKey.findProgramAddressSync([Buffer.from("order"), trader.publicKey.toBuffer(), id], DESK);
-  const keys = sdk.resolveAccounts(IDL, "place_order", { trader: trader.publicKey.toBase58(), certificate, order: order.toBase58(), pof_program: sdk.POF_PROGRAM_ID, system_program: SystemProgram.programId.toBase58() });
+  const [pofConfig] = await sdk.configAddress();
+  const keys = sdk.resolveAccounts(IDL, "place_order", { trader: trader.publicKey.toBase58(), certificate, pof_config: pofConfig, order: order.toBase58(), pof_program: sdk.POF_PROGRAM_ID, system_program: SystemProgram.programId.toBase58() });
   const data = sdk.encodeInstruction(IDL, "place_order", { subject_hash: subjectHash, order_id: BigInt(orderId), side: { kind: side }, amount: 250n * 10n ** 9n, price: 150_000_000n });
   await send([new TransactionInstruction({ programId: DESK, keys: keys.map((k) => ({ ...k, pubkey: new PublicKey(k.pubkey) })), data: Buffer.from(data) })], [trader]);
   return { order, certificate };
@@ -96,8 +97,9 @@ test("refused: a certificate below tier 3, no certificate, and someone else's ce
 
 test("expire_order: refused while the certificate passes, allowed by anyone once it is revoked", { skip }, async () => {
   const { order, certificate } = await placeOrder(alice, alice, 7, "Sell");
+  const [pofConfig] = await sdk.configAddress();
   const expire = (caller) => {
-    const keys = sdk.resolveAccounts(IDL, "expire_order", { caller: caller.publicKey.toBase58(), order: order.toBase58(), trader: alice.publicKey.toBase58(), certificate });
+    const keys = sdk.resolveAccounts(IDL, "expire_order", { caller: caller.publicKey.toBase58(), order: order.toBase58(), trader: alice.publicKey.toBase58(), certificate, pof_config: pofConfig });
     return send([new TransactionInstruction({ programId: DESK, keys: keys.map((k) => ({ ...k, pubkey: new PublicKey(k.pubkey) })), data: Buffer.from(sdk.encodeInstruction(IDL, "expire_order", {})) })], [caller]);
   };
   await assert.rejects(expire(mallory), /CertificateStillLive/);
