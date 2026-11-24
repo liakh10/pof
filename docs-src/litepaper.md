@@ -76,7 +76,8 @@ are public; its surplus goes to the dev key in Config.
 
 A Groth16 circuit over the same Poseidon proves membership, non-spending, the tier and an escrow of each nullifier to a
 revocation key, so the program checks the statement itself and nobody sees an amount or a nullifier key. In development in
-`zk/`, not deployed.
+`zk/` and under internal review: `certify_zk` is switched off on chain until its open Critical and High findings are fixed
+and re-reviewed and a public setup ceremony has run.
 
 ## Read further
 

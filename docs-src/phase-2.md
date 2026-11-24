@@ -37,9 +37,14 @@ The public inputs are the two roots, the asset, the tier minimum, a context valu
 | The X handle check | X and fxtwitter | unchanged |
 | Timing and funding links | as in [Privacy guidance](privacy) | unchanged: a proof hides amounts, not the public deposit |
 
-## Status
+## Status: under review, not live
 
 Phase 2 is in development in `zk/`: the circuit (4 notes per proof), a development setup, the browser prover and the
-on-chain instruction `certify_zk` are built and tested. It is not deployed, and no certificate today is issued by a proof. The
+on-chain instruction `certify_zk`. **It is not live.** The third round of the internal security review found one Critical
+and three High findings in `certify_zk` (ZK-01 to ZK-04 in
+[`reports/audit.md`](https://github.com/liakh10/pof/blob/main/reports/audit.md)); among them, a note spent long ago could
+prove "unspent" against an older nullifier root. `certify_zk` is switched off on chain (`ZkConfig.enabled`) and stays off
+until those findings are fixed, re-reviewed, and the public setup ceremony has run. No certificate today is issued by a
+proof: every live certificate comes from the phase 1 Verifier described in this paper. The
 [zero-knowledge circuit](zk) page describes the circuit, the setup and the on-chain verifier in full; the
 [changelog](https://github.com/liakh10/pof/blob/main/CHANGELOG.md) records when it ships.

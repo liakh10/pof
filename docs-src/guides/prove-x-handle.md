@@ -62,7 +62,8 @@ What you may see:
 
 ## Step 4. Certify
 
-Continue with step 6 of the first guide. An X certificate is always submitted by the relayer and paid from your vault,
+Continue with step 6 of the first guide. For a handle, the controller key also signs the disclosure statement in the
+page, so a link that leaked to someone else cannot certify the handle with their funds. An X certificate is always submitted by the relayer and paid from your vault,
 so no wallet appears in it.
 
 ## What this reveals

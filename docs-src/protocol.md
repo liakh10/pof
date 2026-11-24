@@ -93,7 +93,9 @@ so it can be rebuilt on any device. Then:
    `"POF-LINK2" ‖ program id ‖ handle ‖ 0x00 ‖ controller ‖ expiry (u64)`, valid one hour. After 5 wrong tries the code is
    burnt.
 
-The link id is the subject proof, and it certifies only with the controller it names. No handle state is kept on our side.
+The link id is the subject proof, and it certifies only with the controller it names. The controller key also signs the
+disclosure message (`subject.controllerProof`), so a leaked link id cannot certify the handle with someone else's funds.
+No handle state is kept on our side.
 
 ## Step 3. The disclosure package
 
@@ -122,8 +124,8 @@ In this order, each failure with its own code (`verifier/src/verify.ts`):
    no controller other than the subject key. With `relay: true`, the payer must be the relayer.
 2. The signatures: the ring owner's over the disclosure message, always (`BAD_RING_PROOF`); the subject key's over the same bytes for kinds
    0 and 2, with a fresh slot (`BAD_SUBJECT_PROOF`, `SUBJECT_PROOF_STALE`); for kind 1 a link id this Verifier issued,
-   unexpired, for this handle and bound to this package's controller (`LINK_EXPIRED`, `LINK_OTHER_CONTROLLER`,
-   `LINK_UNBOUND`).
+   unexpired, for this handle and bound to this package's controller, plus the controller's own signature over the
+   disclosure message (`LINK_EXPIRED`, `LINK_OTHER_CONTROLLER`, `LINK_UNBOUND`, `BAD_CONTROLLER_PROOF`).
 3. The ring: a User Registry record exists for `ring.owner` (`NO_RING`) and `Poseidon(nk)` equals its `npk`
    (`NULLIFIER_KEY_MISMATCH`).
 4. The tree: one read of the tree account gives the current state root, its slot (the u64 at offset 120), the 500-root

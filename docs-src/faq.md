@@ -113,6 +113,10 @@ At `/verify`, through `GET /v1/certificates/<subject>`, through the MCP server, 
 With the CPI `require_certificate(subject_hash, asset, min_tier)`, with a `pof_gate` Room, or with the Telegram and
 Discord bots ([Developers](developers)).
 
+**Is the zero-knowledge version live?**
+No. Phase 2 is under internal review and switched off on chain; every certificate today comes from the phase 1 Verifier
+([Phase 2](phase-2)).
+
 **Has the code been audited?**
 It has had an internal security review by a separate reviewer inside the POF build, not a third-party audit. Findings, their
 status and their failing tests are in [`reports/audit.md`](https://github.com/liakh10/pof/blob/main/reports/audit.md).

@@ -12,7 +12,8 @@ USDC. It works the same with Solflare or Backpack. Nothing here needs a command 
 tells you what it is about to do before your wallet asks.
 
 Allow a few minutes of your own time, plus a wait of at least 150 slots after you shield (see step 4). Read
-[Privacy guidance](../privacy) once before you start: some of what you do here is public.
+[Privacy guidance](../privacy) once before you start: some of what you do here is public. In short, the vault keeps a
+secret of your main ring away from the Verifier; it does not hide that the vault belongs to your wallet.
 
 ## What you need
 
@@ -47,8 +48,18 @@ That is true: **the signature is the vault's key**. Sign it only on the Proof of
 
 The first time, the page asks you to sign the same message **twice**. If both signatures are identical (Phantom's are),
 the vault can be rebuilt later on any device by signing again. If your wallet signs differently each time (some
-multi-party and smart wallets do), the page makes a random vault key on this device instead and will ask you to back it
-up before you can shield: **"Back up your vault key first."** Go to step 7, then come back.
+multi-party and smart wallets do), the page makes a random vault key on this device instead:
+
+- It asks you for a **passphrase** of at least 10 characters (**"Choose a passphrase for the backup."**). The key is
+  stored on this device only inside a box locked with that passphrase (PBKDF2-SHA256 with 600,000 rounds, then AES-GCM);
+  it is in the clear only in memory while the vault is open.
+- Each time you come back, the page asks for the passphrase to open the vault (**"Your vault key is locked on this
+  device."**). A wrong one gives **"That passphrase does not open the backup."**
+- Before you can shield, it asks you to download the backup file (**"Back up your vault key first."**): the file carries
+  the same locked box. Go to step 7, then come back.
+
+Choose a passphrase you will not forget and that you do not use anywhere else. Nobody, including us, can recover the vault
+without it.
 
 If you later see **"This wallet opened a different vault than before."**, you are using another wallet or device than
 the one you made the vault with: switch back, or import your backup.
@@ -99,12 +110,13 @@ chain, which must happen within **300 slots** of the Verifier's signature (the p
 
 - **Wallet subject.** Phantom asks you to approve one transaction that submits the certificate and pays the fee and rent.
 - **X handle or badge.** The **relayer** submits it, so your wallet appears nowhere in the certificate. The relayer is paid
-  from the vault, not from your wallet. If you bought relay credits earlier (a private transfer from the vault), one is
-  used and nothing is paid at this moment; otherwise the page pays the quoted fee from the vault now, which sits next to
-  the certificate in time. A payment from the vault is a transaction the vault key signs and pays for, so the page first
+  from the vault, not from your wallet. **When relay credits are available**, you can buy them earlier, by a private
+  transfer from the vault into the relayer's house ring; then one credit is used and nothing is paid at this moment.
+  Otherwise the page pays the quoted fee from the vault now, which sits next to the certificate in time. A payment from the vault is a transaction the vault key signs and pays for, so the page first
   sends the vault key a little SOL from your wallet (a public transfer, between two addresses that are already linked).
   Messages you may see:
-  - **"No relay credit left."**: buy credits ahead of time, or pay now and accept the timing link.
+  - **"No relay credit left."** (when credits are available): buy credits ahead of time, or pay now and accept the
+    timing link.
   - **"The relayer is off right now."**: wait, or confirm that you accept paying from your wallet, which links the
     wallet to this subject in public.
   - **"The relayer reached its spending cap for now."** or **"The relayer is low on SOL."**: try later.
@@ -118,8 +130,9 @@ spend and revoke it, and the sealed details of the notes. It lives in this brows
 
 - If your vault was made from a signature, the file holds the kits; the vault itself can always be rebuilt by signing
   the vault message again with the same wallet.
-- If your vault key is random (step 2), the file also holds the vault key, locked with a passphrase you choose (at least
-  10 characters). **Without this file and passphrase the vault cannot be recovered**, and neither can the funds in it.
+- If your vault key is random (step 2), the file also holds the vault key, in the same box locked with your passphrase
+  (PBKDF2-SHA256, 600,000 rounds, AES-GCM). To restore on another device, import the file and enter the passphrase.
+  **Without this file and passphrase the vault cannot be recovered**, and neither can the funds in it.
 
 Keep the file as carefully as a seed phrase. It does not contain your wallet key.
 
