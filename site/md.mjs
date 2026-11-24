@@ -114,6 +114,7 @@ export function render(src, opts = {}) {
       const rows = [];
       while (i < lines.length && /\|/.test(lines[i]) && !blank(lines[i])) rows.push(cells(lines[i++]));
       const a = k => align[k] ? ` style="text-align:${align[k]}"` : '';
+      for (const r of rows) for (let k = 0; k < r.length; k++) if (/^[—–-]$/.test(r[k])) r[k] = 'n/a';
       out.push(`<div class="table"><table><thead><tr>${head.map((h, k) => `<th${a(k)}>${I(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${head.map((_, k) => `<td${a(k)}>${I(r[k] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
       continue;
     }
