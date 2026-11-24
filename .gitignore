@@ -1,0 +1,7 @@
+node_modules/
+target/
+.vercel/
+.env*
+*.log
+.DS_Store
+program/test-ledger/
