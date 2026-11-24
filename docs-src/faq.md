@@ -6,6 +6,49 @@ summary: Short answers, each pointing to the page that has the long one.
 
 # FAQ
 
+## If you are new
+
+**What is this, in one sentence?**
+A public, live note on Solana that says "this wallet, handle or badge holds at least this much SOL or USDC", without
+saying how much, which stops being valid when the money moves.
+
+**Do I have to show my wallet or my balance?**
+No. You choose what the certificate is about: your wallet, an X handle, or a one-off badge. Nobody but the Verifier sees
+an amount, and it keeps none ([Trust points](trust)).
+
+**Can Proof of Funds take my money?**
+No. Your funds sit in your own Privacy Ring, the vault, and only the vault key can move them. The vault key comes from a
+signature your wallet makes on our site, and never leaves your browser. That is also why you must never sign the vault
+message on any other site.
+
+**Is my money locked while I hold a certificate?**
+No. You can move it at any time. Moving the notes behind a certificate ends that certificate; revoke it first if the
+subject is a handle or a badge ([Revoke, renew, move funds](guides/revoke-renew-move)).
+
+**Why does my wallet ask me to sign twice the first time?**
+To check that your wallet makes the same signature each time, so your vault can be rebuilt later from the wallet alone.
+If it does not, the site makes a random vault key and asks you to back it up with a passphrase.
+
+**Why do I have to wait before certifying?**
+So the certificate cannot be matched with the deposit you just made. The minimum is 150 slots (about a minute); longer
+is better.
+
+**What is a slot?**
+Solana's clock: one slot is about 0.4 seconds. Every wait and every expiry here is counted in slots, because that is what
+the chain itself checks.
+
+**What if the site goes down?**
+Your certificate and your funds are on chain and do not depend on the site. Anyone can still read the certificate with
+their own tools; the open-source client in the repository (`client/`) opens the same vault from the same wallet
+signature and can move your funds; and you can still revoke with your kit.
+What stops while the site is down is getting new certificates.
+
+**What should I keep safe?**
+The backup file the site offers after your first certificate (and its passphrase, if it asked for one). Keep it as
+carefully as a seed phrase.
+
+## Details
+
 **Does a certificate show how much I hold?**
 No. It shows a tier, a floor: "at least 100 SOL". The Verifier compares the sum of your disclosed notes with the tier and
 answers yes or no. The amounts are seen by the Verifier for one request and kept nowhere ([Trust points](trust)).
