@@ -12,11 +12,11 @@ Helius Rings indexer.
 |---|---|---|---|
 | Contract bytes, RFC 9162 log, keys | `cd verifier && node --test test/contract.test.mjs` | 9 | pass |
 | The Verifier against SDK-built notes | `node --test test/verifier.test.mjs` | 13 | pass |
-| Relayer, keeper, escrow, credits, linker, HTTP | `node --test test/services.test.mjs` | 13 | pass |
-| The audit's proofs (rounds 1 to 3) | `node --test ../audit/test/` | 19 | pass |
+| Relayer, keeper, escrow, credits, linker, revoke, HTTP | `node --test test/services.test.mjs` | 14 | pass |
+| The audit's proofs (rounds 1 to 4) | `node --test ../audit/test/` | 22 | pass |
 | Two local validators, Rings cloned from mainnet, this `pof` build | `node test/e2e/local-e2e.mjs` | 13 | pass |
 | Mainnet, read only | `node test/e2e/mainnet-read.mjs` | 7 | pass |
-| Reproducible bundle | `npm run build:check` | 2 builds = published hash | pass |
+| Reproducible bundle, no input outside verifier/, BUILD.json fresh | `node --test test/build.test.mjs` | 2 | pass |
 
 ## The test doubles are the SDK's, not ours
 
@@ -64,8 +64,11 @@ distinct, gap-free indexes (appends are create-if-absent); a stale hash cache ca
 - linker: redeemed only with the starter's secret (POF-03), the author and code checked through the post, bound to the
   controller, the code burns; a second start never cancels the first (POF-09); five wrong tries lock a code;
 - HTTP: JSON errors with codes, 429 with `retry-after`, cron routes need the secret and are off before launch;
-- relayed holder revoke: the controller's signed bytes reach the relayer; answers PROGRAM_NOT_READY until the program has
-  the instruction.
+- relayed holder revoke: a signature that is not the controller's over this certificate's bytes is refused before anything
+  is sent; v2 bytes carry a valid-until slot and an expired one is refused (RV-01); a revoked certificate is not live;
+- credit keys: the pinned key is RSA-3072 with e = 65537 and the client's fingerprint; a key that is not the pinned one
+  turns credits off; a repeated claim gets the same signatures (CR-02); OpenSSL's signature equals the textbook one
+  (CR-03); a retired key's credits are still honoured (CR-04).
 
 ## The local end to end
 
