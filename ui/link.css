@@ -1,0 +1,17 @@
+/* /link (the bots' account link page): the site's poster system on devx's markup. */
+.link-main { max-width: 640px; margin: 0 auto; padding: var(--s7) var(--margin) var(--s8); display: grid; gap: var(--s4); }
+.link-main > p { color: var(--ink-2); margin: 0; }
+.link-main fieldset { border: var(--rule-2) solid var(--ink); background: var(--card); padding: var(--s4); margin: 0; display: grid; gap: var(--s2); min-width: 0; }
+.link-main legend { padding: 0 var(--s2); font: 650 var(--fs-label)/1.2 var(--face-text); letter-spacing: var(--label-tracking); text-transform: uppercase; font-stretch: 112%; }
+.link-main label { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.link-main input[type=radio] { width: 20px; height: 20px; accent-color: var(--ink); }
+.link-main textarea { min-height: 84px; font: 500 13.5px/1.4 var(--face-mono); }
+.link-main button { display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 var(--s4); margin: var(--s1) var(--s2) var(--s1) 0; background: var(--ink); color: var(--on-ink); border: var(--rule-2) solid var(--ink); font: 680 15px/1 var(--face-text); cursor: pointer; }
+.link-main button:hover { background: var(--signal); color: var(--ink); }
+.link-main .row { display: flex; flex-wrap: wrap; gap: var(--s1); }
+.link-main .msg { font: 500 12.5px/1.45 var(--face-mono); overflow-wrap: anywhere; background: var(--paper); border: var(--rule) dashed var(--ink); padding: var(--s2) var(--s3); }
+.link-main #out { min-height: 1.5rem; font-weight: 600; }
+.link-main .ok { color: var(--ink); border-left: var(--rule-heavy) solid var(--signal); padding-left: var(--s3); }
+.link-main .bad { color: var(--ink); border-left: var(--rule-heavy) solid var(--ink); padding-left: var(--s3); }
+.link-main .hide { display: none; }
+.page-link .top { justify-content: space-between; }

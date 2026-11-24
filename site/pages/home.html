@@ -19,9 +19,11 @@
       <div class="film" data-film>
         <!--seal:live:draw-->
         <div class="cert-float"><!--cardart--></div>
+        <svg class="film-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44.5" pathLength="1000" data-film-progress/></svg>
         <button class="film-play" type="button" data-film-play hidden aria-label="Play the film"></button>
-        <div class="film-cta" data-film-cta hidden><button class="btn small" type="button" data-film-play>Play the film</button><span class="label quiet" data-film-len></span></div>
+        <div class="film-cta" data-film-cta hidden><button class="btn small" type="button" data-film-play><span data-film-label>Play the film</span></button><button class="btn small ghost" type="button" data-film-mute hidden>Sound off</button><span class="label quiet" data-film-len></span></div>
       </div>
+      <p class="film-cap" data-film-cap aria-live="off"></p>
     </div>
   </div>
 </section>

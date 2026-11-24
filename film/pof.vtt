@@ -1,0 +1,65 @@
+WEBVTT
+
+1
+00:00:00.700 --> 00:00:02.220
+Everyone says they can pay.
+
+2
+00:00:02.220 --> 00:00:03.990
+The proof is always the same:
+
+3
+00:00:03.990 --> 00:00:05.530
+show the whole wallet.
+
+4
+00:00:06.280 --> 00:00:08.160
+Proof of Funds asks for less.
+
+5
+00:00:08.160 --> 00:00:09.910
+Keep your money in a private Ring,
+
+6
+00:00:09.910 --> 00:00:11.570
+and prove only a minimum.
+
+7
+00:00:12.320 --> 00:00:14.480
+A verifier checks that your notes are real and
+
+8
+00:00:14.480 --> 00:00:16.580
+unspent, signs one statement,
+
+9
+00:00:16.580 --> 00:00:17.750
+and keeps nothing.
+
+10
+00:00:18.510 --> 00:00:20.290
+The chain records a certificate.
+
+11
+00:00:20.290 --> 00:00:22.190
+At least a thousand SOL.
+
+12
+00:00:22.190 --> 00:00:23.690
+Not the amount.
+
+13
+00:00:23.690 --> 00:00:25.990
+Not the wallet, unless you choose it.
+
+14
+00:00:26.730 --> 00:00:28.790
+Move the money, and the certificate breaks.
+
+15
+00:00:28.790 --> 00:00:31.750
+On chain, for everyone, at that slot.
+
+16
+00:00:32.500 --> 00:00:34.130
+Post proof, not wallet.

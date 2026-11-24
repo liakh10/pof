@@ -4,7 +4,7 @@ import { source, LIVE } from './data.js';
 import { syncCards } from './cards.js';
 import { sealSVG, markSVG } from './seal.js';
 
-const FILM = window.POF_FILM || null;   // { src, poster, captions, length } once the film ships (ui/film.js sets it)
+const FILM = { src: '/film/pof.mp4', poster: '/film/poster.jpg', captions: '/film/pof.vtt', length: '0:36' };
 const liveNum = $('[data-live-num]'), liveLabel = $('[data-live-label]'), liveSub = $('[data-live-sub]');
 const wall = $('[data-wall]');
 const film = $('[data-film]');
@@ -17,7 +17,7 @@ function placeCross() {
   const a = hero.getBoundingClientRect(), b = seal.getBoundingClientRect();
   hero.querySelector('.hero-cross').style.setProperty('--cx', `${b.left - a.left + b.width / 2}px`);
   hero.querySelector('.hero-cross').style.setProperty('--cy', `${b.top - a.top + b.height / 2}px`);
-  hero.querySelector('.hero-cross').style.setProperty('--cl', `${$('.hero-art').getBoundingClientRect().left - a.left - 24}px`);
+  hero.querySelector('.hero-cross').style.setProperty('--cl', `${b.left - a.left - 12}px`);
 }
 addEventListener('resize', placeCross); placeCross(); document.fonts?.ready.then(placeCross);
 
@@ -92,23 +92,37 @@ for (const b of $$('[data-filter]')) b.addEventListener('click', () => {
   wall.replaceChildren(); drawWall();
 });
 
-/* ------------------------------------------------------------------ the film (shown only when it exists) */
-if (FILM && film) {
-  const plays = $$('[data-film-play]');
-  plays.forEach(p => (p.hidden = false));
-  $('[data-film-cta]').hidden = false;
-  if (FILM.length) $('[data-film-len]').textContent = FILM.length;
-  plays.forEach(p => p.addEventListener('click', () => {
-    let v = film.querySelector('video');
-    if (!v) {
-      v = Object.assign(document.createElement('video'), { src: FILM.src, playsInline: true, controls: true, preload: 'auto' });
-      if (FILM.poster) v.poster = FILM.poster;
-      if (FILM.captions) { const t = Object.assign(document.createElement('track'), { kind: 'captions', src: FILM.captions, srclang: 'en', label: 'English', default: true }); v.appendChild(t); }
-      film.appendChild(v);
-      v.addEventListener('ended', () => film.classList.remove('playing'));
-    }
-    film.classList.add('playing'); v.play();
-  }));
+/* ------------------------------------------------------------------ the film: it plays inside the seal, its progress is the
+   orange ring drawing round, its captions sit under the circle (never on the picture); shown only when the file is there */
+if (film) {
+  const plays = $$('[data-film-play]'), mute = $('[data-film-mute]'), cap = $('[data-film-cap]'), label = $('[data-film-label]');
+  const prog = $('[data-film-progress]');
+  fetch(FILM.src, { method: 'HEAD' }).then(r => {
+    if (!r.ok) return;
+    plays.forEach(p => (p.hidden = false));
+    $('[data-film-cta]').hidden = false;
+    $('[data-film-len]').textContent = FILM.length;
+  }).catch(() => {});
+  let v = null;
+  const make = () => {
+    v = Object.assign(document.createElement('video'), { src: FILM.src, playsInline: true, preload: 'auto' });
+    v.setAttribute('aria-label', 'The Proof of Funds film');
+    const t = Object.assign(document.createElement('track'), { kind: 'captions', src: FILM.captions, srclang: 'en', label: 'English', default: true });
+    v.appendChild(t);
+    film.insertBefore(v, film.querySelector('.film-ring'));
+    t.track.mode = 'hidden';
+    t.track.addEventListener('cuechange', () => { const c = t.track.activeCues && t.track.activeCues[0]; cap.textContent = c ? c.text : ''; });
+    v.addEventListener('timeupdate', () => { prog.style.strokeDashoffset = String(1000 * (1 - v.currentTime / (v.duration || 1))); });
+    v.addEventListener('ended', () => { film.classList.remove('playing'); label.textContent = 'Play again'; cap.textContent = ''; mute.hidden = true; });
+    v.addEventListener('click', toggle);
+  };
+  const toggle = () => {
+    if (!v) make();
+    if (v.paused) { film.classList.add('playing'); v.play(); label.textContent = 'Pause'; mute.hidden = false; }
+    else { v.pause(); label.textContent = 'Play'; }
+  };
+  plays.forEach(p => p.addEventListener('click', toggle));
+  mute.addEventListener('click', () => { if (!v) return; v.muted = !v.muted; mute.textContent = v.muted ? 'Sound on' : 'Sound off'; });
 }
 
 /* ------------------------------------------------------------------ start */

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Developers · Proof of Funds</title>
 <meta name="description" content="The read API, the SDK, the require_certificate CPI, pof_gate Rooms, the MCP server and the bots.">
-<link rel="canonical" href="https://proofoffunds.vercel.app/developers">
+<link rel="canonical" href="https://pof-dun.vercel.app/developers">
 <meta name="theme-color" content="#f3efe6">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
@@ -15,10 +15,10 @@
 <meta property="og:site_name" content="Proof of Funds">
 <meta property="og:title" content="Developers · Proof of Funds">
 <meta property="og:description" content="The read API, the SDK, the require_certificate CPI, pof_gate Rooms, the MCP server and the bots.">
-<meta property="og:url" content="https://proofoffunds.vercel.app/developers">
-<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta property="og:url" content="https://pof-dun.vercel.app/developers">
+<meta property="og:image" content="https://pof-dun.vercel.app/api/card/proof-of-funds.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:image" content="https://pof-dun.vercel.app/api/card/proof-of-funds.png">
 
 <script src="/config.js"></script>
 <script type="module" src="/ui/app.js"></script>
@@ -45,8 +45,8 @@ note is spent. This page is for people who build on them: read a certificate, ga
 or let an agent ask.</p>
 <p>Everything here reads public state. The chain is the source of truth; the API, the MCP server and the bots are
 conveniences on top of it, and every one of them can be replaced by a direct read with the SDK.</p>
-<p><code>https://proofoffunds.vercel.app</code> below is this site's address.</p>
-<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td><code>pof</code> program</td><td><code>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code></td></tr><tr><td><code>pof_gate</code> program</td><td><code>gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</code></td></tr><tr><td>IDLs</td><td><code>program/idl/pof.json</code>, <code>program/idl/pof_gate.json</code> in the repository</td></tr><tr><td>HTTP API</td><td><code>https://proofoffunds.vercel.app/v1</code>, OpenAPI 3.1 at <code>https://proofoffunds.vercel.app/v1/openapi.json</code></td></tr><tr><td>MCP</td><td><code>https://proofoffunds.vercel.app/mcp</code> (Streamable HTTP), or <code>node mcp/stdio.js</code></td></tr><tr><td>CLI</td><td><code>node cli/pof.js</code> from the repository (<code>pof check</code>, <code>pof watch</code>, <code>pof log verify</code>)</td></tr><tr><td>Embed</td><td><code>&lt;pof-badge&gt;</code> from <code>https://proofoffunds.vercel.app/embed/pof-badge.js</code>, <code>https://proofoffunds.vercel.app/embed/frame.html</code>, <code>https://proofoffunds.vercel.app/v1/badge/{subject}.svg</code></td></tr><tr><td>Witness</td><td><code>node witness/run.js</code>; the project's own at <code>https://proofoffunds.vercel.app/v1/witness</code></td></tr><tr><td>SDK</td><td><code>@pof/sdk</code>, from <code>https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz</code></td></tr><tr><td>Source</td><td><code>https://github.com/liakh10/pof</code></td></tr></tbody></table></div>
+<p><code>https://pof-dun.vercel.app</code> below is this site's address.</p>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td><code>pof</code> program</td><td><code>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code></td></tr><tr><td><code>pof_gate</code> program</td><td><code>gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</code></td></tr><tr><td>IDLs</td><td><code>program/idl/pof.json</code>, <code>program/idl/pof_gate.json</code> in the repository</td></tr><tr><td>HTTP API</td><td><code>https://pof-dun.vercel.app/v1</code>, OpenAPI 3.1 at <code>https://pof-dun.vercel.app/v1/openapi.json</code></td></tr><tr><td>MCP</td><td><code>https://pof-dun.vercel.app/mcp</code> (Streamable HTTP), or <code>node mcp/stdio.js</code></td></tr><tr><td>CLI</td><td><code>node cli/pof.js</code> from the repository (<code>pof check</code>, <code>pof watch</code>, <code>pof log verify</code>)</td></tr><tr><td>Embed</td><td><code>&lt;pof-badge&gt;</code> from <code>https://pof-dun.vercel.app/embed/pof-badge.js</code>, <code>https://pof-dun.vercel.app/embed/frame.html</code>, <code>https://pof-dun.vercel.app/v1/badge/{subject}.svg</code></td></tr><tr><td>Witness</td><td><code>node witness/run.js</code>; the project's own at <code>https://pof-dun.vercel.app/v1/witness</code></td></tr><tr><td>SDK</td><td><code>@pof/sdk</code>, from <code>https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz</code></td></tr><tr><td>Source</td><td><code>https://github.com/liakh10/pof</code></td></tr></tbody></table></div>
 <h2 id="what-a-certificate-is">What a certificate is<a class="anchor" href="#what-a-certificate-is" aria-label="Link to this section">#</a></h2>
 <p>One account per subject and asset, at the PDA <code>[&quot;cert&quot;, subject_hash, [asset]]</code> of the <code>pof</code> program.</p>
 <div class="table"><table><thead><tr><th>field</th><th>meaning</th></tr></thead><tbody><tr><td><code>subject_kind</code>, <code>subject_hash</code></td><td>who: 0 wallet, 1 X handle, 2 badge, and <code>sha256(&quot;pof:&lt;kind&gt;:&quot; ‖ value)</code> (the value is never stored)</td></tr><tr><td><code>asset</code>, <code>tier</code></td><td>0 SOL or 1 USDC, tier 1 to 5 (table below)</td></tr><tr><td><code>status</code></td><td>0 live, 1 revoked because a disclosed note was spent, 2 revoked by its holder</td></tr><tr><td><code>certified_slot</code>, <code>issued_slot</code>, <code>expiry_slot</code>, <code>revoked_slot</code></td><td>when. Live means <code>status == 0</code> and <code>slot &lt;= expiry_slot</code></td></tr><tr><td><code>controller</code></td><td>the key that can revoke it and join rooms with it: the wallet itself, the badge key itself, or a key the holder's client keeps for an X handle</td></tr><tr><td><code>null_hashes</code>, <code>nullset_hash</code></td><td>salted hashes of the disclosed notes' nullifiers. Anyone holding a salt can call <code>revoke_spent</code> once that note is spent</td></tr><tr><td><code>verifier</code>, <code>log_index</code></td><td>the Verifier key that signed, and the attestation's entry in the transparency log</td></tr></tbody></table></div>
@@ -63,7 +63,7 @@ retry), 503 (not configured).</p>
 <p><code>{subject}</code> is what a person types: <code>@handle</code>, <code>x:handle</code>, <code>wallet:&lt;base58&gt;</code>, <code>badge:&lt;base58&gt;</code>, a bare base58 key (tried
 as a wallet and as a badge), or a 64-hex subject hash. No certificate is a <code>200</code> with an empty list, so a gate can read
 one shape.</p>
-<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">curl -s &quot;https://proofoffunds.vercel.app/v1/certificates/@anon?asset=SOL&amp;minTier=4&quot;</code></pre></div>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">curl -s &quot;https://pof-dun.vercel.app/v1/certificates/@anon?asset=SOL&amp;minTier=4&quot;</code></pre></div>
 <div class="code" data-lang="json"><span class="code-lang">json</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-json">{
   &quot;query&quot;: &quot;@anon&quot;,
   &quot;slot&quot;: 389120455,
@@ -149,7 +149,7 @@ tx.add(toWeb3Instruction(ix, web3));</code></pre></div>
 <p>Ask in plain language: &quot;does @anon hold 1,000 SOL?&quot;. Eight read-only tools:</p>
 <div class="table"><table><thead><tr><th>tool</th><th>what</th></tr></thead><tbody><tr><td><code>check_proof_of_funds</code></td><td>yes or no, with the reason; takes <code>min_tier</code> or <code>min_amount</code> (mapped to the smallest tier that proves it)</td></tr><tr><td><code>get_certificates</code></td><td>every certificate of a subject</td></tr><tr><td><code>list_certificates</code></td><td>certificates across subjects, filtered</td></tr><tr><td><code>get_room</code> · <code>list_rooms</code></td><td>pof_gate rooms and their members</td></tr><tr><td><code>get_stats</code></td><td>the counters</td></tr><tr><td><code>get_log_proof</code> · <code>get_log_head</code></td><td>a log entry with its verified proof; the signed head</td></tr></tbody></table></div>
 <p>Hosted, nothing to install:</p>
-<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">claude mcp add --transport http proof-of-funds https://proofoffunds.vercel.app/mcp</code></pre></div>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">claude mcp add --transport http proof-of-funds https://pof-dun.vercel.app/mcp</code></pre></div>
 <p>Or local over stdio, reading the chain through your own RPC (no server of ours involved):</p>
 <div class="code" data-lang="json"><span class="code-lang">json</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-json">{
   &quot;mcpServers&quot;: {
@@ -160,7 +160,7 @@ tx.add(toWeb3Instruction(ix, web3));</code></pre></div>
     }
   }
 }</code></pre></div>
-<p><code>POF_API=https://proofoffunds.vercel.app/v1</code> instead of <code>SOLANA_RPC</code> makes the local server read the API. The hosted endpoint is stateless
+<p><code>POF_API=https://pof-dun.vercel.app/v1</code> instead of <code>SOLANA_RPC</code> makes the local server read the API. The hosted endpoint is stateless
 Streamable HTTP (POST, JSON answers), supports protocol versions 2024-11-05 to 2025-11-25, and has no sessions or keys.
 It takes batches of up to 10 messages and bodies up to 64 KB, and limits each caller's rate (HTTP 429 with
 <code>retry-after</code>). Every answer says the slot it was read at. Room names are chosen by room creators, so tool answers quote
@@ -184,14 +184,14 @@ openings, no nullifiers and no salts. The Verifier signs each tree head (<code>&
 heads are anchored on chain in the Treasury by <code>anchor_log</code>.</p>
 <div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">import { verifyLogEntry, verifyConsistency } from &quot;@pof/sdk&quot;;
 
-const base = &quot;https://proofoffunds.vercel.app/api/attest/log&quot;;
+const base = &quot;https://pof-dun.vercel.app/api/attest/log&quot;;
 const head  = await (await fetch(`${base}?head`)).json();
 const entry = await (await fetch(`${base}?entry=${cert.logIndex}`)).json();
 const proof = await (await fetch(`${base}?proof=${cert.logIndex}&amp;size=${head.treeSize}`)).json();
 const v = await verifyLogEntry({ leaf: entry.leaf, index: cert.logIndex, proof, head, programId: &quot;pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT&quot; });
 // v.ok, v.checks = { leafParses, attestationSigned, included, headSigned, programMatches }</code></pre></div>
 <p>Then tie the head to the chain: <code>(await pof.getTreasury()).log</code> is the last anchored <code>{ treeSize, rootHash, slot }</code>, and
-<code>GET https://proofoffunds.vercel.app/api/attest/log?consistency=&lt;anchored size&gt;&amp;size=&lt;head size&gt;</code> with <code>verifyConsistency</code> proves the current
+<code>GET https://pof-dun.vercel.app/api/attest/log?consistency=&lt;anchored size&gt;&amp;size=&lt;head size&gt;</code> with <code>verifyConsistency</code> proves the current
 head extends it. <code>GET /v1/log/head</code> does these checks for you and reports them; you should still be able to run them
 without us, and you can.</p>
 <p><strong>Trust the keys from the chain, not from the log.</strong> A head or a leaf names the key that signed it, and that proves
@@ -207,7 +207,7 @@ is signed by a key the program lists; extends the last head it saw (a consistenc
 size with another root, is an alarm with both signed heads kept as evidence); and agrees with the head anchored on chain.
 With <code>--monitor</code> it also checks that every certificate on chain is backed by the log entry it names.</p>
 <div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">node witness/keygen.js                     # ~/.config/pof/witness.json, mode 600; prints only the public key
-node witness/run.js --origin https://proofoffunds.vercel.app --rpc https://your-rpc --out witness.json --loop 60 --monitor</code></pre></div>
+node witness/run.js --origin https://pof-dun.vercel.app --rpc https://your-rpc --out witness.json --loop 60 --monitor</code></pre></div>
 <p>Cosignatures are ed25519 over <code>&quot;POF-WIT1&quot; ‖ program_id ‖ tree_size ‖ root_hash ‖ timestamp</code> (88 bytes, CONTRACT §8);
 <code>verifyCosignature</code> in the SDK checks them. Publish your <code>witness.json</code> anywhere, and point witnesses at each other with
 <code>--peer &lt;url&gt;</code>: each one checks the others' cosigned heads against the log it sees, and a head no consistency proof can
@@ -218,21 +218,21 @@ join is a <code>split_view</code> alarm. The more independent witnesses, the har
 with the Verifier. Independence comes from witnesses other people run.</p>
 <h2 id="the-command-line">The command line<a class="anchor" href="#the-command-line" aria-label="Link to this section">#</a></h2>
 <div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">node cli/pof.js check @anon --asset SOL --min-tier 4 --rpc https://your-rpc        # exit 0 yes, 1 no (with the reason)
-node cli/pof.js check wallet:7Xf… --verify-log --origin https://proofoffunds.vercel.app --rpc …         # also ties it to its signed log entry
+node cli/pof.js check wallet:7Xf… --verify-log --origin https://pof-dun.vercel.app --rpc …         # also ties it to its signed log entry
 node cli/pof.js watch @anon --interval 10 --rpc …                                   # one line per change: tier, REVOKED, closed
 node cli/pof.js rooms &lt;room address&gt; --rpc …
-node cli/pof.js log verify --origin https://proofoffunds.vercel.app --rpc …                              # download, recompute, check the anchor</code></pre></div>
+node cli/pof.js log verify --origin https://pof-dun.vercel.app --rpc …                              # download, recompute, check the anchor</code></pre></div>
 <p>Every command takes <code>--json</code>. The CLI reads the chain through your RPC and the log through the site; it never asks our
 API what to believe.</p>
 <h2 id="show-a-certificate-on-any-page">Show a certificate on any page<a class="anchor" href="#show-a-certificate-on-any-page" aria-label="Link to this section">#</a></h2>
-<div class="code" data-lang="html"><span class="code-lang">html</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-html">&lt;script type=&quot;module&quot; src=&quot;https://proofoffunds.vercel.app/embed/pof-badge.js&quot;&gt;&lt;/script&gt;
+<div class="code" data-lang="html"><span class="code-lang">html</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-html">&lt;script type=&quot;module&quot; src=&quot;https://pof-dun.vercel.app/embed/pof-badge.js&quot;&gt;&lt;/script&gt;
 &lt;pof-badge subject=&quot;@anon&quot; asset=&quot;SOL&quot; min-tier=&quot;4&quot;&gt;&lt;/pof-badge&gt;</code></pre></div>
 <p>The badge reads <code>/v1</code>, refreshes every 30 seconds (<code>refresh=&quot;0&quot;</code> turns it off), and flips to <code>REVOKED · slot …</code> when the
 money moves. It fires a <code>pof-status</code> event on every change. Style it with CSS custom properties (<code>--pof-bg</code>, <code>--pof-fg</code>,
 <code>--pof-muted</code>, <code>--pof-border</code>, <code>--pof-live</code>, <code>--pof-revoked</code>, <code>--pof-font</code>, <code>--pof-mono</code>, <code>--pof-radius</code>, <code>--pof-pad</code>) or
 <code>::part(card|label|subject|tier|status|slot)</code>. Where scripts are not allowed:</p>
-<div class="code" data-lang="html"><span class="code-lang">html</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-html">&lt;iframe src=&quot;https://proofoffunds.vercel.app/embed/frame.html?subject=@anon&amp;asset=SOL&amp;min-tier=4&amp;theme=dark&quot; width=&quot;420&quot; height=&quot;56&quot; style=&quot;border:0&quot; title=&quot;Proof of Funds&quot;&gt;&lt;/iframe&gt;
-&lt;img src=&quot;https://proofoffunds.vercel.app/v1/badge/@anon.svg?asset=SOL&amp;minTier=4&quot; alt=&quot;Proof of Funds status&quot;&gt;</code></pre></div>
+<div class="code" data-lang="html"><span class="code-lang">html</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-html">&lt;iframe src=&quot;https://pof-dun.vercel.app/embed/frame.html?subject=@anon&amp;asset=SOL&amp;min-tier=4&amp;theme=dark&quot; width=&quot;420&quot; height=&quot;56&quot; style=&quot;border:0&quot; title=&quot;Proof of Funds&quot;&gt;&lt;/iframe&gt;
+&lt;img src=&quot;https://pof-dun.vercel.app/v1/badge/@anon.svg?asset=SOL&amp;minTier=4&quot; alt=&quot;Proof of Funds status&quot;&gt;</code></pre></div>
 <h2 id="examples">Examples<a class="anchor" href="#examples" aria-label="Link to this section">#</a></h2>
 <ul><li><code>examples/otc-desk/</code>: an Anchor program that takes orders only from a trader with a live certificate of at least
 100 SOL (one <code>require_certificate</code> CPI plus a controller check), and lets anyone close an order once its certificate is
@@ -259,7 +259,7 @@ lookup does not need it.</li></ul>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">515f4232e10ccbe4aca21bb90884d828972443fc6584f434ab0d167a000d6935</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

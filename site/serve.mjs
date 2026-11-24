@@ -91,7 +91,15 @@ http.createServer(async (req, res) => {
       }
     }
     if (file) {
-      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
+      const size = fs.statSync(file).size, range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+      const type = TYPES[path.extname(file)] || 'application/octet-stream';
+      if (req.method === 'HEAD') { res.writeHead(200, { 'content-type': type, 'content-length': size, 'accept-ranges': 'bytes' }); return res.end(); }
+      if (range) {
+        const a = range[1] ? Number(range[1]) : 0, b = range[2] ? Number(range[2]) : size - 1;
+        res.writeHead(206, { 'content-type': type, 'content-range': `bytes ${a}-${b}/${size}`, 'content-length': b - a + 1, 'accept-ranges': 'bytes' });
+        return fs.createReadStream(file, { start: a, end: b }).pipe(res);
+      }
+      res.writeHead(200, { 'content-type': type, 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store' });
       return fs.createReadStream(file).pipe(res);
     }
     if (pathname.startsWith('/api/')) {

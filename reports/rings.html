@@ -7,7 +7,7 @@
 <meta name="description" content="Scope: client/ (the browser client and its SDK bundle), client/server/spr-proxy.js and api/spr/[method].js (the Rings
 indexer and prover proxies), lab/ (the harness and the local validator with Privacy Rings cloned from mainnet), and the
 facts in RINGS.md. Nod">
-<link rel="canonical" href="https://proofoffunds.vercel.app/reports/rings">
+<link rel="canonical" href="https://pof-dun.vercel.app/reports/rings">
 <meta name="theme-color" content="#f3efe6">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
@@ -19,10 +19,10 @@ facts in RINGS.md. Nod">
 <meta property="og:description" content="Scope: client/ (the browser client and its SDK bundle), client/server/spr-proxy.js and api/spr/[method].js (the Rings
 indexer and prover proxies), lab/ (the harness and the local validator with Privacy Rings cloned from mainnet), and the
 facts in RINGS.md. Nod">
-<meta property="og:url" content="https://proofoffunds.vercel.app/reports/rings">
-<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta property="og:url" content="https://pof-dun.vercel.app/reports/rings">
+<meta property="og:image" content="https://pof-dun.vercel.app/api/card/proof-of-funds.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:image" content="https://pof-dun.vercel.app/api/card/proof-of-funds.png">
 
 <script src="/config.js"></script>
 <script type="module" src="/ui/app.js"></script>
@@ -133,7 +133,12 @@ recipient, and no tag is added.</li><li><strong>Blinding.</strong> For each cred
 byte for byte the Verifier's <code>verifier/lib/blind.mjs</code>, a test checks they are identical).</li><li><strong>Claiming.</strong> The claim (message v2) is signed by the vault key that signed the transfer. The relayer signs the blinded
 values without ever seeing the tokens. The client unblinds, checks every signature, and keeps <code>{ kid, token, signature }</code>
 sealed under the vault-seed key.</li><li><strong>Spending.</strong> Each relayed certificate spends one credit in <code>/api/relay/certify</code>. <strong>Even the relayer cannot tie a spent
-credit to the purchase that paid for it.</strong> The v1 hash list this replaces would have let it do so.</li><li><strong>Recovery.</strong> A bundle that was paid but not claimed (a closed tab, an indexer delay) is kept and claimed again by
+credit to the purchase that paid for it.</strong> The v1 hash list this replaces would have let it do so.</li><li><strong>Pinned key</strong> (audit CR-01). The client never takes the credit key or the house ring from the live offer. Both are
+pinned in the build: <code>dist/pins.js</code> is generated from the Verifier's <code>verifier/lib/credit-pins.json</code>, <code>e</code> must be
+65537, and an offer whose kid, modulus or house ring differs is refused before anything is paid
+(<code>CREDIT_KEY_MISMATCH</code>). A network with no pin cannot buy credits (<code>NO_CREDIT_PIN</code>). The page shows the pinned key's
+fingerprint (<code>credits.fingerprint()</code>, 32 hex digits in groups of four) next to the purchase. Tested with a wrong modulus,
+a wrong house ring, a wrong kid and an unpinned network; the lab shows the fingerprint.</li><li><strong>Recovery.</strong> A bundle that was paid but not claimed (a closed tab, an indexer delay) is kept and claimed again by
 <code>credits.resume()</code>.</li><li><strong>Fallbacks.</strong> Paying at certify time needs <code>payNow: true</code> (warned as <code>NO_CREDIT</code>). Paying from the wallet needs
 <code>allowWalletPayer: true</code> (<code>WALLET_PAYER</code>).</li><li><strong>Proven against the Verifier's own <code>Credits</code></strong> (local USDC test, and the lab in Chrome, where the house-ring receipt
 is simulated):
@@ -145,7 +150,8 @@ must be registered for the relayer key (owner step at launch).</li></ul>
 program id, certificate address, subject hash, asset, nullset hash and the certificate's issued slot, so the signature
 dies with that certificate. The bytes are built from the kit's attestation and the certificate PDA.</li><li><strong>The submit.</strong> The client posts them to <code>/api/relay/revoke</code>. The relayer submits <code>[ed25519(controller, bytes),
 revoke_signed()]</code>, so no wallet pays and none appears. It answers <code>PROGRAM_NOT_READY</code> until the deployed program has
-<code>revoke_signed</code> (it is in the IDL now).</li><li><strong>Proven so far.</strong> The client's bytes equal the Verifier's <code>revokeBytes</code>, the badge key's signature over them verifies,
+<code>revoke_signed</code> (it is in the IDL now).</li><li><strong>Proven so far.</strong> The client's bytes equal the Verifier's <code>revokeBytes</code>. The client checks the controller's signature
+before sending (audit RV-01), and the badge key's signature over the bytes verifies,
 and a wallet certificate is refused (it revokes from the wallet). The on-chain <code>revoke_signed</code> run belongs to the
 program and verifier suites.</li></ul>
 <p><strong>What still links, for /docs:</strong></p>
@@ -184,7 +190,7 @@ the vault key is random and must be backed up with a passphrase before any shiel
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">515f4232e10ccbe4aca21bb90884d828972443fc6584f434ab0d167a000d6935</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>
