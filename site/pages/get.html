@@ -87,8 +87,12 @@
         </div>
         <div class="stack" data-relay hidden>
           <p class="label">The relayer</p>
-          <p>For an X handle or a badge, the relayer pays and submits the certificate, so no wallet appears on it. You pay the relayer from the vault with a private transfer. The vault key pays that transfer's network fee itself, so it needs a little SOL of its own.</p>
-          <div class="row"><button class="btn ghost small" type="button" data-act="fund">Add 0.005 SOL to the vault key for fees</button><button class="btn ghost small" type="button" data-act="credits">Buy relay credits ahead of time</button><span class="small quiet" data-credits></span></div>
+          <p>For an X handle or a badge, the relayer pays and submits the certificate, so no wallet appears on it. You pay the relayer one of two ways:</p>
+          <ul class="plain small">
+            <li><strong>Relay credits, ahead of time.</strong> A private transfer inside Rings from your vault, so no payment lands next to the certificate. The best choice.</li>
+            <li><strong>Pay now.</strong> One public transfer from your vault key's own SOL to the relayer, with a reference memo. It sits next to the certificate in time, so the page asks you to accept that first. Your wallet pays only if you allow it.</li>
+          </ul>
+          <div class="row"><button class="btn ghost small" type="button" data-act="credits">Buy relay credits</button><button class="btn ghost small" type="button" data-act="fund">Add SOL to the vault key</button><span class="small quiet" data-credits></span></div>
           <p class="small">Credits are signed blind by the relayer's credit key, so the relayer cannot tell which credit pays for which certificate. The key's fingerprint is <span class="mono" data-credit-fp><!--credit-fp--></span>. It is pinned in the source, shown on <a href="/status">Status</a>, and checked against the relayer's answer before you pay.</p>
         </div>
         <div class="stack" data-privacy>

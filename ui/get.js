@@ -72,7 +72,7 @@ function onStatus(ev) {
     'delay:waiting': ['delay', `Random wait: ${num(ev.remainingSlots)} of ${num(ev.totalSlots)} slots left (${span(ev.remainingSlots)}).`], 'delay:done': ['delay', 'Random wait over.', 'ok'],
     'subject:sign': ['subject', 'Sign the subject statement in your wallet. It names this vault, the tier and the payer.'], 'subject:sign-ring': ['subject', 'Sign for your Ring in your wallet.'],
     'attest:send': ['attest', 'The Verifier is checking your notes against the Rings tree.'], 'attest:done': ['attest', `The Verifier signed. Log entry ${ev.logIndex}.`, 'ok'], 'attest:refused': ['attest', 'The Verifier refused.', 'no'],
-    'relay:pay': ['relay', ev.from === 'vault' ? 'Paying the relayer from the vault (a private transfer).' : 'Approve the relay payment in your wallet.'], 'relay:done': ['relay', 'The relayer submitted the certificate.', 'ok'],
+    'relay:pay': ['relay', ev.from === 'vault' ? 'Paying the relayer from the vault key: one transfer with its reference memo.' : 'Approve the relay payment in your wallet: one transfer with its reference memo.'], 'relay:done': ['relay', 'The relayer submitted the certificate.', 'ok'],
     'relay:off': ['relay', 'The relayer is off: your wallet pays.', 'no'], 'credits:claimed': ['credits', `Relay credits added: ${ev.credited ?? ''}.`, 'ok'],
   };
   const t = T[`${s}:${p}`];
@@ -263,7 +263,13 @@ async function credits() {
 $('[data-act="fund"]').addEventListener('click', async e => {
   const b = e.currentTarget;
   if (!live()) { toast('Opens at launch'); return; }
-  try { busy(b, true, 'Funding'); await pof.fundVault(5_000_000); toast('The vault key can pay its fees now'); }
+  try {
+    busy(b, true, 'Reading the relay fee');
+    const q = await fetch('/api/relay/quote').then(r => r.json()).catch(() => null);
+    const lamports = q && q.lamports ? Number(q.lamports) + 2_000_000 : 5_000_000;
+    if (!confirm(`Send ${fmtUnits(lamports, 0)} SOL from your wallet to your vault key? It pays the vault's network fees${q && q.lamports ? ' and one relay payment' : ''}. This transfer is public.`)) return;
+    busy(b, true, 'Funding'); await pof.fundVault(lamports); toast('The vault key can pay now');
+  }
   catch (err) { showError(err); toastIf(err); } finally { busy(b, false); }
 });
 $('[data-act="credits"]').addEventListener('click', async e => {
@@ -306,7 +312,7 @@ $('[data-act="certify"]').addEventListener('click', async e => {
     if (kind === 0) {
       log('chain', 'Approve the certificate in your wallet. It must land within about 2 min of the Verifier signature.');
       const chain = src.chain();
-      const { instructions } = await certifyInstructions(answer, { payer: state.wallet, client: chain });
+      const { instructions } = await certifyInstructions(pof.holderCertifyArgs(answer), { payer: state.wallet, client: chain });
       const r = await W.send(instructions);
       log('chain', 'Certificate sent. Waiting for the chain.');
       await r.wait();

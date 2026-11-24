@@ -39,7 +39,10 @@ async function pda(seeds, program) { return (await sdk.findProgramAddress(seeds,
  * client: a PofClient for the Config (root mint) and the existing certificate (prior payer).
  */
 export async function certifyInstructions(answer, { payer, client }) {
-  const att = sdk.fromHex(answer.attestation);
+  // `answer` is pof.holderCertifyArgs(verifierAnswer) (bytes, log_index = u64::MAX for a holder-submitted certify), or the
+  // Verifier's raw answer (hex strings)
+  const bytes = v => (v instanceof Uint8Array ? v : sdk.fromHex(v));
+  const att = bytes(answer.attestation);
   const a = sdk.parseAttestation(att);
   const [certificate] = await sdk.certificateAddress(sdk.fromHex(a.subjectHash), a.asset, PROGRAM);
   const [config] = await sdk.configAddress(PROGRAM);
@@ -55,17 +58,17 @@ export async function certifyInstructions(answer, { payer, client }) {
   if (cfg && cfg.rootMint && cfg.rootMint !== SYSTEM) {
     holder = await pda([sdk.toAddressBytes(payer), sdk.toAddressBytes(String(cfg.raw?.root_token_program || 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')), sdk.toAddressBytes(cfg.rootMint)], ATA);
   }
-  const hashes = (answer.hashes || []).map(h => sdk.fromHex(h));
+  const hashes = (answer.hashes || []).map(bytes);
   const data = sdk.encodeInstruction(sdk.POF_IDL, 'certify', {
     att: { subject_kind: a.subjectKind, subject_hash: sdk.fromHex(a.subjectHash), asset: a.asset, tier: a.tier, tree_root: sdk.fromHex(a.treeRoot),
       root_slot: BigInt(a.rootSlot), null_hashes: hashes, issued_slot: BigInt(a.issuedSlot), expiry_slot: BigInt(a.expirySlot), controller: a.controller, nonce: sdk.fromHex(a.nonce) },
-    log_index: BigInt(answer.logIndex),
+    log_index: answer.logIndex == null ? 0xffffffffffffffffn : BigInt(answer.logIndex),
   });
   const keys = sdk.resolveAccounts(sdk.POF_IDL, 'certify', { payer, config, treasury, certificate, prior_payer: prior, holder_token: holder });
   keys[0].isSigner = true; keys[0].isWritable = true;
   if (prior === PROGRAM) keys[4].isWritable = false;   // the absent optional account is the program id, never writable
   const verifier = answer.verifierKey;
-  return { certificate, instructions: [ed25519Instruction(verifier, sdk.fromHex(answer.signature), att), ix(PROGRAM, keys, data)] };
+  return { certificate, instructions: [ed25519Instruction(verifier, bytes(answer.signature), att), ix(PROGRAM, keys, data)] };
 }
 
 /** revoke_by_holder: the certificate's controller signs */
