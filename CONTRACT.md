@@ -76,3 +76,34 @@ The salts and nullifiers go back to the browser, which saves them (the holder's 
   subject_hash]`.
 - HTTP: `GET /v1/certificates/:subject` → `{ subject, kind, asset, tier, tierLabel, status, certifiedSlot, expirySlot,
   revokedSlot, address, logIndex }`. The rest are in POF.md (devx).
+
+## §7 The transparency log (owner: verifier; consumers: devx SDK, site /log)
+An append-only Merkle log of every attestation the Verifier signs, per RFC 9162 (Certificate Transparency v2) hashing.
+It holds no amounts, no openings, no nullifiers, no salts: only the §3 bytes (which carry the salted `nullset_hash`).
+
+**Leaf data** (fixed 345 bytes, all integers little-endian):
+```
+offset size field
+0      1    version        0x01
+1      208  attestation    the exact §3 bytes
+209    64   signature      the Verifier's ed25519 signature over the attestation
+273    32   verifier_key   the ed25519 public key that signed
+305    32   bundle_hash    sha256 of the Verifier bundle that produced it (pof/verifier/dist/BUILD.json)
+337    8    logged_slot    u64, the slot the Verifier read when it appended the entry
+345         total
+```
+- `leaf_hash = sha256(0x00 ‖ leaf_data)`; `node = sha256(0x01 ‖ left ‖ right)`; the tree over n leaves is RFC 9162 §2.1.1
+  (split at the largest power of two below n); the empty tree's root is `sha256("")`.
+- Inclusion proofs are RFC 9162 §2.1.3 audit paths (`index`, `tree_size`, `path: [hex32]`), checked with the §2.1.3.2
+  algorithm. Consistency proofs between two sizes are RFC 9162 §2.1.4.
+- **Signed tree head**: the Verifier signs with the same ed25519 key the 80 bytes
+  `"POF-STH1" (8) ‖ program_id (32) ‖ tree_size u64 (8) ‖ root_hash (32)`. JSON: `{ treeSize, rootHash, slot, signature,
+  verifierKey }` (`slot` is informational, not signed: the anchor below fixes the time).
+- **Anchor on chain**: a Memo-program instruction with the UTF-8 text `pof:log:<tree_size>:<root_hash hex>` inside every
+  relayed `certify` transaction, and a periodic memo from the keeper (off before launch). Anyone can match a head to a slot.
+- **Entry id**: the leaf index (u64, from 0). `logIndex` in the §4 answer and on the Certificate is this index.
+- HTTP (served by `pof/api/attest/log*`, devx may proxy under `/v1/log/*`): `GET /api/attest/log?head` → STH JSON;
+  `GET /api/attest/log?entry=<i>` → `{ index, leaf: hex345, leafHash }`; `GET /api/attest/log?proof=<i>&size=<n>` →
+  `{ index, treeSize, rootHash, path: [hex] }`; `GET /api/attest/log?from=<i>&to=<j>` → entries (≤ 256).
+
+2026-11-25 (verifier): §7 added: RFC 9162 hashing as devx proposed, 345-byte leaf, 80-byte signed head, memo anchor.
