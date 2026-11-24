@@ -112,9 +112,10 @@ export const linkTokenBytes = (programId: Uint8Array, handle: string, controller
 export const revokeBytes = (programId: Uint8Array, certificate: Uint8Array, subjectHash: Uint8Array, asset: number, nullsetHash: Uint8Array, issuedSlot: bigint | number): Uint8Array =>
   concat(text('POF-REVOKE1'), programId, certificate, subjectHash, Uint8Array.of(asset), nullsetHash, u64le(issuedSlot));
 
-/** v2 (audit RV-01, proposed on BOARD): the same fields plus the last slot the signature may be used at */
+/** the program's revoke_bytes since 74654cb (audit RV-01): the same domain and fields plus the last slot the signature may
+ *  be used at, 156 bytes; the 148-byte form above is what the program took before and no longer accepts */
 export const revokeBytesV2 = (programId: Uint8Array, certificate: Uint8Array, subjectHash: Uint8Array, asset: number, nullsetHash: Uint8Array, issuedSlot: bigint | number, validUntil: bigint | number): Uint8Array =>
-  concat(text('POF-REVOKE2'), programId, certificate, subjectHash, Uint8Array.of(asset), nullsetHash, u64le(issuedSlot), u64le(validUntil));
+  concat(text('POF-REVOKE1'), programId, certificate, subjectHash, Uint8Array.of(asset), nullsetHash, u64le(issuedSlot), u64le(validUntil));
 
 export const certificateSeeds = (subjectHash: Uint8Array, asset: number): Uint8Array[] => [text('cert'), subjectHash, Uint8Array.of(asset)];
 export { toB58 };

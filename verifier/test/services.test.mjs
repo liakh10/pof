@@ -347,3 +347,16 @@ test('POF-30: one payment pays one certificate even when two attestations race f
   assert.equal(r.filter(x => x.status === 'fulfilled').length, 1);
   assert.equal(r.find(x => x.status === 'rejected').reason.code, 'NOT_PAID');
 });
+
+test('the relayed revoke bytes equal the program\'s revoke_bytes (156 bytes, POF-REVOKE1 with valid_until)', async () => {
+  const pid = new Uint8Array(32).fill(1), cert = new Uint8Array(32).fill(2), sh = new Uint8Array(32).fill(3), ns = new Uint8Array(32).fill(4);
+  const b = V.revokeBytesV2(pid, cert, sh, 7, ns, 0x0102030405060708n, 0x1112131415161718n);
+  assert.equal(b.length, 156);
+  assert.equal(Buffer.from(b.subarray(0, 11)).toString(), 'POF-REVOKE1');
+  assert.equal(hex(b.subarray(11, 43)), hex(pid)); assert.equal(hex(b.subarray(43, 75)), hex(cert)); assert.equal(hex(b.subarray(75, 107)), hex(sh));
+  assert.equal(b[107], 7); assert.equal(hex(b.subarray(108, 140)), hex(ns));
+  assert.equal(Buffer.from(b).readBigUInt64LE(140), 0x0102030405060708n); assert.equal(Buffer.from(b).readBigUInt64LE(148), 0x1112131415161718n);
+  // the relayer reads the vendored IDL: revoke_signed takes valid_until, so it signs and sends v2
+  const idl = JSON.parse((await import('node:fs')).readFileSync(new URL('../idl/pof.json', import.meta.url), 'utf8'));
+  assert.deepEqual(idl.instructions.find(i => i.name === 'revoke_signed').args.map(a => a.name), ['valid_until']);
+});
