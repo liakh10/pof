@@ -177,10 +177,21 @@ export function logBase(env = process.env, origin) {
   throw new HttpError(503, "log_not_configured", "the transparency log URL is not configured");
 }
 
-/** POF-13: the verifier keys come from the chain (Config and its VerifierSet history), never from the log itself. */
+/**
+ * POF-13: the verifier keys come from the chain, never from the log. `all` (for log entries): the Config, the keys open
+ * certificates were accepted with, and the VerifierSet history in the admin's transactions; cached for 10 minutes.
+ * `active` (for heads, audit W-02): the one key that may sign a head now; cached for 30 seconds.
+ */
 export async function trustedKeys(client) {
-  if (!client) return { all: [], current: null, fromHistory: false };
-  return remember("verifierKeys", 60_000, () => client.verifierKeys({ history: true, maxTransactions: 500 }).catch(() => client.verifierKeys()));
+  if (!client) return { all: [], active: null, fromHistory: false };
+  const [hist, cfg] = await Promise.all([
+    remember("verifierKeys", 600_000, () =>
+      client.verifierKeys({ history: true, fromCertificates: true, maxTransactions: 200 }).catch(() => client.verifierKeys())),
+    remember("config", 30_000, () => client.getConfig()),
+  ]);
+  const active = cfg ? cfg.activeVerifier : hist.active;
+  const all = [...new Set([...hist.all, ...(active ? [active] : [])])];
+  return { all, active, fromHistory: hist.fromHistory };
 }
 
 const keyEq = (a, b) => {
@@ -208,7 +219,8 @@ export async function verifiedHead(base, client, f) {
   const head = await logGet(base, "head", f);
   const programId = client?.programId ?? sdk.POF_PROGRAM_ID;
   const keys = await trustedKeys(client);
-  const keyTrusted = keys.all.some((k) => keyEq(k, head.verifierKey));
+  // a head must be signed by the key active now; a retired key may have signed old entries, never a new head (W-02)
+  const keyTrusted = !!keys.active && keyEq(keys.active, head.verifierKey);
   const signatureValid = keyTrusted && (await sdk.verifyTreeHead(head, programId).catch(() => false));
   // the latest head anchored on chain by anchor_log (Treasury), and whether this head is consistent with it
   let anchor = null;
@@ -225,7 +237,7 @@ export async function verifiedHead(base, client, f) {
       }
     } else anchor.consistent = false;
   }
-  return { ...head, signatureValid, keyTrusted, trustedKeys: keys.all, programId, anchor };
+  return { ...head, signatureValid, keyTrusted, activeKey: keys.active, trustedKeys: keys.all, programId, anchor };
 }
 
 export async function verifiedProof(base, client, index, f, { certificate } = {}) {
@@ -238,7 +250,7 @@ export async function verifiedProof(base, client, index, f, { certificate } = {}
     logGet(base, `proof=${index}&size=${head.treeSize}`, f),
   ]);
   const check = await sdk.verifyLogEntry({
-    leaf: entry.leaf, index, proof: { treeSize: proof.treeSize, rootHash: proof.rootHash, path: proof.path }, head, programId, trustedKeys: keys.all,
+    leaf: entry.leaf, index, proof: { treeSize: proof.treeSize, rootHash: proof.rootHash, path: proof.path }, head, programId, trustedKeys: keys.all, headKeys: keys.active ? [keys.active] : [],
   });
   // POF-18: a certificate's log_index is the submitter's word; match the signed bytes instead
   let certificateMatch = null;

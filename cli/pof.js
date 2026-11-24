@@ -57,7 +57,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
     if (!logUrl) throw new Usage("set --origin <site> (or --log <url>) to read the transparency log");
     return new sdk.LogReader(logUrl, io.fetch);
   };
-  const keys = async (c) => (await c.verifierKeys({ history: true, maxTransactions: 500 }).catch(() => c.verifierKeys())).all;
+  const keySet = async (c) => c.verifierKeys({ history: true, fromCertificates: true, maxTransactions: 200 }).catch(() => c.verifierKeys());
+  const keys = async (c) => (await keySet(c)).all;
   const line = (c) =>
     `${c.assetSymbol.padEnd(4)} ${c.tierLabel.padEnd(16)} ${c.effectiveStatus.toUpperCase().padEnd(17)} ` +
     (c.live ? `until slot ${c.expirySlot}` : c.revokedSlot ? `at slot ${c.revokedSlot}` : `expired after slot ${c.expirySlot}`) +
@@ -82,7 +83,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
       const logs = [];
       if (o["verify-log"]) {
         const rd = reader();
-        const trusted = await keys(c);
+        const ks = await keySet(c);
+        const trusted = ks.all;
         for (const x of r.certificates) {
           if (x.logIndex === null) {
             logs.push({ certificate: x.address, ok: false, why: "no log index" });
@@ -90,7 +92,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
           }
           const head = await rd.head();
           const [e, p] = await Promise.all([rd.entry(x.logIndex), rd.proof(x.logIndex, head.treeSize)]);
-          const v = await sdk.verifyLogEntry({ leaf: e.leaf, index: x.logIndex, proof: p, head, programId: c.programId, trustedKeys: trusted });
+          const v = await sdk.verifyLogEntry({ leaf: e.leaf, index: x.logIndex, proof: p, head, programId: c.programId, trustedKeys: trusted, headKeys: ks.active ? [ks.active] : [] });
           const m = v.leaf ? sdk.matchCertificateLeaf(x, v.leaf) : { matches: false, mismatched: ["leaf"] };
           logs.push({ certificate: x.address, logIndex: x.logIndex, ok: v.ok && m.matches, checks: v.checks, mismatched: m.mismatched });
         }
@@ -181,15 +183,17 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
       const sub = rest[0];
       const rd = reader();
       const c = rpcUrl ? client() : null;
-      const trusted = c ? await keys(c) : null;
+      const ks = c ? await keySet(c) : null;
+      const trusted = ks ? ks.all : null;
+      const active = ks?.active ?? null;
       const programId = c?.programId ?? o.program ?? sdk.POF_PROGRAM_ID;
       if (sub === "head") {
         const h = await rd.head();
         const sig = await sdk.verifyTreeHead(h, programId);
-        const keyOk = trusted ? trusted.some((k) => k === h.verifierKey) : null;
+        const keyOk = ks ? active === h.verifierKey : null; // heads: only the key active now (W-02)
         const t = c ? await c.getTreasury().catch(() => null) : null;
         const ok = sig && keyOk !== false;
-        say([`head size ${h.treeSize} root ${h.rootHash}`, `  signature ${sig ? "valid" : "INVALID"}; key ${h.verifierKey} ${keyOk === null ? "(not checked: no --rpc)" : keyOk ? "is listed in the program's Config" : "is NOT listed in the program's Config"}`,
+        say([`head size ${h.treeSize} root ${h.rootHash}`, `  signature ${sig ? "valid" : "INVALID"}; key ${h.verifierKey} ${keyOk === null ? "(not checked: no --rpc)" : keyOk ? "is the program's active verifier key" : "is NOT the program's active verifier key"}`,
           t?.log ? `  anchored on chain: size ${t.log.treeSize} root ${t.log.rootHash} at slot ${t.log.slot}` : c ? "  no head anchored on chain yet" : ""].filter(Boolean).join("\n"), { head: h, signatureValid: sig, keyTrusted: keyOk, anchor: t?.log ?? null });
         return ok ? 0 : 1;
       }
@@ -199,7 +203,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
         const h = await rd.head();
         const [e, p] = await Promise.all([rd.entry(id), rd.proof(id, h.treeSize)]);
         if (!trusted) io.err("note: without --rpc the verifier key cannot be checked against the program");
-        const v = await sdk.verifyLogEntry({ leaf: e.leaf, index: id, proof: p, head: h, programId, trustedKeys: trusted ?? [] });
+        const v = await sdk.verifyLogEntry({ leaf: e.leaf, index: id, proof: p, head: h, programId, trustedKeys: trusted ?? [], headKeys: active ? [active] : [] });
         let match = null;
         if (o.certificate) {
           const acc = await c?.rpc.getAccount(o.certificate);
@@ -215,8 +219,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
       if (sub === "verify") {
         if (!trusted) throw new Usage("pof log verify needs --rpc: the verifier keys and the anchor come from chain");
         const t = await c.getTreasury().catch(() => null);
-        const r = await sdk.auditLog({ reader: rd, programId, trustedKeys: trusted, anchor: t?.log ?? null, onProgress: json ? undefined : (d, n) => io.err(`  ${d}/${n} entries`) });
-        say([`log size ${r.treeSize}: ${r.ok ? "VERIFIED" : "FAILED"}`, `  head signed by a listed key: ${r.checks.headSigned}`, `  root recomputed from every entry: ${r.checks.rootRecomputed}`,
+        const r = await sdk.auditLog({ reader: rd, programId, trustedKeys: trusted, headKeys: active ? [active] : [], anchor: t?.log ?? null, onProgress: json ? undefined : (d, n) => io.err(`  ${d}/${n} entries`) });
+        say([`log size ${r.treeSize}: ${r.ok ? "VERIFIED" : "FAILED"}`, `  head signed by the active key: ${r.checks.headSigned}`, `  root recomputed from every entry: ${r.checks.rootRecomputed}`,
           `  entries signed by a listed key: ${r.checks.entriesSigned}/${r.treeSize}${r.checks.entriesBad.length ? ` (bad: ${r.checks.entriesBad.slice(0, 20).join(", ")})` : ""}`,
           `  anchor on chain: ${r.anchor ? `size ${r.anchor.treeSize} at slot ${r.anchor.slot}: ${r.checks.anchorMatches ? "matches the log" : "DOES NOT MATCH"}` : "none yet"}`,
           `  every entry is for this program: ${r.checks.programMatches}`].join("\n"), r);

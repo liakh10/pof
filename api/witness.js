@@ -30,6 +30,7 @@ export default async function handler(req, res) {
       state: new BlobState(),
       name: env.WITNESS_NAME || "pof-witness",
       monitorCertificates: true,
+      peers: (env.WITNESS_PEERS || "").split(",").map((x) => x.trim()).filter(Boolean),
     });
     const r = await w.step();
     return out(200, r.ok ? { ok: true, treeSize: r.cosignature.treeSize, anchor: r.cosignature.anchor } : { ok: false, alarm: r.kind });

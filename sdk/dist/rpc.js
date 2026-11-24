@@ -78,6 +78,25 @@ export class Rpc {
         const r = await this.call("getTransaction", [signature, { encoding: "json", maxSupportedTransactionVersion: 0, commitment: this.commitment === "processed" ? "confirmed" : this.commitment }]);
         return r?.meta?.logMessages ?? null;
     }
+    async getAccountsWithSlot(addresses) {
+        const accounts = [];
+        let slot = 0;
+        if (!addresses.length)
+            return { slot: await this.getSlot(), accounts };
+        for (let i = 0; i < addresses.length; i += 100) {
+            const chunk = addresses.slice(i, i + 100);
+            const r = await this.call("getMultipleAccounts", [chunk, { encoding: "base64", commitment: this.commitment }]);
+            slot = Math.max(slot, r.context?.slot ?? 0);
+            r.value.forEach((v, j) => accounts.push(this.toAccount(chunk[j], v)));
+        }
+        return { slot: slot || (await this.getSlot()), accounts };
+    }
+    async getProgramAccountsWithSlot(programId, filters) {
+        const r = await this.call("getProgramAccounts", [programId, { encoding: "base64", commitment: this.commitment, filters, withContext: true }]);
+        const list = Array.isArray(r) ? r : r.value;
+        const slot = Array.isArray(r) ? await this.getSlot() : r.context?.slot ?? (await this.getSlot());
+        return { slot, accounts: list.map((x) => this.toAccount(x.pubkey, x.account)) };
+    }
     async getProgramAccounts(programId, filters) {
         const r = await this.call("getProgramAccounts", [
             programId,

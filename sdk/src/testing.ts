@@ -29,6 +29,14 @@ export class MemoryRpc implements RpcLike {
     this.calls.push("getAccounts");
     return addresses.map((a) => this.accounts.get(a) ?? null);
   }
+  async getAccountsWithSlot(addresses: string[]) {
+    this.calls.push("getMultipleAccounts");
+    return { slot: this.slot, accounts: addresses.map((a) => this.accounts.get(a) ?? null) };
+  }
+  async getProgramAccountsWithSlot(programId: string, filters: MemcmpFilter[]) {
+    const accounts = await this.getProgramAccounts(programId, filters);
+    return { slot: this.slot, accounts };
+  }
   async getProgramAccounts(programId: string, filters: MemcmpFilter[]) {
     this.calls.push("getProgramAccounts");
     return [...this.accounts.values()].filter((a) => {

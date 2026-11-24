@@ -195,8 +195,9 @@ export async function verifyLogEntry(args) {
     if (args.programId)
         checks.programMatches = leaf.attestation.programId === encodeBase58(toAddressBytes(args.programId));
     if (args.head) {
+        const hk = args.headKeys ?? trusted;
         checks.headSigned =
-            trusted.some((k) => sameKey(k, args.head.verifierKey)) &&
+            hk.some((k) => sameKey(k, args.head.verifierKey)) &&
                 args.head.treeSize === args.proof.treeSize &&
                 args.head.rootHash.toLowerCase() === args.proof.rootHash.toLowerCase() &&
                 (await verifyTreeHead(args.head, leaf.attestation.programId));
@@ -283,7 +284,7 @@ export class LogReader {
 export async function auditLog(args) {
     const head = await args.reader.head();
     const trusted = args.trustedKeys ?? [];
-    const headSigned = trusted.some((k) => sameKey(k, head.verifierKey)) && (await verifyTreeHead(head, args.programId));
+    const headSigned = (args.headKeys ?? trusted).some((k) => sameKey(k, head.verifierKey)) && (await verifyTreeHead(head, args.programId));
     const entries = head.treeSize ? await args.reader.entries(0, head.treeSize) : [];
     const hashes = [];
     const bad = [];

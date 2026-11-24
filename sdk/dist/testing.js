@@ -22,6 +22,14 @@ export class MemoryRpc {
         this.calls.push("getAccounts");
         return addresses.map((a) => this.accounts.get(a) ?? null);
     }
+    async getAccountsWithSlot(addresses) {
+        this.calls.push("getMultipleAccounts");
+        return { slot: this.slot, accounts: addresses.map((a) => this.accounts.get(a) ?? null) };
+    }
+    async getProgramAccountsWithSlot(programId, filters) {
+        const accounts = await this.getProgramAccounts(programId, filters);
+        return { slot: this.slot, accounts };
+    }
     async getProgramAccounts(programId, filters) {
         this.calls.push("getProgramAccounts");
         return [...this.accounts.values()].filter((a) => {

@@ -94,7 +94,7 @@ test("pof rooms, config, stats", async () => {
 test("pof log head | proof | verify, against keys and the anchor from chain", async () => {
   let r = await run(["log", "head"]);
   assert.equal(r.code, 0, r.out + r.err);
-  assert.match(r.out, /is listed in the program's Config/);
+  assert.match(r.out, /is the program's active verifier key/);
   assert.match(r.out, /anchored on chain: size 5/);
   r = await run(["log", "proof", "3", "--certificate", loggedCert.addr]);
   assert.equal(r.code, 0, r.out + r.err);
@@ -111,10 +111,10 @@ test("pof log head | proof | verify, against keys and the anchor from chain", as
   await w.rpc.putConfig({ verifier: rand() });
   r = await run(["log", "verify"]);
   assert.equal(r.code, 1);
-  assert.match(r.out, /head signed by a listed key: false/);
+  assert.match(r.out, /head signed by the active key: false/);
   r = await run(["log", "head"]);
   assert.equal(r.code, 1);
-  assert.match(r.out, /is NOT listed/);
+  assert.match(r.out, /is NOT the program's active verifier key/);
   await w.rpc.putConfig({ verifier: log.verifierKey });
 });
 

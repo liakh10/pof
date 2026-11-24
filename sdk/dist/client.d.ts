@@ -44,6 +44,9 @@ export declare class PofClient {
     readonly programId: string;
     readonly gateProgramId: string;
     constructor(opts: PofClientOptions);
+    /** accounts and the slot in one RPC call when the RPC supports it, else two in parallel */
+    private accountsAt;
+    private programAccountsAt;
     private live;
     /** The certificate for one subject and asset, or null. */
     getCertificate(subject: Subject | Uint8Array, asset: number | string): Promise<LiveCertificate | null>;
@@ -71,18 +74,24 @@ export declare class PofClient {
         slot: number;
     }) | null>;
     /**
-     * The verifier keys a log head or entry may be signed with: the Config's verifier and scheduled next verifier, plus,
-     * with `history`, every key a `VerifierSet` event ever named (read from the Config account's transaction history,
-     * when the RPC serves it). Never trust the key a head or a leaf names about itself.
+     * The verifier keys the program accepted, for checking log ENTRIES (never trust the key a leaf names about itself):
+     *  - the Config's verifier and scheduled next verifier;
+     *  - with `fromCertificates`, the `verifier` of every open certificate (certify only stores the key it accepted);
+     *  - with `history`, every key a `VerifierSet` event named, read from the ADMIN's transactions (set_verifier and
+     *    init_config are admin-signed; scanning the Config account instead would walk every certify ever made).
+     * `active` is the one key a log HEAD may be signed with now (audit W-02): a retired key must not sign new heads.
      */
     verifierKeys(opts?: {
         history?: boolean;
+        fromCertificates?: boolean;
         maxTransactions?: number;
     }): Promise<{
+        active: string | null;
         current: string | null;
         next: string | null;
         all: string[];
         fromHistory: boolean;
+        rpcCalls: number;
     }>;
     /** The Treasury's public counters, and the transparency log head anchored on chain. */
     getTreasury(): Promise<(Treasury & {

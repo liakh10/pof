@@ -79,7 +79,10 @@ export declare function verifyLogEntry(args: {
     };
     head?: SignedTreeHead;
     programId?: AddressLike;
+    /** keys a LEAF may be signed with: every key the program ever accepted (Config, VerifierSet history, certificates) */
     trustedKeys: string[];
+    /** keys a HEAD may be signed with now: the active verifier only (audit W-02); default `trustedKeys` */
+    headKeys?: string[];
 }): Promise<ProofCheck>;
 /**
  * Does this log leaf hold the attestation behind this certificate? The certificate's `log_index` is not signed
@@ -173,6 +176,8 @@ export declare function auditLog(args: {
     } | null;
     /** verifier keys from the chain (PofClient.verifierKeys); a head or entry signed by any other key fails */
     trustedKeys: string[];
+    /** keys the head may be signed with now (the active verifier); default trustedKeys */
+    headKeys?: string[];
     onProgress?: (done: number, total: number) => void;
 }): Promise<AuditResult>;
 export {};

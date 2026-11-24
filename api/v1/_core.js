@@ -203,7 +203,7 @@ export async function handleV1(req) {
         if (second === head.treeSize) {
           secondRoot = head.rootHash;
           const keys = await trustedKeys(client);
-          secondRootSigned = keys.all.some((k) => k === head.verifierKey) && (await sdk.verifyTreeHead(head, client?.programId ?? sdk.POF_PROGRAM_ID).catch(() => false));
+          secondRootSigned = keys.active === head.verifierKey && (await sdk.verifyTreeHead(head, client?.programId ?? sdk.POF_PROGRAM_ID).catch(() => false));
         }
         const verified = first === 0 || (p.firstRoot && secondRoot
           ? await sdk.verifyConsistency({ size1: first, size2: second, root1: p.firstRoot, root2: secondRoot, proof: p.path })

@@ -211,7 +211,10 @@ export async function verifyLogEntry(args: {
   proof: { treeSize: number; rootHash: Hex; path: Hex[] };
   head?: SignedTreeHead;
   programId?: AddressLike;
+  /** keys a LEAF may be signed with: every key the program ever accepted (Config, VerifierSet history, certificates) */
   trustedKeys: string[];
+  /** keys a HEAD may be signed with now: the active verifier only (audit W-02); default `trustedKeys` */
+  headKeys?: string[];
 }): Promise<ProofCheck> {
   const checks: ProofCheck["checks"] = { leafParses: false, attestationSigned: false, keyTrusted: false, included: false, headSigned: null, programMatches: null };
   let leaf: LogLeaf | null = null;
@@ -229,8 +232,9 @@ export async function verifyLogEntry(args: {
   });
   if (args.programId) checks.programMatches = leaf.attestation.programId === encodeBase58(toAddressBytes(args.programId));
   if (args.head) {
+    const hk = args.headKeys ?? trusted;
     checks.headSigned =
-      trusted.some((k) => sameKey(k, args.head!.verifierKey)) &&
+      hk.some((k) => sameKey(k, args.head!.verifierKey)) &&
       args.head.treeSize === args.proof.treeSize &&
       args.head.rootHash.toLowerCase() === args.proof.rootHash.toLowerCase() &&
       (await verifyTreeHead(args.head, leaf.attestation.programId));
@@ -351,11 +355,13 @@ export async function auditLog(args: {
   anchor?: { treeSize: number; rootHash: Hex; slot: number } | null;
   /** verifier keys from the chain (PofClient.verifierKeys); a head or entry signed by any other key fails */
   trustedKeys: string[];
+  /** keys the head may be signed with now (the active verifier); default trustedKeys */
+  headKeys?: string[];
   onProgress?: (done: number, total: number) => void;
 }): Promise<AuditResult> {
   const head = await args.reader.head();
   const trusted = args.trustedKeys ?? [];
-  const headSigned = trusted.some((k) => sameKey(k, head.verifierKey)) && (await verifyTreeHead(head, args.programId));
+  const headSigned = (args.headKeys ?? trusted).some((k) => sameKey(k, head.verifierKey)) && (await verifyTreeHead(head, args.programId));
   const entries = head.treeSize ? await args.reader.entries(0, head.treeSize) : [];
   const hashes: Uint8Array[] = [];
   const bad: number[] = [];

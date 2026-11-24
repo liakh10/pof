@@ -160,23 +160,29 @@ test("verifierKeys: Config keys, plus every key VerifierSet events ever named (h
   const old = Keypair.generate().publicKey.toBase58();
   const cur = Keypair.generate().publicKey.toBase58();
   const nxt = Keypair.generate().publicKey.toBase58();
-  await rpc.putConfig({ verifier: cur, next_verifier: nxt, next_verifier_slot: 99999 });
+  const admin = Keypair.generate().publicKey.toBase58();
+  await rpc.putConfig({ admin, verifier: cur, next_verifier: nxt, next_verifier_slot: 99999 });
   const ev = (verifier, next) => {
     const disc = sdk.POF_IDL.events.find((e) => e.name === "VerifierSet").discriminator;
     const body = Buffer.concat([Buffer.from(disc), new PublicKey(verifier).toBuffer(), new PublicKey(next).toBuffer(), Buffer.alloc(8)]);
     return `Program data: ${body.toString("base64")}`;
   };
-  const [cfg] = await sdk.configAddress();
-  rpc.history.set(cfg, [
-    { signature: "s3", logs: ["Program log: Instruction: SetVerifier", ev(cur, nxt)] },
-    { signature: "s2", logs: [ev(old, cur)] },
-    { signature: "s1", logs: [ev(old, "11111111111111111111111111111111")] },
+  const inv = `Program ${sdk.POF_PROGRAM_ID} invoke [1]`;
+  rpc.history.set(admin, [
+    { signature: "s4", logs: ["Program 11111111111111111111111111111111 invoke [1]", ev(Keypair.generate().publicKey.toBase58(), cur)] }, // not pof: ignored
+    { signature: "s3", logs: [inv, "Program log: Instruction: SetVerifier", ev(cur, nxt)] },
+    { signature: "s2", logs: [inv, ev(old, cur)] },
+    { signature: "s1", logs: [inv, ev(old, "11111111111111111111111111111111")] },
   ]);
   const now = await client.verifierKeys();
   assert.deepEqual(new Set(now.all), new Set([cur, nxt]));
   assert.equal(now.current, cur);
+  assert.equal(now.active, cur, "the next key is not active before its slot");
   const h = await client.verifierKeys({ history: true });
   assert.deepEqual(new Set(h.all), new Set([cur, nxt, old]));
   assert.equal(h.fromHistory, true);
+  assert.equal(h.rpcCalls, 1 + 1 + 4, "config, one signature page, four transactions");
+  const fc = await client.verifierKeys({ fromCertificates: true });
+  assert.ok(fc.all.includes("11111111111111111111111111111111") === false);
   assert.equal(sdk.decodeEvents([ev(old, cur), "Program data: !!!", "nothing"]).length, 1);
 });

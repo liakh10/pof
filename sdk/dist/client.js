@@ -14,6 +14,19 @@ export class PofClient {
         this.programId = toAddress(opts.programId ?? POF_PROGRAM_ID);
         this.gateProgramId = toAddress(opts.gateProgramId ?? POF_GATE_PROGRAM_ID);
     }
+    /** accounts and the slot in one RPC call when the RPC supports it, else two in parallel */
+    async accountsAt(addrs) {
+        if (this.rpc.getAccountsWithSlot)
+            return this.rpc.getAccountsWithSlot(addrs);
+        const [accounts, slot] = await Promise.all([this.rpc.getAccounts(addrs), this.rpc.getSlot()]);
+        return { slot, accounts };
+    }
+    async programAccountsAt(programId, filters) {
+        if (this.rpc.getProgramAccountsWithSlot)
+            return this.rpc.getProgramAccountsWithSlot(programId, filters);
+        const [accounts, slot] = await Promise.all([this.rpc.getProgramAccounts(programId, filters), this.rpc.getSlot()]);
+        return { slot, accounts };
+    }
     live(c, slot) {
         const s = effectiveStatus(c, slot);
         return { ...c, effectiveStatus: s, live: s === "live" };
@@ -22,7 +35,7 @@ export class PofClient {
     async getCertificate(subject, asset) {
         const hash = subject instanceof Uint8Array ? subject : await subjectHash(subject);
         const [addr] = await certificateAddress(hash, parseAsset(asset), this.programId);
-        const [acc, slot] = await Promise.all([this.rpc.getAccount(addr), this.rpc.getSlot()]);
+        const { slot, accounts: [acc] } = await this.accountsAt([addr]);
         if (!acc || acc.owner !== this.programId)
             return null;
         return this.live(decodeCertificate(addr, acc.data), slot);
@@ -44,7 +57,7 @@ export class PofClient {
         for (const c of candidates)
             for (const a of assets)
                 addrs.push((await certificateAddress(fromHex(c.subjectHash), a, this.programId))[0]);
-        const [accs, slot] = await Promise.all([this.rpc.getAccounts(addrs), this.rpc.getSlot()]);
+        const { slot, accounts: accs } = await this.accountsAt(addrs);
         const certificates = [];
         accs.forEach((acc) => {
             if (acc && acc.owner === this.programId)
@@ -80,7 +93,7 @@ export class PofClient {
             filters.push(memcmp(layout.certificate.offset("tier"), Uint8Array.of(f.tier)));
         if (f.subjectKind !== undefined)
             filters.push(memcmp(layout.certificate.offset("subject_kind"), Uint8Array.of(f.subjectKind)));
-        const [accs, slot] = await Promise.all([this.rpc.getProgramAccounts(this.programId, filters), this.rpc.getSlot()]);
+        const { slot, accounts: accs } = await this.programAccountsAt(this.programId, filters);
         let certificates = accs.map((a) => this.live(decodeCertificate(a.address, a.data), slot));
         if (f.minTier !== undefined)
             certificates = certificates.filter((c) => c.tier >= f.minTier);
@@ -93,18 +106,22 @@ export class PofClient {
     /** The program's Config: verifier keys, fee, validity, tier tables in base units. */
     async getConfig() {
         const [addr] = await configAddress(this.programId);
-        const [acc, slot] = await Promise.all([this.rpc.getAccount(addr), this.rpc.getSlot()]);
+        const { slot, accounts: [acc] } = await this.accountsAt([addr]);
         if (!acc || acc.owner !== this.programId)
             return null;
         const c = decodeConfig(acc.data);
         return { ...c, activeVerifier: activeVerifier(c, slot), slot };
     }
     /**
-     * The verifier keys a log head or entry may be signed with: the Config's verifier and scheduled next verifier, plus,
-     * with `history`, every key a `VerifierSet` event ever named (read from the Config account's transaction history,
-     * when the RPC serves it). Never trust the key a head or a leaf names about itself.
+     * The verifier keys the program accepted, for checking log ENTRIES (never trust the key a leaf names about itself):
+     *  - the Config's verifier and scheduled next verifier;
+     *  - with `fromCertificates`, the `verifier` of every open certificate (certify only stores the key it accepted);
+     *  - with `history`, every key a `VerifierSet` event named, read from the ADMIN's transactions (set_verifier and
+     *    init_config are admin-signed; scanning the Config account instead would walk every certify ever made).
+     * `active` is the one key a log HEAD may be signed with now (audit W-02): a retired key must not sign new heads.
      */
     async verifierKeys(opts = {}) {
+        let calls = 1;
         const c = await this.getConfig();
         const keys = new Set();
         const DEFAULT = "11111111111111111111111111111111";
@@ -113,21 +130,31 @@ export class PofClient {
             if (c.nextVerifier)
                 keys.add(c.nextVerifier);
         }
+        if (opts.fromCertificates) {
+            calls++;
+            const { certificates } = await this.listCertificates();
+            for (const x of certificates)
+                if (x.verifier && x.verifier !== DEFAULT)
+                    keys.add(x.verifier);
+        }
         let fromHistory = false;
-        if (opts.history && this.rpc.getSignaturesForAddress && this.rpc.getTransactionLogs) {
-            const [cfg] = await configAddress(this.programId);
+        if (opts.history && c && this.rpc.getSignaturesForAddress && this.rpc.getTransactionLogs) {
             let before;
             let seen = 0;
-            const max = opts.maxTransactions ?? 2000;
+            const max = opts.maxTransactions ?? 200;
             for (;;) {
-                const page = await this.rpc.getSignaturesForAddress(cfg, { before, limit: Math.min(1000, max - seen) });
+                calls++;
+                const page = await this.rpc.getSignaturesForAddress(c.admin, { before, limit: Math.min(1000, max - seen) });
                 if (!page.length)
                     break;
                 for (const sig of page) {
                     if (sig.err)
                         continue;
+                    calls++;
                     const logs = await this.rpc.getTransactionLogs(sig.signature);
-                    for (const e of decodeEvents(logs ?? [])) {
+                    if (!logs?.some((l) => l.startsWith("Program " + this.programId + " invoke")))
+                        continue;
+                    for (const e of decodeEvents(logs)) {
                         if (e.name !== "VerifierSet")
                             continue;
                         for (const k of [e.data.verifier, e.data.next_verifier])
@@ -142,7 +169,8 @@ export class PofClient {
             }
             fromHistory = true;
         }
-        return { current: c ? activeVerifier(c, c.slot) : null, next: c?.nextVerifier ?? null, all: [...keys], fromHistory };
+        const active = c ? activeVerifier(c, c.slot) : null;
+        return { active, current: active, next: c?.nextVerifier ?? null, all: [...keys], fromHistory, rpcCalls: calls };
     }
     /** The Treasury's public counters, and the transparency log head anchored on chain. */
     async getTreasury() {
@@ -174,7 +202,7 @@ export class PofClient {
         ]);
         const members = accs.map((a) => decodeMember(a.address, a.data));
         const certAddrs = await Promise.all(members.map(async (m) => m.certificate ?? (await certificateAddress(fromHex(m.subjectHash), room.asset, this.programId))[0]));
-        const [certs, slot] = await Promise.all([this.rpc.getAccounts(certAddrs), this.rpc.getSlot()]);
+        const { slot, accounts: certs } = await this.accountsAt(certAddrs);
         return {
             slot,
             room,

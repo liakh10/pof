@@ -18,6 +18,15 @@ export interface RpcLike {
     getAccount(address: string): Promise<AccountData | null>;
     getAccounts(addresses: string[]): Promise<(AccountData | null)[]>;
     getProgramAccounts(programId: string, filters: MemcmpFilter[]): Promise<AccountData[]>;
+    /** optional: accounts plus the slot they were read at, in ONE call (saves the separate getSlot) */
+    getAccountsWithSlot?(addresses: string[]): Promise<{
+        slot: number;
+        accounts: (AccountData | null)[];
+    }>;
+    getProgramAccountsWithSlot?(programId: string, filters: MemcmpFilter[]): Promise<{
+        slot: number;
+        accounts: AccountData[];
+    }>;
     /** optional: transaction history of an address, newest first */
     getSignaturesForAddress?(address: string, opts?: {
         before?: string;
@@ -59,6 +68,14 @@ export declare class Rpc implements RpcLike {
         err: unknown;
     }[]>;
     getTransactionLogs(signature: string): Promise<string[] | null>;
+    getAccountsWithSlot(addresses: string[]): Promise<{
+        slot: number;
+        accounts: (AccountData | null)[];
+    }>;
+    getProgramAccountsWithSlot(programId: string, filters: MemcmpFilter[]): Promise<{
+        slot: number;
+        accounts: AccountData[];
+    }>;
     getProgramAccounts(programId: string, filters: MemcmpFilter[]): Promise<AccountData[]>;
 }
 export declare function memcmp(offset: number, bytes: Uint8Array): MemcmpFilter;

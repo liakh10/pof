@@ -2,6 +2,7 @@
 // Run a witness anywhere:
 //   node witness/run.js --origin https://<site> --rpc https://<your rpc> [--key ~/.config/pof/witness.json]
 //                       [--out witness.json] [--name my-witness] [--loop 60] [--monitor]
+// --peer <url> (repeatable) cross-checks another witness's published document against this log (split views).
 // --monitor also checks that every certificate on chain is backed by the log entry it names (needs getProgramAccounts).
 // --log <url> overrides the log endpoint (default <origin>/api/attest/log). Exit code 1 on an alarm (single run).
 import fs from "node:fs";
@@ -36,6 +37,8 @@ const w = new Witness({
   state: new FileState(opt("out", "witness.json")),
   name: opt("name", "pof-witness"),
   monitorCertificates: args.includes("--monitor"),
+  // --peer <url of another witness's document>, repeatable: cross-check their cosigned heads (gossip)
+  peers: args.flatMap((a, i) => (a === "--peer" ? [args[i + 1]] : [])),
 });
 const loop = Number(opt("loop", 0));
 const once = async () => {

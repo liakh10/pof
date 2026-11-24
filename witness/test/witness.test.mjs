@@ -148,3 +148,84 @@ test("monitor: a certificate whose log entry does not hold its attestation raise
   const again = await witness.step();
   assert.equal(again.doc.alarms.filter((a) => a.kind === "unlogged_certificate").length, bad.length, "each certificate is checked once");
 });
+
+async function certFromLeaf(rpc, leafBytes, logIndex, { verifier } = {}) {
+  const l = sdk.parseLeaf(leafBytes);
+  const a = l.attestation;
+  const hash = sdk.fromHex(a.subjectHash);
+  const [addr, bump] = await sdk.certificateAddress(hash, a.asset);
+  rpc.put(addr, sdk.POF_PROGRAM_ID, sdk.encodeAccountPartial(sdk.POF_IDL, "Certificate", {
+    subject_kind: a.subjectKind, subject_hash: hash, asset: a.asset, tier: a.tier, certified_slot: a.issuedSlot, issued_slot: a.issuedSlot,
+    expiry_slot: a.expirySlot, note_count: a.noteCount, nullset_hash: sdk.fromHex(a.nullsetHash), payer: a.payer, controller: a.controller,
+    verifier: verifier ?? l.verifierKey, nonce: sdk.fromHex(a.nonce), log_index: logIndex, revealed_index: 255, bump,
+  }));
+  return addr;
+}
+
+test("W-01: an unlogged attestation cannot hide behind log_index = u64::MAX; a misindexed one is found by its bytes; zk is skipped", async () => {
+  const { MemoryRpc } = await import("../../sdk/dist/testing.js");
+  const rpc = new MemoryRpc();
+  rpc.slot = 10_000;
+  const client = new sdk.PofClient({ rpc });
+  const log = await makeLog(5);
+  await rpc.putConfig({ verifier: log.verifierKey });
+  const MAX = 18446744073709551615n;
+  // signed by the Verifier but never appended: its leaf exists only here
+  const hidden = await certFromLeaf(rpc, log.makeLeaf(77), MAX);
+  // logged at 3, but certify was told 0
+  const misindexed = await certFromLeaf(rpc, log.leaves[3], 0);
+  // a zk certificate
+  await certFromLeaf(rpc, log.makeLeaf(78), MAX, { verifier: "6q7PxLzgUtLHMfCDDHzkU4Ho54rC6b21VZmSFsD6Tsv1" });
+  const witness = new Witness({ reader: new sdk.LogReader(log.base, log.fetch), client, signer: signerFromSecret(newSecret()), state: new MemoryState(), monitorCertificates: true });
+  const r = await witness.step();
+  const unlogged = r.doc.alarms.filter((a) => a.kind === "unlogged_certificate");
+  assert.equal(unlogged.length, 1);
+  assert.equal(unlogged[0].detail.certificate, hidden);
+  assert.deepEqual(r.doc.notes, [{ kind: "misindexed", certificate: misindexed, claimed: 0, actual: 3 }]);
+  // inside the grace period the same case waits
+  rpc.slot = 300 + 1000;
+  const w2 = new Witness({ reader: new sdk.LogReader(log.base, log.fetch), client, signer: signerFromSecret(newSecret()), state: new MemoryState(), monitorCertificates: true });
+  const r2 = await w2.step();
+  assert.equal(r2.doc.alarms.filter((a) => a.kind === "unlogged_certificate").length, 0);
+  assert.equal(Object.values(r2.doc.monitored).filter((v) => v === "pending").length, 1);
+});
+
+test("W-02: a head signed by a retired key is not cosigned, even though that key signed old entries", async () => {
+  const { log, witness, w } = await setup(4);
+  assert.equal((await witness.step()).ok, true);
+  const next = signerFromSecret(newSecret());
+  await w.rpc.putConfig({ verifier: log.verifierKey, next_verifier: next.publicKey, next_verifier_slot: 4000 }); // slot 5000: rotated
+  const r = await witness.step();
+  assert.equal(r.kind, "unknown_key");
+  assert.deepEqual(r.detail.allowed, [next.publicKey]);
+});
+
+test("W-03: gossip with other witnesses; a peer shown another log raises split_view", async () => {
+  const { log, w } = await setup(6);
+  const mk = (peers, fetchImpl) => new Witness({ reader: new sdk.LogReader(log.base, log.fetch), client: w.client, signer: signerFromSecret(newSecret()), state: new MemoryState(), peers, fetch: fetchImpl });
+  const peer = mk([]);
+  const peerDoc = (await peer.step()).doc;
+  await log.append(3);
+  const docs = { "https://a.test/w.json": peerDoc };
+  const f = async (u) => new Response(JSON.stringify(docs[u]), { status: 200 });
+  let r = await mk(["https://a.test/w.json"], f).step();
+  assert.equal(r.ok, true);
+  assert.equal(r.doc.peers[0].ok, true, "the peer's older head is a prefix of ours");
+  // a peer that was shown a different log of the same size, with a valid cosignature over it
+  const evil = await mk([]).step().then((x) => x.doc);
+  const forked = structuredClone(evil);
+  const secret = newSecret();
+  const s = signerFromSecret(secret);
+  const root = "ee".repeat(32);
+  const ts = 1_800_000_000;
+  forked.witness.key = s.publicKey;
+  forked.latest = { witnessKey: s.publicKey, treeSize: 9, rootHash: root, timestamp: ts, signature: sdk.toHex(s.sign(sdk.cosignMessage(sdk.POF_PROGRAM_ID, 9, root, ts))) };
+  forked.heads = [forked.latest];
+  docs["https://b.test/w.json"] = forked;
+  r = await mk(["https://b.test/w.json"], f).step();
+  assert.ok(r.doc.alarms.some((a) => a.kind === "split_view"));
+  // a peer document with a forged cosignature is not trusted at all
+  docs["https://c.test/w.json"] = { ...forked, heads: [{ ...forked.latest, signature: "00".repeat(64) }] };
+  r = await mk(["https://c.test/w.json"], f).step();
+  assert.equal(r.doc.peers[0].error, "bad cosignatures");
+});

@@ -301,8 +301,15 @@ node witness/run.js --origin {{ORIGIN}} --rpc https://your-rpc --out witness.jso
 ```
 
 Cosignatures are ed25519 over `"POF-WIT1" ‖ program_id ‖ tree_size ‖ root_hash ‖ timestamp` (88 bytes, CONTRACT §8);
-`verifyCosignature` in the SDK checks them. Publish your `witness.json` anywhere: the more independent witnesses, the
-harder it is to show two people two different logs.
+`verifyCosignature` in the SDK checks them. Publish your `witness.json` anywhere, and point witnesses at each other with
+`--peer <url>`: each one checks the others' cosigned heads against the log it sees, and a head no consistency proof can
+join is a `split_view` alarm. The more independent witnesses, the harder it is to show two people two different logs.
+
+A head counts only when it is signed by the key the program has active now. Keys the program accepted before (from its
+`VerifierSet` history and from open certificates) are good for old entries, never for new heads.
+
+The witness the project runs itself (`/v1/witness`) is a convenience, not an independent party: it shares an operator
+with the Verifier. Independence comes from witnesses other people run.
 
 ## The command line
 

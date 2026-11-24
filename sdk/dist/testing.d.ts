@@ -11,6 +11,14 @@ export declare class MemoryRpc implements RpcLike {
     getSlot(): Promise<number>;
     getAccount(address: string): Promise<AccountData | null>;
     getAccounts(addresses: string[]): Promise<(AccountData | null)[]>;
+    getAccountsWithSlot(addresses: string[]): Promise<{
+        slot: number;
+        accounts: (AccountData | null)[];
+    }>;
+    getProgramAccountsWithSlot(programId: string, filters: MemcmpFilter[]): Promise<{
+        slot: number;
+        accounts: AccountData[];
+    }>;
     getProgramAccounts(programId: string, filters: MemcmpFilter[]): Promise<AccountData[]>;
     /** transaction history for verifierKeys({ history: true }): address → [{ signature, logs }] newest first */
     history: Map<string, {

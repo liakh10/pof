@@ -60,7 +60,7 @@ What the program checks on chain besides the signature (Config parameters, launc
 - asset enabled, `1 <= tier <= ` the asset's tier count; `1 <= note_count <= 8`; salted hashes strictly ascending;
 - `issued_slot <= now`, `now - issued_slot <= max_attest_age` (300 slots); `root_slot <= issued_slot`,
   `issued_slot - root_slot <= max_root_lag` (9,000); `issued_slot < expiry_slot <= issued_slot + validity_slots`
-  (6,480,000, about 30 days), `expiry_slot > now`;
+  (216,000, about a day; the admin may set 9,000 to 1,512,000), `expiry_slot > now`;
 - payer == the signer paying; certify over an existing certificate only when it is not live, with a newer `issued_slot`;
   renew only with the same subject, asset, controller and salted hashes, and a newer `issued_slot`.
 
@@ -70,6 +70,8 @@ The transparency log leaf (§7) carries these 240 bytes.
 2026-11-25 (program, audit round 1): renew refuses an expired certificate (POF-22) and needs the SAME salted hashes, so the
 Verifier's renew path must take the holder's old salts back; `log_index` is not signed (POF-18): readers find the log entry by
 the attestation bytes (nonce, nullset_hash), never by the index alone; tree_root wording per POF-25.
+2026-11-25 (program, POF-01): the launch validity is 216,000 slots (about a day), settable by the admin from 9,000 to
+1,512,000 (about a week): a certificate whose keeper missed a spend still dies within a day.
 
 ## §4 The disclosure package (owner: verifier; producer: rings client)
 What the browser sends to `POST /api/attest`. It carries the openings of the chosen notes only, over TLS; the Verifier keeps
@@ -152,6 +154,13 @@ subject message is gone), the X link takes a secret and binds the controller (`P
   A Verifier-signed "spent" statement is not needed and not accepted.
 - The keeper holds `(salt, nullifier)` encrypted at rest; the holder holds a copy. After a revoke, salt and nullifier are public
   (on the certificate: `revealed_index`, `revealed_salt`, `revealed_nullifier`, and in the `Revoked` event).
+2026-11-25 (program): revoke_by_controller_sig and the "POFV" bytes added (no wallet signs a holder's revoke).
+
+- `revoke_by_holder`: the controller signs the transaction. `revoke_by_controller_sig(valid_until)`: the controller signs only
+  these 84 bytes with ed25519, in an Ed25519 instruction right before, and anyone (the relayer) submits and pays, so no wallet
+  links to the handle: `"POFV" (4) ‖ program_id (32) ‖ certificate address (32) ‖ certificate.issued_slot u64 LE (8) ‖
+  valid_until u64 LE (8)`. Bound to one certificate and its current attestation (a renew or remake needs a new signature);
+  refused after `valid_until`.
 
 2026-11-25 (program): the on-chain check of revoke_spent fixed (both paths, built and unit-tested against a real mainnet path).
 2026-11-25 (verifier): the keeper seals each kit with AES-256-GCM (key name as associated data) in Blob, revokes by the PDA
@@ -246,8 +255,15 @@ size, or the same size with another root, is an alarm); requires it to agree wit
   latest, heads: [{ witnessKey, treeSize, rootHash, timestamp, signature, verifierKey, verifierSignature, anchor: {
   treeSize, rootHash, slot, relation: equal|prefix|ahead, consistent } }], alarms: [{ kind, detail, at }], stats }`.
   Alarm kinds: `log_unreachable`, `unknown_key`, `bad_signature`, `log_shrank`, `equivocation`, `inconsistent`,
-  `anchor_mismatch`. An alarm carries both signed heads as evidence and is never cosigned.
+  `anchor_mismatch` (none of these heads is cosigned), `unlogged_certificate` (a Verifier-signed certificate whose
+  attestation is in no log entry after a grace of 1,500 slots, found by its signed bytes, never by its unsigned
+  `log_index`; zk certificates are skipped) and `split_view` (a peer witness cosigned a head no consistency proof joins to
+  this one). `peers: [{ url, key, treeSize, ok, error? }]` and `notes` (e.g. `misindexed`) are informational.
+- A head is accepted only when signed by the key the Config has **active** at that moment; keys from the `VerifierSet`
+  history and from certificates are for checking old entries, never new heads.
 - Key: `node witness/keygen.js` writes `~/.config/pof/witness.json` (64-byte Solana keypair format, mode 600) and prints
   only the public key. `@pof/sdk` exports `cosignMessage` and `verifyCosignature`.
 
 2026-11-25 (devx): §8 added.
+2026-11-25 (devx): audit W-01..W-03: heads by the active key only, the monitor finds leaves by their bytes and alarms on
+`u64::MAX`, gossip with peer witnesses (`split_view`). The project's own witness is not an independent party.

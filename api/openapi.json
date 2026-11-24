@@ -958,7 +958,8 @@
                               "equivocation",
                               "inconsistent",
                               "anchor_mismatch",
-                              "unlogged_certificate"
+                              "unlogged_certificate",
+                              "split_view"
                             ]
                           },
                           "at": {
