@@ -52,7 +52,7 @@ await check('init_config: only the program\'s upgrade authority (an outsider ref
   unit('init_config');
   const c = await k.config();
   eq(c.admin, admin.publicKey.toBase58(), 'admin'); eq(c.verifier, V.publicKey.toBase58(), 'verifier'); eq(c.relayer, relayer.publicKey.toBase58()); eq(c.dev, dev.publicKey.toBase58());
-  eq(c.params.fee_lamports, 10_000_000n, 'launch fee'); eq(c.params.validity_slots, 6_480_000n); eq(c.params.rotation_delay, 216_000n);
+  eq(c.params.fee_lamports, 10_000_000n, 'launch fee'); eq(c.params.validity_slots, 216_000n); eq(c.params.rotation_delay, 40n, 'the test build\'s launch rotation delay (216,000 in the launch build: the rehearsal checks it)');
   eq(c.assets[0].mins.join(), [1e9, 1e10, 1e11, 1e12, 1e13].map(BigInt).join(), 'SOL tiers');
   eq(c.assets[1].mins[0], 100_000_000n, 'USDC tier 1'); eq(c.assets[1].mint, 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
   ok(!c.assets[2].enabled && !c.assets[3].enabled, 'free asset slots');
@@ -62,6 +62,7 @@ await check('set_params: admin only, bounds held (fee above the 0.25 SOL cap, va
   await refuses(setP({}, outsider), 'admin');
   await refuses(setP({ fee_lamports: 250_000_001n }), 'cap');
   await refuses(setP({ validity_slots: 9n }), 'bounds');
+  await refuses(setP({ validity_slots: 1_512_001n }), 'bounds');   // the cap: 1,512,000 slots (about a week)
   await refuses(setP({ max_root_lag: 0n }), 'bounds');
   await refuses(setP({ rotation_delay: 4n }), 'bounds');
   await setP();
@@ -297,6 +298,35 @@ await check('revoke_by_holder: only the controller (the X-handle key, not the re
   await send([q.P.ix('revoke_by_holder', {}, { controller: c2.publicKey, certificate: q.certPda(b.subject_hash, 0) })], [c2], 100_000);
   await refuses(doCertify(relayer, b), 'newer');
   eq((await k.cert(b.subject_hash)).status, 2);
+});
+await check('revoke_signed: the controller signs the 148 POF-REVOKE1 bytes, the relayer submits and pays, no wallet signs; a wrong key, tampered bytes, another certificate, a replay, and a signature from before a remake refused', async () => {
+  const ctl = Keypair.generate();
+  const a = await k.attestation({ kind: 1, handle: 'sig' + rand(3).toString('hex'), controller: ctl.publicKey, tier: 1 });
+  await doCertify(relayer, a);
+  const cp = q.certPda(a.subject_hash, 0), c = await k.cert(a.subject_hash);
+  const rv = (signer, msg, cert = cp) => send([q.signIx(signer, msg), q.P.ix('revoke_signed', {}, { caller: relayer.publicKey, certificate: cert })], [relayer], 100_000);
+  const good = q.revokeBytes(cp, c);
+  eq(good.length, 148, 'POF-REVOKE1 bytes');
+  await refuses(rv(relayer, good), 'controller');
+  await refuses(rv(ctl, q.revokeBytes(cp, { ...c, issued_slot: c.issued_slot - 1n })), 'differ');
+  await refuses(rv(ctl, q.revokeBytes(cp, { ...c, nullset_hash: rand(32) })), 'differ');
+  await refuses(rv(ctl, q.revokeBytes(cp, c, Keypair.generate().publicKey)), 'differ');
+  // the same controller holds a second certificate: a signature for one never revokes the other
+  const b2 = await k.attestation({ kind: 1, handle: 'sig2' + rand(3).toString('hex'), controller: ctl.publicKey, tier: 1 });
+  await doCertify(relayer, b2);
+  const cp2 = q.certPda(b2.subject_hash, 0);
+  await refuses(rv(ctl, good, cp2), 'differ');
+  await refuses(send([q.P.ix('revoke_signed', {}, { caller: relayer.publicKey, certificate: cp })], [relayer], 100_000), 'ed25519');
+  const sig = await rv(ctl, good);
+  unit('revoke_signed');
+  eq((await k.cert(a.subject_hash)).status, 2); eq((await k.ev(sig, 'Revoked')).path, 4);
+  await refuses(rv(ctl, good), 'not live');   // replay
+  // remade with a newer attestation: the old signature is dead
+  const again = await k.attestation({ kind: 1, subject_hash: a.subject_hash, controller: ctl.publicKey, tier: 1 });
+  await doCertify(relayer, again);
+  await refuses(rv(ctl, good), 'differ');
+  await rv(ctl, q.revokeBytes(cp, await k.cert(a.subject_hash)));
+  eq((await k.cert(a.subject_hash)).status, 2);
 });
 await check('certify over a revoked certificate: a newer attestation remakes it; its old payer gets the rent back (and must be passed)', async () => {
   const { a } = live.carol;   // revoked spent, paid by carol

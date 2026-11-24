@@ -701,6 +701,78 @@ export type Pof = {
       "args": []
     },
     {
+      "name": "revokeSigned",
+      "docs": [
+        "Anyone submits the controller's signed revoke (Ed25519 instruction right before, signed by the certificate's controller",
+        "key over the 148 POF-REVOKE1 bytes). The holder's wallet never signs or pays: for an X-handle or badge certificate the",
+        "relayer submits it."
+      ],
+      "discriminator": [
+        224,
+        136,
+        97,
+        88,
+        214,
+        203,
+        185,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "certificate",
+          "writable": true
+        },
+        {
+          "name": "instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "revokeSpent",
       "docs": [
         "Anyone: a disclosed note's salt and nullifier, and a proof that the nullifier is spent on the Rings program: without",
@@ -2411,7 +2483,7 @@ export type Pof = {
     {
       "name": "revoked",
       "docs": [
-        "path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder."
+        "path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder (controller signs the transaction), 4 by the controller's signed revoke."
       ],
       "type": {
         "kind": "struct",

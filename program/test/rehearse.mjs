@@ -65,7 +65,7 @@ try {
   const auth = async id => { const p = await conn.getAccountInfo(id); const pd = await conn.getAccountInfo(new PublicKey(p.data.subarray(4, 36))); return new PublicKey(pd.data.subarray(13, 45)); };
   ok((await auth(q.PID)).equals(dev.publicKey) && (await auth(q.GATE)).equals(dev.publicKey), 'both programs deployed through sol-ops, the dev their upgrade authority');
   const c = await k.config();
-  ok(c && c.admin === dev.publicKey.toBase58() && c.dev === dev.publicKey.toBase58() && c.verifier === V.publicKey.toBase58() && c.relayer === relayer.publicKey.toBase58() && c.params.fee_lamports === 10_000_000n && c.params.validity_slots === 6_480_000n && c.params.rotation_delay === 216_000n, 'init_config: the Verifier and relayer public keys, fees to the dev, the launch parameters (0.01 SOL, 6,480,000 slots, rotation 216,000)');
+  ok(c && c.admin === dev.publicKey.toBase58() && c.dev === dev.publicKey.toBase58() && c.verifier === V.publicKey.toBase58() && c.relayer === relayer.publicKey.toBase58() && c.params.fee_lamports === 10_000_000n && c.params.validity_slots === 216_000n && c.params.rotation_delay === 216_000n, 'init_config: the Verifier and relayer public keys, fees to the dev, the launch parameters (0.01 SOL, validity 216,000 slots, rotation 216,000)');
   ROOT = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(mintFile, 'utf8')))).publicKey;
   const cfg = fs.readFileSync(cfgFile, 'utf8');
   ok(/the coin's image is live: https?:\/\/\S+\/coin\.png/.test(out) && out.indexOf("the coin's image is live") < out.indexOf('created on pump.fun'), "launch.mjs checks the coin's image answers 200 before the create");

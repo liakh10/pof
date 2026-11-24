@@ -6,7 +6,7 @@
      1. the programs: pof_gate and pof deployed through sol-ops when missing (each from its own staging folder), then
         init_config(verifier, relayer, dev) with the Verifier's and the relayer's PUBLIC keys (read from ~/.config/pof/verifier.json
         and relayer.json, made by verifier/scripts/keys.mjs; or --verifier / --relayer); this wallet must be the upgrade authority of
-        both and the config's admin. The launch parameters are in the program (fee 0.01 SOL, validity 6,480,000 slots, rotation
+        both and the config's admin. The launch parameters are in the program (fee 0.01 SOL, validity 216,000 slots (about a day), rotation
         delay 216,000 slots). Nothing is certified by the dev
      2. the coin's address first: a mint key ending in "pump" (made once into --mint-key, or taken from there), or the owner's own CA
         (in config.js or --ca): CA, PROGRAM and GATE into config.js, coin.json written, pushed, the live site checked until it shows the CA

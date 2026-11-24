@@ -101,6 +101,8 @@ export function makePof(web3) {
   }
   /** CONTRACT §7: the signed tree head */
   const sthBytes = (size, root, programId = PID) => Buffer.concat([Buffer.from('POF-STH1'), pk(programId).toBuffer(), u64le(size), Buffer.from(root)]);
+  /** the controller's signed revoke (CONTRACT §5): "POF-REVOKE1" ‖ program id ‖ certificate ‖ subject_hash ‖ asset ‖ nullset_hash ‖ issued_slot (148 bytes) */
+  const revokeBytes = (certificate, cert, programId = PID) => Buffer.concat([Buffer.from('POF-REVOKE1'), pk(programId).toBuffer(), pk(certificate).toBuffer(), Buffer.from(cert.subject_hash), Buffer.from([cert.asset]), Buffer.from(cert.nullset_hash), u64le(cert.issued_slot)]);
   /** the Ed25519 program instruction the Verifier's signature rides in (all offsets inside itself) */
   const signIx = (signer, message) => Ed25519Program.createInstructionWithPrivateKey({ privateKey: signer.secretKey, message: Buffer.from(message) });
 
@@ -153,5 +155,5 @@ export function makePof(web3) {
     }
     return '';
   }
-  return { K, PID, GATE, pda, certPda, roomPda, memberPda, nullifierPda, ata, attestationBytes, sthBytes, signIx, P, G, reason };
+  return { K, PID, GATE, pda, certPda, roomPda, memberPda, nullifierPda, ata, attestationBytes, sthBytes, revokeBytes, signIx, P, G, reason };
 }

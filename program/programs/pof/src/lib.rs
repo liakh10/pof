@@ -61,19 +61,27 @@ pub const STATUS_EXPIRED: u8 = 3;
 
 pub const ATTESTATION_LEN: usize = 240;
 pub const DOMAIN_CERT: &[u8; 4] = b"POF1";
+/// A controller's signed revoke (CONTRACT §5): "POF-REVOKE1" ‖ program id ‖ certificate ‖ subject_hash ‖ asset ‖ nullset_hash ‖
+/// issued_slot (148 bytes).
+pub const DOMAIN_REVOKE: &[u8; 11] = b"POF-REVOKE1";
 /// CONTRACT §7: the transparency log's signed tree head.
 pub const DOMAIN_LOG: &[u8; 8] = b"POF-STH1";
 
 // the floors of the validity and the rotation delay; the test build ("quick") lowers them so the suite expires and rotates in seconds
 #[cfg(not(feature = "quick"))]
-pub const VALIDITY_MIN: u64 = 216_000;
+pub const VALIDITY_MIN: u64 = 9_000;
 #[cfg(feature = "quick")]
 pub const VALIDITY_MIN: u64 = 10;
 #[cfg(not(feature = "quick"))]
 pub const ROTATION_MIN: u64 = 9_000;
 #[cfg(feature = "quick")]
 pub const ROTATION_MIN: u64 = 5;
-pub const VALIDITY_MAX: u64 = 13_000_000;
+pub const VALIDITY_MAX: u64 = 1_512_000;
+/// The launch rotation delay (about a day); the test build starts at 40 slots, so lowering it later is still tested against a held delay.
+#[cfg(not(feature = "quick"))]
+pub const LAUNCH_ROTATION: u64 = 216_000;
+#[cfg(feature = "quick")]
+pub const LAUNCH_ROTATION: u64 = 40;
 pub const ROTATION_MAX: u64 = 1_296_000;
 
 // ------------------------------------------------------------------------------------------------------------
@@ -100,10 +108,10 @@ impl Params {
         Params {
             fee_lamports: 10_000_000,
             holder_min: 1_000_000 * 1_000_000,
-            validity_slots: 6_480_000,
+            validity_slots: 216_000,
             max_attest_age: 300,
             max_root_lag: 9_000,
-            rotation_delay: 216_000,
+            rotation_delay: LAUNCH_ROTATION,
         }
     }
     pub fn check(&self) -> Result<()> {
@@ -337,6 +345,21 @@ pub fn log_bytes(program_id: &Pubkey, size: u64, head: &[u8; 32]) -> [u8; 80] {
     b[8..40].copy_from_slice(program_id.as_ref());
     b[40..48].copy_from_slice(&size.to_le_bytes());
     b[48..80].copy_from_slice(head);
+    b
+}
+
+/// The 148 bytes a certificate's controller signs to revoke it without sending a transaction itself (anyone, e.g. the relayer,
+/// submits them): "POF-REVOKE1" (11) ‖ program id (32) ‖ certificate address (32) ‖ subject_hash (32) ‖ asset (1) ‖ nullset_hash
+/// (32) ‖ issued_slot u64 LE (8). Bound to the certificate's current attestation: a renew or remake needs a new signature.
+pub fn revoke_bytes(program_id: &Pubkey, certificate: &Pubkey, cert: &Certificate) -> [u8; 148] {
+    let mut b = [0u8; 148];
+    b[0..11].copy_from_slice(DOMAIN_REVOKE);
+    b[11..43].copy_from_slice(program_id.as_ref());
+    b[43..75].copy_from_slice(certificate.as_ref());
+    b[75..107].copy_from_slice(&cert.subject_hash);
+    b[107] = cert.asset;
+    b[108..140].copy_from_slice(&cert.nullset_hash);
+    b[140..148].copy_from_slice(&cert.issued_slot.to_le_bytes());
     b
 }
 
@@ -764,6 +787,23 @@ pub mod pof {
         Ok(())
     }
 
+    /// Anyone submits the controller's signed revoke (Ed25519 instruction right before, signed by the certificate's controller
+    /// key over the 148 POF-REVOKE1 bytes). The holder's wallet never signs or pays: for an X-handle or badge certificate the
+    /// relayer submits it.
+    pub fn revoke_signed(ctx: Context<RevokeSigned>) -> Result<()> {
+        let slot = Clock::get()?.slot;
+        let a = ctx.accounts;
+        let key = a.certificate.key();
+        let cert = &mut a.certificate;
+        require!(cert.status == STATUS_LIVE, PofError::NotLive);
+        let (signer, msg) = ext::signed_before(&a.instructions)?;
+        require_keys_eq!(signer, cert.controller, PofError::NotController);
+        require!(msg.as_slice() == revoke_bytes(&crate::ID, &key, cert), PofError::AttestationMismatch);
+        revoke(&a.config, &mut a.treasury, cert, STATUS_REVOKED_HOLDER, slot);
+        emit!(Revoked { subject_hash: cert.subject_hash, asset: cert.asset, tier: cert.tier, status: STATUS_REVOKED_HOLDER, slot, by: a.caller.key(), index: u8::MAX, salt: [0; 32], nullifier: [0; 32], path: 4 });
+        Ok(())
+    }
+
     /// Anyone, past the expiry slot (or at any moment during the wind-down): the account closes, its rent back to its payer.
     pub fn expire(ctx: Context<Expire>) -> Result<()> {
         let slot = Clock::get()?.slot;
@@ -939,6 +979,20 @@ pub struct RevokeByHolder<'info> {
 }
 
 #[derive(Accounts)]
+pub struct RevokeSigned<'info> {
+    pub caller: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, seeds = [TREASURY_SEED], bump = treasury.bump)]
+    pub treasury: Box<Account<'info, Treasury>>,
+    #[account(mut, seeds = [CERT_SEED, certificate.subject_hash.as_ref(), &[certificate.asset]], bump = certificate.bump)]
+    pub certificate: Box<Account<'info, Certificate>>,
+    /// CHECK: the instructions sysvar
+    #[account(address = ext::INSTRUCTIONS_ID)]
+    pub instructions: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
 pub struct Expire<'info> {
     pub caller: Signer<'info>,
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
@@ -1045,7 +1099,7 @@ pub struct Renewed {
     pub fee: u64,
     pub renewals: u32,
 }
-/// path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder.
+/// path: 0 nullifier PDA, 1 nullifier tree membership, 3 by the holder (controller signs the transaction), 4 by the controller's signed revoke.
 #[event]
 pub struct Revoked {
     pub subject_hash: [u8; 32],
