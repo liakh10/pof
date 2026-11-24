@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POF zk prover bench</title>
+<style>
+  body { font: 14px/1.5 ui-monospace, Menlo, monospace; margin: 24px; background: #fff; color: #111; }
+  button { font: inherit; padding: 6px 14px; }
+  pre { background: #f4f4f4; padding: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>POF zk: proving in this browser</h1>
+<p>Loads the circuit (wasm) and the proving key (zkey), computes a witness for a fixed test input (4 notes) and makes a Groth16
+proof with snarkjs, then verifies it. Nothing leaves the page.</p>
+<button id="go">Prove</button> <span id="stage"></span>
+<pre id="out"></pre>
+<script src="../dist/snarkjs.min.js"></script>
+<script type="module">
+import { prove } from '../js/zk.js';
+const $ = id => document.getElementById(id);
+const log = s => { $('out').textContent += s + '\n'; };
+async function fetchBytes(url, label) {
+  const t0 = performance.now();
+  const r = await fetch(url);
+  const len = Number(r.headers.get('content-length') || 0);
+  const reader = r.body.getReader(); const parts = []; let got = 0;
+  for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); got += value.length; $('stage').textContent = `loading ${label} ${(got / 1e6).toFixed(1)}${len ? ' / ' + (len / 1e6).toFixed(1) : ''} MB`; }
+  const out = new Uint8Array(got); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+  return { bytes: out, ms: Math.round(performance.now() - t0) };
+}
+async function run() {
+  $('go').disabled = true;
+  const res = { ua: navigator.userAgent, cores: navigator.hardwareConcurrency, runs: [] };
+  const wasm = await fetchBytes('../setup/pof.wasm', 'circuit');
+  const zkey = await fetchBytes('../setup/pof_final.zkey', 'proving key');
+  const vkey = await (await fetch('../setup/verification_key.json')).json();
+  const input = await (await fetch('input.json')).json();
+  res.load = { wasmBytes: wasm.bytes.length, wasmMs: wasm.ms, zkeyBytes: zkey.bytes.length, zkeyMs: zkey.ms };
+  log(`loaded: circuit ${(wasm.bytes.length / 1e6).toFixed(2)} MB in ${wasm.ms} ms, key ${(zkey.bytes.length / 1e6).toFixed(1)} MB in ${zkey.ms} ms; ${navigator.hardwareConcurrency} cores`);
+  const runs = Number(new URLSearchParams(location.search).get('runs') || 3);
+  for (let i = 0; i < runs; i++) {
+    const r = await prove(window.snarkjs, { input, wasm: wasm.bytes, zkey: zkey.bytes, onStage: s => { $('stage').textContent = s; } });
+    const ok = await window.snarkjs.groth16.verify(vkey, r.publicSignals, r.proof);
+    res.runs.push({ ...r.ms, verified: ok });
+    log(`run ${i + 1}: witness ${r.ms.witness} ms, proof ${r.ms.prove} ms, total ${r.ms.total} ms, verifies: ${ok}`);
+  }
+  $('stage').textContent = 'done';
+  if (location.search.includes('report')) await fetch('/result', { method: 'POST', body: JSON.stringify(res) });
+}
+$('go').onclick = run;
+if (location.search.includes('auto')) run().catch(e => { log('error ' + e.message); fetch('/result', { method: 'POST', body: JSON.stringify({ error: String(e.stack || e) }) }); });
+</script>
+</body>
+</html>

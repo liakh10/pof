@@ -1,0 +1,19 @@
+# Native tests of the on-chain Groth16 verifier (src/groth16.rs + src/vk.rs) against proofs snarkjs made. On a non-Solana target
+# solana-bn254 runs arkworks, the same arithmetic the alt_bn128 syscalls run. The program itself takes these files through
+# apply.py. Run: cargo test --manifest-path onchain/Cargo.toml   (target dir goes to the scratchpad)
+[package]
+name = "pof-zk-verify"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/native.rs"
+
+[dependencies]
+solana-bn254 = "3.2.1"
+
+[dev-dependencies]
+serde_json = "1"
+
+[workspace]

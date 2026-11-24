@@ -1,0 +1,18 @@
+{
+  "name": "@pof/zk",
+  "private": true,
+  "type": "module",
+  "description": "Proof of Funds phase 2: a Groth16 proof of funds over Helius Privacy Rings notes (circom 2, BN254, Poseidon as in Rings), its development setup, the browser prover and the on-chain certify_zk patch",
+  "scripts": {
+    "build": "zsh scripts/build.sh",
+    "setup": "zsh scripts/ceremony.sh",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "snarkjs": "0.7.5"
+  },
+  "devDependencies": {
+    "circomlib": "2.0.5",
+    "circomlibjs": "0.1.7"
+  }
+}
