@@ -127,6 +127,7 @@ export function depsFromEnv(env = process.env, origin = "") {
     indexer: env.HELIUS_API_KEY ? { url: (env.HELIUS_SPR_URL || "https://mainnet.helius-rpc.com/v1/spr").replace(/\/+$/, ""), apiKey: env.HELIUS_API_KEY } : null,
     origin: selfOrigin(env, origin),
     keeperLive: env.POF_KEEPER_LIVE === "1",
+    internalSecret: env.POF_INTERNAL_SECRET || null,
     network: env.POF_NETWORK || "mainnet",
     limits: { ...LIMITS, relayFloorLamports: Number(env.POF_RELAY_FLOOR_LAMPORTS || LIMITS.relayFloorLamports) },
     store: null,
@@ -141,7 +142,10 @@ function client(d) {
 
 async function getJson(d, path) {
   const t0 = Date.now();
-  const r = await withTimeout(d.fetch(d.origin + path, { headers: { accept: "application/json" } }), 8_000, path);
+  const headers = { accept: "application/json" };
+  // the log's rate limit lets this deployment's own readers through; the secret goes only to our own origin (selfOrigin)
+  if (d.internalSecret && path.startsWith("/api/attest/log")) headers["x-pof-internal"] = d.internalSecret;
+  const r = await withTimeout(d.fetch(d.origin + path, { headers }), 8_000, path);
   const body = await r.json().catch(() => null);
   return { status: r.status, body, ms: Date.now() - t0 };
 }

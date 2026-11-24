@@ -72,11 +72,13 @@ async function world(o = {}) {
   const indexerRoot = o.indexerRootUnknown ? new Uint8Array(32).fill(4) : nfRoot;
   const bundleHash = o.bundleHash ?? S.PUBLISHED.sha256;
   const calls = [];
+  const seen = [];
 
   const ok = (j, status = 200) => ({ ok: status < 400, status, json: async () => j });
   async function fetchFake(url, init = {}) {
     url = String(url);
     calls.push(url);
+    seen.push({ url, headers: init.headers || {} });
     if (url.startsWith("https://rpc.test")) {
       if (o.rpcDown) throw new Error(`connect ECONNREFUSED ${url}`);
       const { method, params } = JSON.parse(init.body);
@@ -119,11 +121,11 @@ async function world(o = {}) {
     throw new Error(`unexpected fetch ${url}`);
   }
 
-  const d = S.depsFromEnv({ SOLANA_RPC: RPC, HELIUS_API_KEY: KEY, HELIUS_SPR_URL: SPR, POF_KEEPER_LIVE: o.keeperLive ? "1" : "" }, ORIGIN);
+  const d = S.depsFromEnv({ SOLANA_RPC: RPC, HELIUS_API_KEY: KEY, HELIUS_SPR_URL: SPR, POF_KEEPER_LIVE: o.keeperLive ? "1" : "", ...(o.internal ? { POF_INTERNAL_SECRET: o.internal } : {}) }, ORIGIN);
   d.fetch = fetchFake;
   d.store = o.store ?? new S.MemoryStatusStore();
   if (o.keeperLast) await d.store.putJson("keeper/last-scan.json", o.keeperLast);
-  return { d, calls, slot, leaves, verifier };
+  return { d, calls, seen, slot, leaves, verifier };
 }
 
 const byId = (run) => Object.fromEntries(run.checks.map((c) => [c.id, c]));
@@ -314,4 +316,19 @@ test("single flight: 200 concurrent requests on a cold cache cost one run of ups
   const after = await S.cachedRun(w.d);
   assert.equal(after, runs[0], "the finished run is then served from the memo");
   S.clearCache();
+});
+
+test("log reads carry x-pof-internal (POF_INTERNAL_SECRET) to our own origin only, and the secret never appears in the answer", async () => {
+  const SECRET = "internal-secret-0123456789abcdef";
+  const w = await world({ anchored: 4, internal: SECRET });
+  const run = await S.runChecks(w.d);
+  const logReads = w.seen.filter((x) => x.url.startsWith(ORIGIN + "/api/attest/log"));
+  assert.ok(logReads.length >= 2, "head and consistency reads");
+  assert.ok(logReads.every((x) => x.headers["x-pof-internal"] === SECRET));
+  const others = w.seen.filter((x) => !x.url.startsWith(ORIGIN + "/api/attest/log"));
+  assert.ok(others.every((x) => !("x-pof-internal" in x.headers)), "never sent to RPC, the indexer or /api/attest");
+  assert.ok(!JSON.stringify(run).includes(SECRET));
+  const none = await world({ anchored: 4 });
+  await S.runChecks(none.d);
+  assert.ok(none.seen.every((x) => !("x-pof-internal" in x.headers)), "no header when the secret is unset");
 });
