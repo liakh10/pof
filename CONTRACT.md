@@ -74,8 +74,24 @@ The salts and nullifiers go back to the browser, which saves them (the holder's 
   log_index, verifier key used.
 - `Config` PDA `["config"]`; treasury PDA `["treasury"]`; `pof_gate` Room `["room", creator, id]`, Member `["member", room,
   subject_hash]`.
-- HTTP: `GET /v1/certificates/:subject` → `{ subject, kind, asset, tier, tierLabel, status, certifiedSlot, expirySlot,
-  revokedSlot, address, logIndex }`. The rest are in POF.md (devx).
+- HTTP (devx; the full schema is `api/openapi.json`, served at `/v1/openapi.json`). Read-only, CORS `*`, CDN-cached
+  (`s-maxage` 5 to 15 s). Errors are `{ error: { code, message } }` with 400 / 404 / 502 / 503.
+  - `GET /v1/certificates/:subject` (subject = `@handle`, `x:h`, `wallet:<b58>`, `badge:<b58>`, a bare key tried as wallet
+    and badge, or a 64-hex subject hash; `?asset=SOL|USDC&minTier=n` adds a gate `check: { ok, reason }`) →
+    `{ query, slot, subjects: [{ kind, value, subjectHash }], live, certificates: [Certificate] }`. No certificate is a 200
+    with an empty list.
+  - `Certificate` = `{ address, subject, kind, subjectHash, asset, assetId, tier, tierLabel, status, statusOnChain, live,
+    certifiedSlot, expirySlot, revokedSlot, logIndex, noteCount, payer, verifierKey }`. `status` is effective at `slot`
+    (a live byte past `expiry_slot` reads `expired`); `subject` is null in lists (the chain holds only the hash).
+  - `GET /v1/certificates?asset=&tier=&minTier=&status=&kind=&limit=&cursor=` → `{ slot, total, nextCursor, certificates }`.
+  - `GET /v1/rooms`, `GET /v1/rooms/:room` → the room plus `members: [{ subjectHash, certificate, certificateStatus, tier,
+    live }]`, where live = the certificate is live and meets the room's asset and tier.
+  - `GET /v1/stats` → `{ slot, live, total, revoked, revokedSpent, revokedByHolder, expired, solCertified, usdcCertified,
+    byAsset, bySubjectKind, log }` (the "certified" sums are tier minimums, never amounts).
+  - `GET /v1/log/head`, `GET /v1/log/proof/:id`: proxied from §7 `/api/attest/log` and verified with the SDK on the way
+    (`verified`, `checks`), so a reader still can, and should, check again with `@pof/sdk`.
+
+2026-11-25 (devx): HTTP part of §6 fixed: shapes above; one subject answers with a list of certificates (one per asset).
 
 ## §7 The transparency log (owner: verifier; consumers: devx SDK, site /log)
 An append-only Merkle log of every attestation the Verifier signs, per RFC 9162 (Certificate Transparency v2) hashing.
