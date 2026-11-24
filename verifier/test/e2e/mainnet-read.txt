@@ -1,0 +1,7 @@
+PASS tree 0 decoded: 500 state roots, 12 nullifier roots, head slot 473518519
+PASS found a recent Rings transaction with outputs and nullifiers
+PASS a real leaf (index 64280) re-hashes with the SDK's Poseidon to a root in the on-chain history
+PASS the creating transaction gives the leaf's slot (473518519)
+PASS a published nullifier reads spent (PDA); a random one reads unspent with a verified non-inclusion path
+PASS the newest nullifier is still queued (PDA path only), as expected
+PASS 6825 registry records; one owner's npk read through the record PDA

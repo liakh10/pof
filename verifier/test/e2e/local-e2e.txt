@@ -1,0 +1,13 @@
+PASS init_config: the Verifier and relayer keys are in Config · validity 6480000 slots, max attest age 300
+PASS a vault ring registered and shielded 2 SOL on the clone · deposit 37WJrFUoxCSF…, leaf 64201
+PASS the Verifier signed a 240-byte attestation for @e2e_anon, payer = the relayer · log index 0, controller 644Z5yry…
+PASS certify landed through the relayer: the certificate is live, tier 1, with the salted hashes · tx 5QMKAKRP6rM6…, GbUr4a4CbSSkf9s2Qb8efrB1zJ5KCSiZGviubuqzUkm2
+PASS the certificate carries the controller key and the log index
+PASS the keeper holds the sealed kit and sees the certificate live, nothing spent
+PASS the same note is refused for a second handle (NOTE_IN_USE)
+PASS anchor_log: the treasury holds the signed log head · size 1
+PASS the attestation is provably in the anchored log (RFC 9162 inclusion against the on-chain head)
+PASS on B the certificate is still live before the keeper runs
+PASS the keeper found the spent nullifier and called revoke_spent · tx 5zk2F9rThhwR…, index 0
+PASS the certificate reads revoked (spent), with the salt and nullifier now public · revoked at slot 473511661
+PASS the keeper dropped the kit after the revoke
