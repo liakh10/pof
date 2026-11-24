@@ -42,7 +42,7 @@ test vectors were read earlier.
 | notes | 1 to 4 (unused slots are zero) |
 | Powers of Tau | 2^17 (131,072) |
 | witness wasm | 4.6 MB |
-| proving key | 57.7 MB; 38.5 MB gzipped. `setup/pof_final.zkey.gz` went into git with d7f850b (history is never rewritten), so later keys must not: `scripts/publish-zkey-release.sh` puts a key on a GitHub Release (a pre-release named as a development ceremony; it publishes a public file, so the owner runs it), and `scripts/fetch-zkey.sh` downloads it (`POF_ZKEY_URL`) or uses the copy in git, checking it against `setup/ZKEY.sha256` |
+| proving key | 57.7 MB; 38.5 MB gzipped, in git at d7f850b (`setup/pof_final.zkey.gz`). `scripts/fetch-zkey.sh` downloads it from the raw GitHub URL pinned to that commit (not `main`) and checks it against `setup/ZKEY.sha256`. Later keys (the public ceremony) go to a GitHub Release with `scripts/publish-zkey-release.sh`, never into git |
 | verifying key | 18 IC points, `VK_HASH f360e497…a406` (in `onchain/src/vk.rs` and `ZkConfig.vk_hash`) |
 
 The statement, the public inputs and who sets each one are in `docs-src/zk.md`.
@@ -189,7 +189,6 @@ The entropy came from `/dev/urandom` and was never written. **Labelled a develop
 
 ## What remains
 
-- **The release asset**: the owner runs `zk/scripts/publish-zkey-release.sh` (tag `zk-dev-ceremony-1`). Later keys go only there.
 - **The public ceremony** before mainnet (`docs-src/zk.md`), then rebuild `vk.rs`, publish the build hash, and `set_zk`.
 - **The merge into `pof`:** the program agent reviews `onchain/patch/pof-program.diff` and merges it with `apply.py`. The
   zk part stays off on chain until the audit re-reviews it.
