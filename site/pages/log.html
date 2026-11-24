@@ -1,0 +1,33 @@
+<section class="page-head">
+  <div class="grid">
+    <p class="label col-12">Transparency log</p>
+    <h1 class="h1 col-8">Every signature the Verifier makes, in one append-only log.</h1>
+    <p class="lead col-7">Each attestation is a leaf of an RFC 9162 Merkle tree. The head is signed and anchored on chain, so the Verifier cannot sign for one person and hide it from everyone else. No amounts, no openings, no nullifiers: only the 240 signed bytes.</p>
+  </div>
+</section>
+<div class="wrap" style="padding-top:var(--s7)">
+  <div class="log-head" data-head>
+    <div><span class="label quiet">Entries</span><b data-h="size">0</b></div>
+    <div><span class="label quiet">Root</span><span class="mono" data-h="root">reading</span></div>
+    <div><span class="label quiet">Head signature</span><b data-h="sig" style="font-size:24px">checking</b><span class="mono" data-h="key"></span></div>
+    <div><span class="label quiet">Anchored on chain</span><b data-h="anchor" style="font-size:24px">checking</b><span class="mono" data-h="anchor-note"></span></div>
+  </div>
+  <div data-witness style="margin-top:var(--s4)"></div>
+
+  <section class="band" style="margin-top:var(--s7)" aria-labelledby="entry-h">
+    <div class="grid" style="padding:0">
+      <div class="col-5 stack">
+        <p class="label signal">Check an entry</p>
+        <h2 class="h2" id="entry-h">Prove one leaf in your browser.</h2>
+        <p>Pick an entry. The page fetches the leaf and its audit path, recomputes the root, checks the Verifier's signatures and compares the key with the one the program's Config holds on chain.</p>
+        <form class="inline-form" data-entry-form><input class="mono" type="number" min="0" step="1" id="entry" placeholder="entry number" aria-label="Entry number"><button class="btn" type="submit">Check</button></form>
+      </div>
+      <div class="col-7" data-entry-out></div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="recent-h">
+    <div class="wall-head"><div><p class="label signal">Recent entries</p><h2 class="h2" id="recent-h">The tail of the log</h2></div><span class="small quiet" data-recent-note></span></div>
+    <div class="table"><table class="data"><thead><tr><th>#</th><th>Subject hash</th><th>Kind</th><th>Tier</th><th>Signed at slot</th><th>Verifier</th></tr></thead><tbody data-recent></tbody></table></div>
+  </section>
+</div>

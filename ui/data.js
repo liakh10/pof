@@ -67,11 +67,10 @@ function liveSource() {
 }
 
 let current = null;
-/** the one data source of this page */
-export async function source() {
+/** the one data source of this page (one promise, so concurrent callers share one source) */
+export function source() {
   if (current) return current;
-  if (FIXTURE) { const { fixtureSource } = await import('./fixture.js'); current = await fixtureSource(); }
-  else current = liveSource();
+  current = FIXTURE ? import('./fixture.js').then(m => m.fixtureSource()) : Promise.resolve(liveSource());
   return current;
 }
 
@@ -106,3 +105,11 @@ export function slotClock(src, onTick, { every = 4000 } = {}) {
   const id = setInterval(read, every);
   return { stop() { stop = true; clearInterval(id); }, now: () => last };
 }
+
+/** an SDK certificate (read from chain in this browser) in the /v1 JSON shape the cards use */
+export const fromChain = (c, subjectValue = null) => ({
+  address: c.address, subject: subjectValue, kind: c.subjectKindName, subjectHash: c.subjectHash, asset: c.assetSymbol, assetId: c.asset,
+  tier: c.tier, tierLabel: c.tierLabel, status: c.effectiveStatus, statusOnChain: c.statusName, live: c.live, certifiedSlot: c.certifiedSlot,
+  expirySlot: c.expirySlot, revokedSlot: c.revokedSlot, logIndex: c.logIndex, noteCount: c.noteCount, payer: c.payer, verifierKey: c.verifier,
+  controller: c.controller, issuedSlot: c.issuedSlot, renewals: c.renewals, revealed: c.revealed, nullsetHash: c.nullsetHash, nonce: c.nonce, treeRoot: c.treeRoot, rootSlot: c.rootSlot,
+});

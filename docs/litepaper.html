@@ -84,7 +84,8 @@ are public; its surplus goes to the dev key in Config.</p>
 <h2 id="phase-2">Phase 2<a class="anchor" href="#phase-2" aria-label="Link to this section">#</a></h2>
 <p>A Groth16 circuit over the same Poseidon proves membership, non-spending, the tier and an escrow of each nullifier to a
 revocation key, so the program checks the statement itself and nobody sees an amount or a nullifier key. In development in
-<code>zk/</code>, not deployed.</p>
+<code>zk/</code> and under internal review: <code>certify_zk</code> is switched off on chain until its open Critical and High findings are fixed
+and re-reviewed and a public setup ceremony has run.</p>
 <h2 id="read-further">Read further<a class="anchor" href="#read-further" aria-label="Link to this section">#</a></h2>
 <p>The full paper (<code>/docs</code>), <code>CONTRACT.md</code> (every byte), <code>RINGS.md</code> (the Rings facts, checked on mainnet), <code>reports/</code> (tests
 and the internal security review), and the source at github.com/liakh10/pof.</p>
@@ -105,7 +106,7 @@ and the internal security review), and the source at github.com/liakh10/pof.</p>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

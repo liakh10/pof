@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Transparency log · Proof of Funds</title>
+<meta name="description" content="Every attestation the Verifier signs, in an append-only Merkle log anchored on chain. Check any entry in your browser.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/log">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Transparency log · Proof of Funds">
+<meta property="og:description" content="Every attestation the Verifier signs, in an append-only Merkle log anchored on chain. Check any entry in your browser.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/log">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/log.js"></script>
+</head>
+<body class="" data-page="log">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log" aria-current="page">Log</a><a href="/docs">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<section class="page-head">
+  <div class="grid">
+    <p class="label col-12">Transparency log</p>
+    <h1 class="h1 col-8">Every signature the Verifier makes, in one append-only log.</h1>
+    <p class="lead col-7">Each attestation is a leaf of an RFC 9162 Merkle tree. The head is signed and anchored on chain, so the Verifier cannot sign for one person and hide it from everyone else. No amounts, no openings, no nullifiers: only the 240 signed bytes.</p>
+  </div>
+</section>
+<div class="wrap" style="padding-top:var(--s7)">
+  <div class="log-head" data-head>
+    <div><span class="label quiet">Entries</span><b data-h="size">0</b></div>
+    <div><span class="label quiet">Root</span><span class="mono" data-h="root">reading</span></div>
+    <div><span class="label quiet">Head signature</span><b data-h="sig" style="font-size:24px">checking</b><span class="mono" data-h="key"></span></div>
+    <div><span class="label quiet">Anchored on chain</span><b data-h="anchor" style="font-size:24px">checking</b><span class="mono" data-h="anchor-note"></span></div>
+  </div>
+  <div data-witness style="margin-top:var(--s4)"></div>
+
+  <section class="band" style="margin-top:var(--s7)" aria-labelledby="entry-h">
+    <div class="grid" style="padding:0">
+      <div class="col-5 stack">
+        <p class="label signal">Check an entry</p>
+        <h2 class="h2" id="entry-h">Prove one leaf in your browser.</h2>
+        <p>Pick an entry. The page fetches the leaf and its audit path, recomputes the root, checks the Verifier's signatures and compares the key with the one the program's Config holds on chain.</p>
+        <form class="inline-form" data-entry-form><input class="mono" type="number" min="0" step="1" id="entry" placeholder="entry number" aria-label="Entry number"><button class="btn" type="submit">Check</button></form>
+      </div>
+      <div class="col-7" data-entry-out></div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="recent-h">
+    <div class="wall-head"><div><p class="label signal">Recent entries</p><h2 class="h2" id="recent-h">The tail of the log</h2></div><span class="small quiet" data-recent-note></span></div>
+    <div class="table"><table class="data"><thead><tr><th>#</th><th>Subject hash</th><th>Kind</th><th>Tier</th><th>Signed at slot</th><th>Verifier</th></tr></thead><tbody data-recent></tbody></table></div>
+  </section>
+</div>
+
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

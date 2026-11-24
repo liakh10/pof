@@ -51,14 +51,19 @@ they, can recover it and show the spend to <code>revoke_spent</code>.</li></ul>
 <p>The public inputs are the two roots, the asset, the tier minimum, a context value that ties the proof to one certificate, the escrow key, and per note a tag and a ciphertext. The program rebuilds or checks each one.</p>
 <h2 id="what-changes-and-what-stays">What changes and what stays<a class="anchor" href="#what-changes-and-what-stays" aria-label="Link to this section">#</a></h2>
 <div class="table"><table><thead><tr><th></th><th>phase 1</th><th>phase 2</th></tr></thead><tbody><tr><td>Who sees amounts</td><td>the Verifier, for one request</td><td>nobody</td></tr><tr><td>Who sees the nullifier key</td><td>the Verifier, for one request</td><td>nobody</td></tr><tr><td>Who checks membership and non-spending</td><td>the Verifier, against on-chain roots</td><td>the program, by verifying the proof against on-chain roots</td></tr><tr><td>Who can revoke on spend</td><td>holders of the salts (holder, keeper)</td><td>holders of the revocation key (and the holder)</td></tr><tr><td>Trusted setup</td><td>none</td><td>a Groth16 setup per circuit: today a development setup made on one machine; a public ceremony runs before <code>certify_zk</code> is switched on</td></tr><tr><td>The X handle check</td><td>X and fxtwitter</td><td>unchanged</td></tr><tr><td>Timing and funding links</td><td>as in <a href="/docs/privacy">Privacy guidance</a></td><td>unchanged: a proof hides amounts, not the public deposit</td></tr></tbody></table></div>
-<h2 id="status">Status<a class="anchor" href="#status" aria-label="Link to this section">#</a></h2>
+<h2 id="status-under-review-not-live">Status: under review, not live<a class="anchor" href="#status-under-review-not-live" aria-label="Link to this section">#</a></h2>
 <p>Phase 2 is in development in <code>zk/</code>: the circuit (4 notes per proof), a development setup, the browser prover and the
-on-chain instruction <code>certify_zk</code> are built and tested. It is not deployed, and no certificate today is issued by a proof. The
+on-chain instruction <code>certify_zk</code>. <strong>It is not live.</strong> The third round of the internal security review found one Critical
+and three High findings in <code>certify_zk</code> (ZK-01 to ZK-04 in
+<a href="https://github.com/liakh10/pof/blob/main/reports/audit.md" rel="noopener" target="_blank"><code>reports/audit.md</code></a>); among them, a note spent long ago could
+prove &quot;unspent&quot; against an older nullifier root. <code>certify_zk</code> is switched off on chain (<code>ZkConfig.enabled</code>) and stays off
+until those findings are fixed, re-reviewed, and the public setup ceremony has run. No certificate today is issued by a
+proof: every live certificate comes from the phase 1 Verifier described in this paper. The
 <a href="/docs/zk">zero-knowledge circuit</a> page describes the circuit, the setup and the on-chain verifier in full; the
 <a href="https://github.com/liakh10/pof/blob/main/CHANGELOG.md" rel="noopener" target="_blank">changelog</a> records when it ships.</p>
     <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/fees"><span>Previous</span>Fees and the $POF holder rule</a><a class="next" href="/docs/zk"><span>Next</span>Zero-knowledge circuit</a></nav>
   </article>
-  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-statement">The statement</a></li><li class="d2"><a href="#what-changes-and-what-stays">What changes and what stays</a></li><li class="d2"><a href="#status">Status</a></li></ol></aside>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-statement">The statement</a></li><li class="d2"><a href="#what-changes-and-what-stays">What changes and what stays</a></li><li class="d2"><a href="#status-under-review-not-live">Status: under review, not live</a></li></ol></aside>
 </div>
 </main>
 <footer class="foot">
@@ -73,7 +78,7 @@ on-chain instruction <code>certify_zk</code> are built and tested. It is not dep
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

@@ -47,7 +47,9 @@ and choose revoke. The certificate's <strong>controller</strong> signs:</p>
 <ul><li>a wallet certificate: Phantom asks you to approve the transaction;</li><li>a badge certificate: the badge key, kept in your kit, signs in the page;</li><li>a handle certificate: the controller key, rebuilt from your vault, signs in the page.</li></ul>
 <p>Revoking reveals no secret. It is the step to take <strong>before</strong> you move funds behind a handle or badge certificate (see
 below). Every transaction also needs an account that pays its network fee, and that account appears in the
-transaction: the page tells you which one it uses before you confirm.</p>
+transaction. For a handle or badge certificate, the relayer can send the revocation for you: the controller key signs
+a revoke statement in the page and the relayer pays the fee, so no wallet appears (this needs the program's signed revoke,
+which is being added; until then the page tells you which account pays before you confirm).</p>
 <p>If you lost the kit, you can still revoke a wallet certificate (the wallet is the controller) and a handle certificate
 (the controller comes back from the vault); a badge's key lives only in the kit.</p>
 <h2 id="renew-it">Renew it<a class="anchor" href="#renew-it" aria-label="Link to this section">#</a></h2>
@@ -93,7 +95,7 @@ expiry slot, which is why certificates are short-lived by default (<a href="/doc
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

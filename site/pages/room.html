@@ -1,0 +1,25 @@
+<section class="page-head">
+  <div class="grid">
+    <p class="label col-12"><a href="/rooms">Rooms</a></p>
+    <h1 class="h1 col-8" data-r-title>Reading the room</h1>
+    <p class="lead col-7" data-r-lead>Read from the chain in your browser.</p>
+  </div>
+</section>
+<div class="wrap" style="padding-top:var(--s7)">
+  <div class="grid" style="padding:0">
+    <div class="col-5 stack">
+      <dl class="facts" data-r-facts></dl>
+      <div class="panel" data-join>
+        <h2 class="h3">Join</h2>
+        <p class="small">Joining writes a member account that names your certificate. It passes only while the certificate is live and at least this tier.</p>
+        <div class="row"><button class="btn" type="button" data-act="join-wallet">Join with my wallet's certificate</button></div>
+        <p class="small quiet">An X handle or badge certificate joins with its own key, from the kit in the browser that certified it: <a href="/get">open your vault on Get certified</a>, then come back.</p>
+        <div class="note err" data-error hidden></div>
+      </div>
+    </div>
+    <div class="col-7">
+      <div class="wall-head"><div><p class="label signal">Members</p><h2 class="h2" data-r-count>0</h2></div><span class="small quiet" data-r-slot></span></div>
+      <div class="table"><table class="data"><thead><tr><th>Subject hash</th><th>Tier</th><th>Certificate</th><th>Passes</th><th></th></tr></thead><tbody data-r-members></tbody></table></div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rooms · Proof of Funds</title>
+<meta name="description" content="pof_gate Rooms admit only live certificates of a tier, on chain. Members fall out when their certificate dies.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/rooms">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Rooms · Proof of Funds">
+<meta property="og:description" content="pof_gate Rooms admit only live certificates of a tier, on chain. Members fall out when their certificate dies.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/rooms">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/rooms.js"></script>
+</head>
+<body class="" data-page="rooms">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms" aria-current="page">Rooms</a><a href="/log">Log</a><a href="/docs">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<section class="page-head">
+  <div class="grid">
+    <p class="label col-12">Rooms</p>
+    <h1 class="h1 col-8">Rooms that check the money at the door, and keep checking.</h1>
+    <p class="lead col-7">A Room is an account of the pof_gate program with a minimum tier. Joining writes a member account only if your certificate is live and high enough. When it dies, anyone can evict you. Telegram groups and Discord roles follow the Room.</p>
+  </div>
+</section>
+<div class="wrap" style="padding-top:var(--s7)">
+  <div class="wall-head"><div><p class="label signal">Open rooms</p><h2 class="h2">On chain now</h2></div><button class="btn" type="button" data-act="new">Create a room</button></div>
+  <div class="rooms" data-rooms></div>
+
+  <section class="panel" data-create hidden style="margin-top:var(--s7)" aria-labelledby="new-h">
+    <div class="panel-head"><h2 class="h2" id="new-h">Create a room</h2><span class="label quiet" data-create-state></span></div>
+    <p>You pay the room's rent (a few thousandths of a SOL, returned if you close it). The tier is fixed per room; members of a lower tier cannot join.</p>
+    <div class="field"><label for="rname">Name (up to 32 bytes, public)</label><input id="rname" type="text" maxlength="32" placeholder="Desk 1000"></div>
+    <div class="field"><span>Asset</span><div class="seg" role="radiogroup" aria-label="Asset"><label><input type="radio" name="rasset" value="0" checked><span>SOL</span></label><label><input type="radio" name="rasset" value="1"><span>USDC</span></label></div></div>
+    <div class="field"><span>Minimum tier</span><div class="choices" data-rtiers role="radiogroup" aria-label="Minimum tier"></div></div>
+    <div class="row"><button class="btn signal" type="button" data-act="create">Connect and create</button></div>
+    <div class="note err" data-error hidden></div>
+  </section>
+</div>
+
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

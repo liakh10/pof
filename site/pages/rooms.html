@@ -1,0 +1,21 @@
+<section class="page-head">
+  <div class="grid">
+    <p class="label col-12">Rooms</p>
+    <h1 class="h1 col-8">Rooms that check the money at the door, and keep checking.</h1>
+    <p class="lead col-7">A Room is an account of the pof_gate program with a minimum tier. Joining writes a member account only if your certificate is live and high enough. When it dies, anyone can evict you. Telegram groups and Discord roles follow the Room.</p>
+  </div>
+</section>
+<div class="wrap" style="padding-top:var(--s7)">
+  <div class="wall-head"><div><p class="label signal">Open rooms</p><h2 class="h2">On chain now</h2></div><button class="btn" type="button" data-act="new">Create a room</button></div>
+  <div class="rooms" data-rooms></div>
+
+  <section class="panel" data-create hidden style="margin-top:var(--s7)" aria-labelledby="new-h">
+    <div class="panel-head"><h2 class="h2" id="new-h">Create a room</h2><span class="label quiet" data-create-state></span></div>
+    <p>You pay the room's rent (a few thousandths of a SOL, returned if you close it). The tier is fixed per room; members of a lower tier cannot join.</p>
+    <div class="field"><label for="rname">Name (up to 32 bytes, public)</label><input id="rname" type="text" maxlength="32" placeholder="Desk 1000"></div>
+    <div class="field"><span>Asset</span><div class="seg" role="radiogroup" aria-label="Asset"><label><input type="radio" name="rasset" value="0" checked><span>SOL</span></label><label><input type="radio" name="rasset" value="1"><span>USDC</span></label></div></div>
+    <div class="field"><span>Minimum tier</span><div class="choices" data-rtiers role="radiogroup" aria-label="Minimum tier"></div></div>
+    <div class="row"><button class="btn signal" type="button" data-act="create">Connect and create</button></div>
+    <div class="note err" data-error hidden></div>
+  </section>
+</div>

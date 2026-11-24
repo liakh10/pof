@@ -33,12 +33,13 @@
 </header>
 <main id="main">
 <section class="band"><div class="grid"><p class="label col-12">Record</p><h1 class="h1 col-8">Test reports</h1><p class="lead col-7">Each part publishes what it tested, the commands that run the tests, and what is still open. Findings stay in the reports after they are fixed.</p></div></section>
-<section class="band"><ol class="index-list"><li><a href="/reports/rings"><span class="n">01</span><span class="t">Test report: the Privacy Rings client (browser client, lab, proxies)</span><span class="s">Scope: client/ (the browser client and its SDK bundle), client/server/spr-proxy.js and api/spr/[method].js (the Rings
+<section class="band"><ol class="index-list"><li><a href="/reports/verifier"><span class="n">01</span><span class="t">Test report: the Verifier, the transparency log, the relayer, the keeper and the X-handle linker</span><span class="s">Scope: verifier/ (one bundle, dist/pof-verifier.mjs) and the Vercel functions that run it: api/attest,
+api/attest/log, api/relay/[fn], api/link/[fn], api/keeper/[fn]. The bytes are in CONTRACT.md §3, §4, §5 and §7.
+Environment: Node 20, solana-cli 4.1.2 (Agave</span></a></li><li><a href="/reports/rings"><span class="n">02</span><span class="t">Test report: the Privacy Rings client (browser client, lab, proxies)</span><span class="s">Scope: client/ (the browser client and its SDK bundle), client/server/spr-proxy.js and api/spr/[method].js (the Rings
 indexer and prover proxies), lab/ (the harness and the local validator with Privacy Rings cloned from mainnet), and the
-facts in RINGS.md. Nod</span></a></li><li><a href="/reports/devx"><span class="n">02</span><span class="t">Test report: developer surfaces (API, SDK, MCP, bots)</span><span class="s">Scope: sdk/ (@pof/sdk 0.1.0), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js.
-Every suite below runs from a clean checkout with the commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0
-programs built from program/ at the ti</span></a></li><li><a href="/reports/audit"><span class="n">03</span><span class="t">Proof of Funds: internal security review</span><span class="s">Status: round 2 (2026-11-25). The four High findings of round 1 are fixed and re-tested. New findings from round 2 are in §4b. This report is updated as fixes land; every row of the findings table carries its status.
-Reviewer: the POF audit agent. It did not w</span></a></li><li><a href="/reports/zk"><span class="n">04</span><span class="t">Test report: phase 2, the zero-knowledge proof of funds (zk/)</span><span class="s">Development setup only. Every number and every proof below comes from a trusted setup made on one machine
+facts in RINGS.md. Nod</span></a></li><li><a href="/reports/devx"><span class="n">03</span><span class="t">Test report: developer surfaces (API, SDK, MCP, bots)</span><span class="s">Scope: sdk/ (@pof/sdk 0.2.0), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js,
+witness/ and api/witness.js, cli/, embed/, examples/. Every suite below runs from a clean checkout with the
+commands shown. Node 20, solana-cli 4.1.2 (Agave</span></a></li><li><a href="/reports/audit"><span class="n">04</span><span class="t">Proof of Funds: internal security review</span><span class="s">Status: round 3 (2026-11-25). Round 1's four High findings are fixed and re-tested. Round 2's re-review is in §4b. Round 3 reviewed the phase 2 zero-knowledge circuit and certify_zk (§4c), the log witness and the last verifier fixes. Round 3 found one Critical</span></a></li><li><a href="/reports/zk"><span class="n">05</span><span class="t">Test report: phase 2, the zero-knowledge proof of funds (zk/)</span><span class="s">Development setup only. Every number and every proof below comes from a trusted setup made on one machine
 (zk/setup/TRANSCRIPT.md). Whoever ran it could forge proofs for that key. It is fit for local tests and devnet, never for
 mainnet certificates; the public</span></a></li></ol></section>
 </main>
@@ -54,7 +55,7 @@ mainnet certificates; the public</span></a></li></ol></section>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

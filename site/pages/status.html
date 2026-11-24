@@ -1,0 +1,19 @@
+<section class="page-head">
+  <div class="grid">
+    <p class="label col-12">Status</p>
+    <h1 class="h1 col-8" data-overall>Checking every part</h1>
+    <p class="lead col-7">Every check reads public state: the Solana RPC, the Rings tree, the Rings indexer, the Verifier's public endpoints and the program's own accounts. Nothing here is typed in by hand. <a href="/docs/status">What each check means</a>.</p>
+  </div>
+</section>
+<div class="wrap" style="padding-top:var(--s7)">
+  <div class="row small quiet" style="margin-bottom:var(--s5)"><span data-checked></span><button class="btn ghost small" type="button" data-refresh>Run the checks again</button></div>
+  <div class="status-grid" data-checks></div>
+  <section class="band" style="margin-top:var(--s7)">
+    <p class="label signal">The Verifier you are talking to</p>
+    <dl class="facts" style="margin-top:var(--s3)" data-verifier></dl>
+  </section>
+  <section class="band" data-history-wrap hidden>
+    <p class="label signal">History</p>
+    <div data-history class="stack" style="margin-top:var(--s3)"></div>
+  </section>
+</div>

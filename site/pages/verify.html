@@ -1,0 +1,28 @@
+<section class="page-head">
+  <div class="grid">
+    <p class="label col-12">Verify</p>
+    <h1 class="h1 col-8">Check anyone. It takes one read.</h1>
+    <p class="lead col-7">Type a wallet, an @handle or a badge key. The answer comes from the chain, with the slot it was read at. Add a minimum to get a plain yes or no.</p>
+  </div>
+</section>
+<div class="wrap" style="padding-top:var(--s7)">
+  <form class="stack" data-verify-form autocomplete="off">
+    <div class="field"><label for="subject">Subject</label>
+      <div class="inline-form"><input id="subject" class="mono" type="search" name="subject" placeholder="@handle, a wallet, badge:… or a subject hash" spellcheck="false" required><button class="btn" type="submit">Check</button></div>
+    </div>
+    <div class="row">
+      <div class="field"><span>Needs at least</span>
+        <div class="seg" role="radiogroup" aria-label="Asset"><label><input type="radio" name="asset" value="" checked><span>Any</span></label><label><input type="radio" name="asset" value="SOL"><span>SOL</span></label><label><input type="radio" name="asset" value="USDC"><span>USDC</span></label></div>
+      </div>
+      <div class="field" data-min hidden><label for="mintier">Tier</label><select id="mintier" name="minTier"></select></div>
+    </div>
+  </form>
+  <div data-verdict style="margin-top:var(--s6)"></div>
+  <div class="wall" data-results style="margin-top:var(--s5)"></div>
+  <section class="band" style="margin-top:var(--s8)">
+    <div class="grid" style="padding:0">
+      <div class="col-6"><p class="label">From your own code</p><div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>curl https://<span data-host></span>/v1/certificates/@anon?asset=SOL&amp;minTier=4</code></pre></div></div>
+      <div class="col-6"><p class="label">What a yes means</p><p>A live certificate of that asset at that tier or higher: the notes behind it were in the Rings tree and unspent when the Verifier signed, and none has been spent since, or the keeper would have revoked it. It never says how much more there is.</p></div>
+    </div>
+  </section>
+</div>

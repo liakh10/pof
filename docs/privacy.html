@@ -42,10 +42,12 @@
 <p>POF hides amounts and which notes back a certificate. It does not hide everything, and some of what it does not hide is
 on chain at the moment you fund the vault. This page lists what each step reveals, then the habits that help.</p>
 <h2 id="what-each-step-reveals">What each step reveals<a class="anchor" href="#what-each-step-reveals" aria-label="Link to this section">#</a></h2>
-<div class="table"><table><thead><tr><th>step</th><th>public on chain</th><th>seen by the POF operator</th></tr></thead><tbody><tr><td>Register the vault</td><td>the vault owner key and its public keys; the wallet that paid, in the same transaction</td><td>nothing</td></tr><tr><td>Shield into the vault</td><td>the depositing wallet, <strong>the amount</strong>, and the vault as recipient</td><td>nothing</td></tr><tr><td>Link an X handle</td><td>the post you make (you may delete it after the check)</td><td>the handle, your IP</td></tr><tr><td>Attest</td><td>nothing</td><td>the subject, the vault, its <code>nk</code>, the openings and amounts of the disclosed notes, your IP; the registered keepers get the salts and nullifiers</td></tr><tr><td>Pay the relayer</td><td>a withdrawal from the vault (by default), the amount (fee + rent + a unique tag) and the slot</td><td>the payment</td></tr><tr><td>Certify</td><td>subject (hash for a handle), asset, tier, slots, payer, controller, note count</td><td>the same</td></tr><tr><td>Revoke by holder</td><td>the revocation and its slot</td><td>the same</td></tr><tr><td>Revoke by spend</td><td>one disclosed note's nullifier, which matches a spend signed by the vault key</td><td>the same</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>step</th><th>public on chain</th><th>seen by the POF operator</th></tr></thead><tbody><tr><td>Register the vault</td><td>the vault owner key and its public keys; the wallet that paid, in the same transaction</td><td>nothing</td></tr><tr><td>Shield into the vault</td><td>the depositing wallet, <strong>the amount</strong>, and the vault as recipient</td><td>nothing</td></tr><tr><td>Link an X handle</td><td>the post you make (you may delete it after the check)</td><td>the handle, your IP</td></tr><tr><td>Attest</td><td>nothing</td><td>the subject, the vault, its <code>nk</code>, the openings and amounts of the disclosed notes, your IP; the registered keepers get the salts and nullifiers</td></tr><tr><td>Buy relay credits (when available)</td><td>a private transfer from the vault into the relayer's house ring: visible as a transaction the vault signed, amount and recipient hidden</td><td>which vault bought which credits</td></tr><tr><td>Pay the relayer at certify time (no credit)</td><td>a withdrawal from the vault, the amount (fee + rent + a unique tag) and the slot</td><td>the payment</td></tr><tr><td>Certify</td><td>subject (hash for a handle), asset, tier, slots, payer, controller, note count</td><td>the same</td></tr><tr><td>Revoke by holder</td><td>the revocation and its slot</td><td>the same</td></tr><tr><td>Revoke by spend</td><td>one disclosed note's nullifier, which matches a spend signed by the vault key</td><td>the same</td></tr></tbody></table></div>
 <p>Two consequences follow directly:</p>
-<ol><li><strong>The vault is linked to the wallet that funded it</strong>, by its registration and by every public deposit. Vault mode
-keeps the nullifier key of your main ring away from the Verifier; it does not hide that the vault is yours.</li><li><strong>For an X-handle or badge certificate, the chain does not name the vault</strong>, but timing and amounts can. If a vault
+<ol><li><strong>The vault isolates the nullifier key, not your identity.</strong> The vault keeps the nullifier key of your main ring away
+from the Verifier. It does not hide that the vault is yours: it is linked to the wallet in public, by its registration,
+by every shield (a public deposit from the wallet naming the vault) and by the plain transfer that funds the vault
+key's fees. Shielding from a fresh wallet that has no link to you is the only way to fund a vault with no wallet link.</li><li><strong>For an X-handle or badge certificate, the chain does not name the vault</strong>, but timing and amounts can. If a vault
 receives a public deposit of 1,200 SOL and a handle gets a &quot;≥ 1,000 SOL&quot; certificate a little later, an observer can
 pair them, the more easily the rarer deposits of that size are.</li></ol>
 <h2 id="habits-that-help">Habits that help<a class="anchor" href="#habits-that-help" aria-label="Link to this section">#</a></h2>
@@ -57,12 +59,14 @@ similar size land in between.</p>
 <p><strong>Prefer a private transfer into the vault over a public deposit.</strong> A deposit from a public balance shows the amount. A
 private Rings transfer from another ring into the vault hides it (its output has a random blinding and an encrypted
 amount). When you deposit publicly, avoid amounts that sit just above one tier.</p>
-<p><strong>Let the relayer submit handle and badge certificates.</strong> The client does this by default: the relayer is the payer, and
-its fee is paid as a withdrawal from the vault, so no wallet appears in the certificate, its event or its log entry. Know
-what remains: a withdrawal is a Rings spend signed by the vault key, and it lands shortly before the relayer's <code>certify</code>.
-Someone watching both can pair the vault with the certificate by timing. Paying the relayer from an account that has no
-link to the vault, well before you attest, weakens that pairing. Submitting from your wallet instead names the wallet as
-payer; the client asks for explicit consent before it does that.</p>
+<p><strong>Let the relayer submit handle and badge certificates.</strong> The client does this by default: the relayer is the payer, so
+no wallet appears in the certificate, its event or its log entry. How you pay the relayer decides what remains:</p>
+<ul><li><strong>With relay credits (when credits are available).</strong> You buy credits ahead of time by a private transfer from the vault
+into the relayer's house ring, and each certificate later spends one. Nothing is paid next to the certificate and no
+amount carries a tag. The transfer is still visible as a transaction the vault signed (amount and recipient hidden).
+Credits are blind-signed (RSA blind signatures, checked in the page before they are kept), so when a credit is spent
+the relayer cannot tell which purchase paid for it. It still sees that the vault bought credits.</li><li><strong>Paying at certify time.</strong> The fee is a withdrawal from the vault, a spend signed by the vault key that lands shortly
+before the relayer's <code>certify</code>. Someone watching both can pair the vault with the certificate by timing.</li><li><strong>From your wallet.</strong> That names the wallet as payer; the client asks for explicit consent before it does it.</li></ul>
 <p><strong>Revoke first, then move.</strong> Spending notes behind a live certificate lets anyone holding the kit revoke it by spend, and
 that reveals a nullifier that matches a transaction signed by the vault. For a handle or badge certificate, revoke it
 with the controller key first (it reveals nothing), wait for confirmation, then spend.</p>
@@ -79,11 +83,17 @@ signs, and the host sees request IP addresses. The code stores no amount, openin
 the keeper's sealed pairs, and rate-limit counters named by a keyed hash of the client address per window (swept by the
 keeper). Phase 2 removes the operator's view of amounts and <code>nk</code>
 (<a href="/docs/phase-2">Phase 2</a>); it does not remove the host's view of your IP. Use the network path you trust.</p>
+<h2 id="what-still-links-in-one-list">What still links, in one list<a class="anchor" href="#what-still-links-in-one-list" aria-label="Link to this section">#</a></h2>
+<p>Even when every habit above is followed:</p>
+<ul><li><strong>the vault and the wallet</strong>, in public, through the vault's registration, its shields and its fee funding;</li><li><strong>the vault's activity</strong>: its private transfers are visible as transactions the vault signed (amounts and recipients
+hidden);</li><li><strong>subject, vault and wallet, for the operator</strong>: the Verifier learns them together at attest time, and the relayer
+sees which vaults buy credits (not which certificate each credit later pays for);</li><li><strong>a certificate and its vault, in public, after a revocation by spend</strong>: the revealed nullifier matches a spend the
+vault signed. Revoke first, then move, and this one does not happen.</li></ul>
 <h2 id="by-subject-kind">By subject kind<a class="anchor" href="#by-subject-kind" aria-label="Link to this section">#</a></h2>
 <div class="table"><table><thead><tr><th></th><th>wallet</th><th>X handle</th><th>badge</th></tr></thead><tbody><tr><td>Who is named publicly</td><td>the wallet</td><td>the handle (as a hash anyone can recompute)</td><td>a fresh key</td></tr><tr><td>Who submits <code>certify</code></td><td>the wallet</td><td>the relayer</td><td>the relayer</td></tr><tr><td>Links to the funding wallet on chain</td><td>yes, the subject is the wallet</td><td>only by timing, amounts, the relayer payment, or a revocation by spend</td><td>same as a handle</td></tr><tr><td>Who can revoke by hand</td><td>the wallet</td><td>the controller key, rebuilt from the vault</td><td>the badge key, kept in the kit</td></tr><tr><td>Best for</td><td>showing size for a known wallet</td><td>posting under a handle</td><td>one counterparty, one deal</td></tr></tbody></table></div>
     <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/transparency-log"><span>Previous</span>The transparency log</a><a class="next" href="/docs/fees"><span>Next</span>Fees and the $POF holder rule</a></nav>
   </article>
-  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-each-step-reveals">What each step reveals</a></li><li class="d2"><a href="#habits-that-help">Habits that help</a></li><li class="d2"><a href="#by-subject-kind">By subject kind</a></li></ol></aside>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-each-step-reveals">What each step reveals</a></li><li class="d2"><a href="#habits-that-help">Habits that help</a></li><li class="d2"><a href="#what-still-links-in-one-list">What still links, in one list</a></li><li class="d2"><a href="#by-subject-kind">By subject kind</a></li></ol></aside>
 </div>
 </main>
 <footer class="foot">
@@ -98,7 +108,7 @@ keeper). Phase 2 removes the operator's view of amounts and <code>nk</code>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

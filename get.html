@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Get certified · Proof of Funds</title>
+<meta name="description" content="Shield into your POF vault, choose a tier and a subject, and get a public certificate that never shows the amount.">
+<link rel="canonical" href="https://proofoffunds.vercel.app/get">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Get certified · Proof of Funds">
+<meta property="og:description" content="Shield into your POF vault, choose a tier and a subject, and get a public certificate that never shows the amount.">
+<meta property="og:url" content="https://proofoffunds.vercel.app/get">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/get.js"></script>
+</head>
+<body class="" data-page="get">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get" aria-current="page">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<section class="page-head">
+  <div class="grid">
+    <p class="label col-12">Get certified</p>
+    <h1 class="h1 col-8">Prove a tier. Show nothing else.</h1>
+    <p class="lead col-7">Six steps in this page. Your wallet signs three or four times; the vault key signs in the page. The amounts never leave your browser except to the Verifier, which keeps none of them.</p>
+  </div>
+</section>
+
+<div class="wrap" style="padding-top:var(--s7)">
+  <div class="note hot" data-prelaunch hidden style="margin-bottom:var(--s6)">
+    <strong>Certificates open at launch.</strong>
+    <p>You can connect and make your vault now: that is one signature and nothing goes on chain. Registering, shielding and certifying turn on when the program is live.</p>
+  </div>
+  <div class="flow">
+    <ol class="flow-steps" aria-label="Steps">
+      <li data-step-nav="wallet" class="on"><div><b>Wallet</b><span>Connect the wallet that pays and signs.</span></div></li>
+      <li data-step-nav="vault"><div><b>Vault</b><span>A separate Ring for this, from one signature.</span></div></li>
+      <li data-step-nav="shield"><div><b>Shield</b><span>Move funds into the vault.</span></div></li>
+      <li data-step-nav="claim"><div><b>Tier and subject</b><span>What the certificate says, and about whom.</span></div></li>
+      <li data-step-nav="certify"><div><b>Certify</b><span>The Verifier checks; the chain records.</span></div></li>
+      <li data-step-nav="done"><div><b>Share</b><span>The live card and your revoke kit.</span></div></li>
+    </ol>
+
+    <div class="flow-panels">
+      <!-- 1 wallet -->
+      <section class="panel" data-step="wallet" aria-labelledby="s1">
+        <div class="panel-head"><h2 class="h2" id="s1">01 Wallet</h2><span class="label quiet" data-wallet-state>Not connected</span></div>
+        <p>The wallet pays the network fees and, for a wallet certificate, is the subject. For an X handle or a badge it never appears on the certificate.</p>
+        <div class="row"><button class="btn" type="button" data-act="connect">Connect a wallet</button></div>
+        <dl class="facts" data-wallet-facts hidden></dl>
+      </section>
+
+      <!-- 2 vault -->
+      <section class="panel" data-step="vault" aria-labelledby="s2" aria-disabled="true">
+        <div class="panel-head"><h2 class="h2" id="s2">02 Vault</h2><span class="label quiet" data-vault-state>Not made</span></div>
+        <p>Your POF vault is a separate Privacy Ring made from one signature of your wallet. Only the vault's keys are ever shown to the Verifier, so your main Ring stays private. The same wallet rebuilds the same vault on any device.</p>
+        <div class="note" data-vault-warning>
+          <strong>Sign this only on this site.</strong>
+          <p>The vault message says so in its first lines. Whoever gets that signature can move the money in the vault.</p>
+        </div>
+        <div class="field" data-passphrase hidden>
+          <label for="pp">Passphrase for your vault key (10 characters or more)</label>
+          <input id="pp" type="password" autocomplete="new-password" minlength="10">
+          <span class="small quiet" style="text-transform:none;letter-spacing:0;font-weight:400" data-passphrase-why></span>
+        </div>
+        <div class="row">
+          <button class="btn" type="button" data-act="vault" disabled>Make my vault</button>
+          <button class="btn ghost" type="button" data-act="register" hidden>Register the vault</button>
+          <button class="btn ghost" type="button" data-act="backup" hidden>Download the backup</button>
+        </div>
+        <dl class="facts" data-vault-facts hidden></dl>
+      </section>
+
+      <!-- 3 shield -->
+      <section class="panel" data-step="shield" aria-labelledby="s3" aria-disabled="true">
+        <div class="panel-head"><h2 class="h2" id="s3">03 Shield</h2><span class="label quiet" data-shield-state></span></div>
+        <p>A shield moves SOL or USDC from your wallet into the vault. The deposit itself is public; what happens after it is not. Shield once, then let the notes age: a certificate right after a shield is easy to pair with it.</p>
+        <div class="fields">
+          <div class="field"><span>Asset</span><div class="seg" role="radiogroup" aria-label="Asset to shield"><label><input type="radio" name="shield-asset" value="0" checked><span>SOL</span></label><label><input type="radio" name="shield-asset" value="1"><span>USDC</span></label></div></div>
+          <div class="field"><label for="amt">Amount</label><input id="amt" class="mono" type="text" inputmode="decimal" placeholder="0.0" autocomplete="off"></div>
+          <div><button class="btn" type="button" data-act="shield" disabled>Shield</button></div>
+        </div>
+        <div class="row"><button class="btn ghost small" type="button" data-act="sync" disabled>Read my vault</button><span class="small quiet" data-vault-balance></span></div>
+      </section>
+
+      <!-- 4 claim -->
+      <section class="panel" data-step="claim" aria-labelledby="s4" aria-disabled="true">
+        <div class="panel-head"><h2 class="h2" id="s4">04 Tier and subject</h2></div>
+        <div class="field"><span>Asset</span><div class="seg" role="radiogroup" aria-label="Certificate asset"><label><input type="radio" name="asset" value="0" checked><span>SOL</span></label><label><input type="radio" name="asset" value="1"><span>USDC</span></label></div></div>
+        <div class="field"><span>Tier: the certificate says "at least"</span><div class="choices" data-tiers role="radiogroup" aria-label="Tier"></div></div>
+        <div class="field"><span>Subject: who the certificate is about</span>
+          <div class="choices" role="radiogroup" aria-label="Subject">
+            <label class="choice"><input type="radio" name="kind" value="0" checked><b>This wallet</b><span>The certificate names your wallet. Simple, and public.</span></label>
+            <label class="choice"><input type="radio" name="kind" value="1"><b>X handle</b><span>Proven with one post. The relayer pays, so no wallet appears.</span></label>
+            <label class="choice"><input type="radio" name="kind" value="2"><b>Badge</b><span>A fresh key that names nobody. Share its link; keep its kit.</span></label>
+          </div>
+        </div>
+        <div class="stack" data-x hidden>
+          <div class="field"><label for="handle">Your X handle</label><div class="inline-form"><input id="handle" type="text" placeholder="@handle" autocomplete="off" spellcheck="false"><button class="btn" type="button" data-act="link-start">Get a code</button></div></div>
+          <div data-x-code hidden class="stack">
+            <p>Post this from the handle, exactly as it is. Then paste the post's link here. The code works once and only in this tab.</p>
+            <div class="codebox" data-code></div>
+            <div class="row"><a class="btn ghost" data-x-intent href="https://x.com/compose/post" rel="noopener" target="_blank">Post it on X</a><button class="btn ghost small" type="button" data-act="copy-post">Copy the text</button></div>
+            <div class="field"><label for="post">Link to your post</label><div class="inline-form"><input id="post" type="text" placeholder="https://x.com/you/status/…" autocomplete="off"><button class="btn" type="button" data-act="link-check">Check the post</button></div></div>
+          </div>
+          <p class="note" data-x-ok hidden></p>
+        </div>
+        <div class="stack" data-relay hidden>
+          <p class="label">The relayer</p>
+          <p>For an X handle or a badge, the relayer pays and submits the certificate, so no wallet appears on it. You pay the relayer from the vault with a private transfer. The vault key pays that transfer's network fee itself, so it needs a little SOL of its own.</p>
+          <div class="row"><button class="btn ghost small" type="button" data-act="fund">Add 0.005 SOL to the vault key for fees</button><button class="btn ghost small" type="button" data-act="credits">Buy relay credits ahead of time</button><span class="small quiet" data-credits></span></div>
+        </div>
+        <div class="stack" data-privacy>
+          <p class="label">Before you certify</p>
+          <div data-warnings class="stack"></div>
+          <div class="field"><span>Wait a random time before certifying</span>
+            <div class="seg" role="radiogroup" aria-label="Random delay"><label><input type="radio" name="delay" value="0" checked><span>No</span></label><label><input type="radio" name="delay" value="150-600"><span>A few minutes</span></label><label><input type="radio" name="delay" value="1500-9000"><span>Up to an hour</span></label></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 certify -->
+      <section class="panel" data-step="certify" aria-labelledby="s5" aria-disabled="true">
+        <div class="panel-head"><h2 class="h2" id="s5">05 Certify</h2><span class="label quiet" data-cert-state></span></div>
+        <div class="kv"><span>Certificate</span><span data-sum-tier>at least 100 SOL</span></div>
+        <div class="kv"><span>Subject</span><span data-sum-subject>this wallet</span></div>
+        <div class="kv"><span>Paid and submitted by</span><span data-sum-payer>your wallet</span></div>
+        <div class="kv"><span>Fee</span><span data-sum-fee>read from the program</span></div>
+        <div class="row"><button class="btn signal" type="button" data-act="certify" disabled>Certify</button><button class="btn ghost small" type="button" data-act="stop" hidden>Stop waiting</button></div>
+        <div class="progress" data-progress hidden><i></i></div>
+        <ul class="checks" data-log aria-live="polite"></ul>
+        <div class="note err" data-error hidden></div>
+      </section>
+
+      <!-- 6 done -->
+      <section class="panel" data-step="done" aria-labelledby="s6" aria-disabled="true">
+        <div class="panel-head"><h2 class="h2" id="s6">06 Share</h2></div>
+        <div data-done-card></div>
+        <div class="row" data-done-actions hidden>
+          <a class="btn" data-done-link href="/verify">Open the certificate</a>
+          <button class="btn ghost" type="button" data-act="share-copy">Copy the link</button>
+          <a class="btn ghost" data-done-x href="https://x.com/compose/post" rel="noopener" target="_blank">Post on X</a>
+        </div>
+        <div class="note">
+          <strong>Keep your revoke kit.</strong>
+          <p>It holds the salts that let anyone revoke this certificate once a note is spent, and, sealed, the openings and any badge key. It is in this browser now; download a copy.</p>
+          <div class="row"><button class="btn ghost small" type="button" data-act="kit">Download the kit</button><label class="btn ghost small" style="cursor:pointer">Import a kit<input type="file" accept="application/json" data-kit-import hidden></label></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

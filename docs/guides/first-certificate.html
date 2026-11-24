@@ -43,7 +43,8 @@
 USDC. It works the same with Solflare or Backpack. Nothing here needs a command line: the <code>/get</code> page does every step and
 tells you what it is about to do before your wallet asks.</p>
 <p>Allow a few minutes of your own time, plus a wait of at least 150 slots after you shield (see step 4). Read
-<a href="/docs/privacy">Privacy guidance</a> once before you start: some of what you do here is public.</p>
+<a href="/docs/privacy">Privacy guidance</a> once before you start: some of what you do here is public. In short, the vault keeps a
+secret of your main ring away from the Verifier; it does not hide that the vault belongs to your wallet.</p>
 <h2 id="what-you-need">What you need<a class="anchor" href="#what-you-need" aria-label="Link to this section">#</a></h2>
 <ul><li>A Solana wallet in the browser, with SOL for:
 <ul><li>the amount you want to certify (for USDC: the USDC, plus a little SOL for fees);</li><li>network fees for a few transactions;</li><li>the vault's registry record, once: <strong>0.00116 SOL</strong> of rent;</li><li>for a wallet certificate: the protocol fee (<strong>0.01 SOL</strong> at launch, none if the wallet holds 1,000,000 $POF) and the
@@ -63,8 +64,14 @@ it before you approve. It starts with <code>Proof of Funds: create my POF vault 
 <p>That is true: <strong>the signature is the vault's key</strong>. Sign it only on the Proof of Funds site, never anywhere else.</p>
 <p>The first time, the page asks you to sign the same message <strong>twice</strong>. If both signatures are identical (Phantom's are),
 the vault can be rebuilt later on any device by signing again. If your wallet signs differently each time (some
-multi-party and smart wallets do), the page makes a random vault key on this device instead and will ask you to back it
-up before you can shield: <strong>&quot;Back up your vault key first.&quot;</strong> Go to step 7, then come back.</p>
+multi-party and smart wallets do), the page makes a random vault key on this device instead:</p>
+<ul><li>It asks you for a <strong>passphrase</strong> of at least 10 characters (<strong>&quot;Choose a passphrase for the backup.&quot;</strong>). The key is
+stored on this device only inside a box locked with that passphrase (PBKDF2-SHA256 with 600,000 rounds, then AES-GCM);
+it is in the clear only in memory while the vault is open.</li><li>Each time you come back, the page asks for the passphrase to open the vault (<strong>&quot;Your vault key is locked on this
+device.&quot;</strong>). A wrong one gives <strong>&quot;That passphrase does not open the backup.&quot;</strong></li><li>Before you can shield, it asks you to download the backup file (<strong>&quot;Back up your vault key first.&quot;</strong>): the file carries
+the same locked box. Go to step 7, then come back.</li></ul>
+<p>Choose a passphrase you will not forget and that you do not use anywhere else. Nobody, including us, can recover the vault
+without it.</p>
 <p>If you later see <strong>&quot;This wallet opened a different vault than before.&quot;</strong>, you are using another wallet or device than
 the one you made the vault with: switch back, or import your backup.</p>
 <h2 id="step-3-register-the-vault">Step 3. Register the vault<a class="anchor" href="#step-3-register-the-vault" aria-label="Link to this section">#</a></h2>
@@ -93,20 +100,22 @@ wallet subject Phantom signs it too (one prompt).</p>
 <p>The Verifier checks everything against the chain and signs, or explains what is wrong. Then the certificate goes on
 chain, which must happen within <strong>300 slots</strong> of the Verifier's signature (the page does it at once):</p>
 <ul><li><strong>Wallet subject.</strong> Phantom asks you to approve one transaction that submits the certificate and pays the fee and rent.</li><li><strong>X handle or badge.</strong> The <strong>relayer</strong> submits it, so your wallet appears nowhere in the certificate. The relayer is paid
-from the vault, not from your wallet. If you bought relay credits earlier (a private transfer from the vault), one is
-used and nothing is paid at this moment; otherwise the page pays the quoted fee from the vault now, which sits next to
-the certificate in time. A payment from the vault is a transaction the vault key signs and pays for, so the page first
+from the vault, not from your wallet. <strong>When relay credits are available</strong>, you can buy them earlier, by a private
+transfer from the vault into the relayer's house ring; then one credit is used and nothing is paid at this moment.
+Otherwise the page pays the quoted fee from the vault now, which sits next to the certificate in time. A payment from the vault is a transaction the vault key signs and pays for, so the page first
 sends the vault key a little SOL from your wallet (a public transfer, between two addresses that are already linked).
 Messages you may see:
-<ul><li><strong>&quot;No relay credit left.&quot;</strong>: buy credits ahead of time, or pay now and accept the timing link.</li><li><strong>&quot;The relayer is off right now.&quot;</strong>: wait, or confirm that you accept paying from your wallet, which links the
+<ul><li><strong>&quot;No relay credit left.&quot;</strong> (when credits are available): buy credits ahead of time, or pay now and accept the
+timing link.</li><li><strong>&quot;The relayer is off right now.&quot;</strong>: wait, or confirm that you accept paying from your wallet, which links the
 wallet to this subject in public.</li><li><strong>&quot;The relayer reached its spending cap for now.&quot;</strong> or <strong>&quot;The relayer is low on SOL.&quot;</strong>: try later.</li></ul></li></ul>
 <p>When it lands, the page shows the certificate and its live status.</p>
 <h2 id="step-7-back-up-the-kit">Step 7. Back up the kit<a class="anchor" href="#step-7-back-up-the-kit" aria-label="Link to this section">#</a></h2>
 <p>The page keeps a <strong>revoke kit</strong> for each certificate: the secrets that let you (or anyone you give them to) prove a
 spend and revoke it, and the sealed details of the notes. It lives in this browser. Download the backup file now:</p>
 <ul><li>If your vault was made from a signature, the file holds the kits; the vault itself can always be rebuilt by signing
-the vault message again with the same wallet.</li><li>If your vault key is random (step 2), the file also holds the vault key, locked with a passphrase you choose (at least
-10 characters). <strong>Without this file and passphrase the vault cannot be recovered</strong>, and neither can the funds in it.</li></ul>
+the vault message again with the same wallet.</li><li>If your vault key is random (step 2), the file also holds the vault key, in the same box locked with your passphrase
+(PBKDF2-SHA256, 600,000 rounds, AES-GCM). To restore on another device, import the file and enter the passphrase.
+<strong>Without this file and passphrase the vault cannot be recovered</strong>, and neither can the funds in it.</li></ul>
 <p>Keep the file as carefully as a seed phrase. It does not contain your wallet key.</p>
 <h2 id="after-that">After that<a class="anchor" href="#after-that" aria-label="Link to this section">#</a></h2>
 <ul><li>Check your certificate like anyone else would: <a href="/docs/guides/verify-a-proof">Verify someone's proof</a>.</li><li>It lasts <strong>216,000 slots</strong> by default (roughly a day). Renew it before then to keep it: <a href="/docs/guides/revoke-renew-move">Revoke, renew, move funds</a>.</li><li>Moving the notes behind it ends it. If the subject is a handle or badge, revoke it yourself <strong>first</strong>, then move.</li></ul>
@@ -127,7 +136,7 @@ the vault message again with the same wallet.</li><li>If your vault key is rando
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">adea8d91542efa89a8fa25100fd3d127ab0e0d38dcc5da492d831730889be699</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">374814f9edac1ff724209b25182b506cfa216ba42c74eff654f069a74f730dff</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

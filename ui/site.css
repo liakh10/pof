@@ -136,7 +136,7 @@ input::placeholder { color: var(--ink-3); }
 
 /* notices */
 .note { border-left: var(--rule-heavy) solid var(--ink); padding: var(--s3) var(--s4); background: var(--paper-2); }
-.note.signal { border-left-color: var(--signal); }
+.note.hot { border-left-color: var(--signal); }
 .note.err { border-left-color: var(--signal); background: var(--card); }
 .note h3, .note strong:first-child { display: block; font-weight: 720; margin-bottom: var(--s1); }
 .note p:last-child { margin-bottom: 0; }
@@ -228,7 +228,7 @@ input::placeholder { color: var(--ink-3); }
 /* ------------------------------------------------------------------ certificates */
 .wall-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--s4); margin-bottom: var(--s5); }
 .wall-filter { display: flex; flex-wrap: wrap; gap: var(--s2); }
-.wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--gutter); }
+.wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: var(--gutter); }
 .cert {
   position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: var(--s3); min-height: 248px; padding: var(--s4);
   background: var(--card); border: var(--rule-2) solid var(--ink); text-decoration: none; color: var(--ink);
@@ -258,11 +258,14 @@ a.cert:hover { color: var(--ink); transform: rotate(-1.2deg) translateY(-3px); }
 .cert-stamp { position: absolute; right: var(--s3); top: 46%; transform: rotate(-9deg); font: var(--display-weight) 28px/1 var(--face-display); font-stretch: 78%; letter-spacing: -0.01em; padding: 4px 10px; border: 4px solid var(--ink); background: var(--paper); }
 
 /* the big certificate on /c */
-.cert-xl { grid-template-columns: minmax(0, 1fr) 220px; grid-template-rows: auto; min-height: 0; padding: var(--s6); gap: var(--s5); }
-.cert-xl .seal { width: 220px; }
+.cert-xl { grid-template-columns: minmax(0, 1fr) minmax(160px, 240px); grid-template-rows: auto 1fr auto; min-height: 0; padding: var(--s6); gap: var(--s4) var(--s5); }
+.cert-xl .cert-top, .cert-xl .cert-tier { grid-column: 1; }
+.cert-xl .cert-foot { grid-column: 1 / -1; }
+.cert-xl .cert-seal { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+.cert-xl .cert-stamp { top: auto; bottom: 64px; right: var(--s5); }
 .cert-xl .cert-tier .amt { font-size: clamp(64px, 9vw, 132px); }
 .cert-xl .cert-tier .ge { font-size: clamp(36px, 4vw, 56px); }
-@media (max-width: 720px) { .cert-xl { grid-template-columns: 1fr; padding: var(--s4); } .cert-xl .seal { width: 140px; order: -1; } }
+@media (max-width: 720px) { .cert-xl { grid-template-columns: minmax(0, 1fr) 96px; padding: var(--s4); } .cert-xl .cert-seal { grid-row: 1; } .cert-xl .cert-tier { grid-column: 1 / -1; } }
 
 /* key/value facts */
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); margin: 0; border-top: var(--rule) solid var(--ink); }
@@ -420,9 +423,9 @@ tr.hit td { background: var(--paper-2); }
 .tree text { font: 600 11px var(--face-mono); fill: var(--ink-2); }
 
 /* status */
-.status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--gutter); }
-.svc { border: var(--rule-2) solid var(--ink); background: var(--card); padding: var(--s4); display: grid; gap: var(--s2); align-content: start; }
-.svc-top { display: flex; justify-content: space-between; gap: var(--s3); align-items: center; }
+.status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: var(--gutter); }
+.svc { min-width: 0; overflow-wrap: anywhere; border: var(--rule-2) solid var(--ink); background: var(--card); padding: var(--s4); display: grid; gap: var(--s2); align-content: start; }
+.svc-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s3); align-items: center; }
 .svc h3 { margin: 0; font: 720 19px/1.2 var(--face-display); font-stretch: 90%; }
 .state { font: 720 11.5px/1 var(--face-text); letter-spacing: var(--label-tracking); text-transform: uppercase; padding: 5px 8px; border: var(--rule-2) solid var(--ink); font-stretch: 112%; }
 .state.ok { background: var(--signal); border-color: var(--signal); }
@@ -439,7 +442,7 @@ tr.hit td { background: var(--paper-2); }
 .bars i.n { background: var(--paper-2); }
 
 /* rooms */
-.rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--gutter); }
+.rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: var(--gutter); }
 .room-card { display: grid; gap: var(--s3); padding: var(--s4); border: var(--rule-2) solid var(--ink); background: var(--card); text-decoration: none; }
 .room-card:hover { color: var(--ink); background: var(--paper-2); }
 .room-card .h3 { overflow-wrap: anywhere; }
@@ -491,3 +494,6 @@ tr.hit td { background: var(--paper-2); }
 .plain { list-style: none; margin: var(--s3) 0 0; padding: 0; border-top: var(--rule) solid currentColor; }
 .plain li { padding: var(--s3) 0 var(--s3) var(--s5); border-bottom: var(--rule) solid rgba(127, 127, 127, .35); position: relative; }
 .plain li::before { content: ""; position: absolute; left: 0; top: calc(var(--s3) + .45em); width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--signal); }
+
+.fields { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--s4); align-items: end; }
+@media (max-width: 560px) { .fields { grid-template-columns: 1fr; } }

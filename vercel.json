@@ -47,6 +47,18 @@
     "api/witness.js": {
       "maxDuration": 60,
       "includeFiles": "{witness/*.js,sdk/dist/**,sdk/package.json}"
+    },
+    "api/rpc.js": {
+      "maxDuration": 30
+    },
+    "api/card.js": {
+      "maxDuration": 30,
+      "memory": 1024,
+      "includeFiles": "{ui/seal.js,api/_card/*.ttf,node_modules/@resvg/resvg-wasm/**,api/v1/_lib.js,sdk/dist/**,sdk/package.json}"
+    },
+    "api/share.js": {
+      "maxDuration": 15,
+      "includeFiles": "{c.html,api/v1/_lib.js,sdk/dist/**,sdk/package.json}"
     }
   },
   "rewrites": [
@@ -77,7 +89,55 @@
     {
       "source": "/api/link",
       "destination": "/api/link/verify"
+    },
+    {
+      "source": "/c/:subject",
+      "destination": "/api/share?subject=:subject"
+    },
+    {
+      "source": "/rooms/:room",
+      "destination": "/room?room=:room"
+    },
+    {
+      "source": "/api/card/:subject",
+      "destination": "/api/card?subject=:subject"
     }
   ],
-  "buildCommand": "npm --prefix verifier ci && npm --prefix verifier run build:verify"
+  "buildCommand": "npm --prefix verifier ci && npm --prefix verifier run build:verify",
+  "headers": [
+    {
+      "source": "/((?!embed/|lab/|link$).*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    },
+    {
+      "source": "/ui/fonts/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
 }
