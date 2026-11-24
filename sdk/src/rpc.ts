@@ -26,12 +26,7 @@ export interface RpcLike {
   getTransactionLogs?(signature: string): Promise<string[] | null>;
 }
 
-function b64(s: string): Uint8Array {
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
+import { fromBase64 as b64 } from "./bytes.js";
 
 export class RpcError extends Error {
   constructor(message: string, public code?: number) {

@@ -1,5 +1,6 @@
 // Shared server helpers for /v1, the hosted MCP endpoint and the bots. Everything reads the chain through @pof/sdk.
 import * as sdk from "../../sdk/dist/index.js";
+import { LogMirror } from "./_logmirror.js";
 
 export { sdk };
 
@@ -33,16 +34,31 @@ export function getClient(env = process.env) {
 
 /** A small per-instance memo so a burst of identical heavy reads (getProgramAccounts) costs one RPC call. */
 const memo = new Map();
+export const memoStats = { hits: 0, misses: 0 };
+/**
+ * Single-flight: concurrent callers of the same key share ONE upstream call (the promise is cached, not just the value),
+ * so a burst of identical heavy reads (getProgramAccounts) costs one RPC call, not one per request.
+ */
 export async function remember(key, ms, fn) {
+  if (process.env.POF_MEMO_OFF === "1") return fn();
   const hit = memo.get(key);
-  if (hit && hit.until > Date.now()) return hit.value;
-  const value = await fn();
-  memo.set(key, { value, until: Date.now() + ms });
+  if (hit && hit.until > Date.now()) {
+    memoStats.hits++;
+    return hit.promise;
+  }
+  memoStats.misses++;
+  const promise = Promise.resolve().then(fn);
+  memo.set(key, { promise, until: Date.now() + ms });
   if (memo.size > 500) memo.delete(memo.keys().next().value);
-  return value;
+  promise.catch(() => {
+    if (memo.get(key)?.promise === promise) memo.delete(key);
+  });
+  return promise;
 }
 export function clearMemo() {
   memo.clear();
+  logCache.clear();
+  mirrors.clear();
 }
 
 /** The public shape of a certificate (CONTRACT §6, HTTP part). */
@@ -184,15 +200,21 @@ export function logBase(env = process.env, origin) {
  */
 export async function trustedKeys(client) {
   if (!client) return { all: [], active: null, fromHistory: false };
-  const [hist, cfg] = await Promise.all([
-    remember("verifierKeys", 600_000, () =>
-      client.verifierKeys({ history: true, fromCertificates: true, maxTransactions: 200 }).catch(() => client.verifierKeys())),
+  const [hist, cfg, list] = await Promise.all([
+    remember("verifierKeys", 600_000, () => client.verifierKeys({ history: true, maxTransactions: 200 }).catch(() => client.verifierKeys())),
     remember("config", 30_000, () => client.getConfig()),
+    // the same memoized scan the list endpoint and stats use: no second getProgramAccounts for the certificates' keys
+    remember(LIST_ALL, 10_000, () => client.listCertificates()).catch(() => ({ certificates: [] })),
   ]);
   const active = cfg ? cfg.activeVerifier : hist.active;
-  const all = [...new Set([...hist.all, ...(active ? [active] : [])])];
+  const DEFAULT = "11111111111111111111111111111111";
+  const fromCerts = list.certificates.map((c) => c.verifier).filter((k) => k && k !== DEFAULT);
+  const all = [...new Set([...hist.all, ...fromCerts, ...(active ? [active] : [])])];
   return { all, active, fromHistory: hist.fromHistory };
 }
+
+/** the memo key of the unfiltered certificate scan (shared by list, stats and trusted keys) */
+export const LIST_ALL = "list:undefined:undefined:undefined";
 
 const keyEq = (a, b) => {
   try {
@@ -202,7 +224,35 @@ const keyEq = (a, b) => {
   }
 };
 
+/**
+ * Log reads, cached: entries, proofs at a given size and consistency proofs between two sizes never change, so they are
+ * kept (LRU, per instance); the head for 3 seconds. A burst of /v1/log traffic then costs the Verifier's log a handful of
+ * calls, which matters because its rate limit sees every /v1 instance as one client.
+ */
+const logCache = new Map();
+const LOG_CACHE_MAX = 5000;
+const immutable = (qs) => /^(entry=\d+|proof=\d+&size=\d+|consistency=\d+&size=\d+)$/.test(qs);
+export const logStats = { fetched: 0, cached: 0 };
 export async function logGet(base, qs, f = fetch) {
+  const key = `${base}?${qs}`;
+  if (qs === "head") return remember(`loghead:${base}`, 3_000, () => logFetch(base, qs, f));
+  if (!immutable(qs)) return logFetch(base, qs, f);
+  const hit = logCache.get(key);
+  if (hit) {
+    logStats.cached++;
+    logCache.delete(key);
+    logCache.set(key, hit); // LRU: most recent last
+    return hit;
+  }
+  const p = logFetch(base, qs, f);
+  logCache.set(key, p);
+  p.catch(() => logCache.delete(key));
+  if (logCache.size > LOG_CACHE_MAX) logCache.delete(logCache.keys().next().value);
+  return p;
+}
+
+async function logFetch(base, qs, f = fetch) {
+  logStats.fetched++;
   let res;
   try {
     res = await f(`${base}?${qs}`, { headers: { accept: "application/json" } });
@@ -211,8 +261,17 @@ export async function logGet(base, qs, f = fetch) {
   }
   const body = await res.json().catch(() => null);
   if (res.status === 404) throw new HttpError(404, "not_found", body?.error?.message ?? body?.message ?? "no such log entry");
+  if (res.status === 429) throw new HttpError(503, "log_busy", "the transparency log is rate limiting this server; retry in a few seconds", { retryAfter: 5 });
   if (!res.ok || !body) throw new HttpError(502, "log_error", `the transparency log answered ${res.status}`);
   return body;
+}
+
+export function clearLogCache() {
+  logCache.clear();
+}
+/** drop cached answers that did not verify, so a bad answer is never served from the cache */
+export function forgetLog(base, ...qs) {
+  for (const q of qs) logCache.delete(`${base}?${q}`);
 }
 
 export async function verifiedHead(base, client, f) {
@@ -224,7 +283,7 @@ export async function verifiedHead(base, client, f) {
   const signatureValid = keyTrusted && (await sdk.verifyTreeHead(head, programId).catch(() => false));
   // the latest head anchored on chain by anchor_log (Treasury), and whether this head is consistent with it
   let anchor = null;
-  const t = client ? await client.getTreasury().catch(() => null) : null;
+  const t = client ? await remember("treasury", 5_000, () => client.getTreasury()).catch(() => null) : null;
   if (t?.log) {
     anchor = { ...t.log, consistent: null };
     if (t.log.treeSize === head.treeSize) anchor.consistent = t.log.rootHash === String(head.rootHash).toLowerCase();
@@ -240,18 +299,59 @@ export async function verifiedHead(base, client, f) {
   return { ...head, signatureValid, keyTrusted, activeKey: keys.active, trustedKeys: keys.all, programId, anchor };
 }
 
+const mirrors = new Map();
+const MIRROR_WAIT_MS = 1_500;
+// synchronous on purpose: an await between the lookup and the set let a burst build fifty mirrors, each paging the log
+function mirrorFor(base, f) {
+  if (!mirrors.has(base)) {
+    mirrors.set(base, new LogMirror({
+      head: () => logGet(base, "head", f),
+      entries: async (a, b) => (await logFetch(base, `from=${a}&to=${b}`, f)).entries,
+      entry: (i) => logGet(base, `entry=${i}`, f),
+    }));
+  }
+  return mirrors.get(base);
+}
+export function mirrorStats() {
+  return [...mirrors.values()].map((m) => ({ size: m.size, ...m.stats }));
+}
+
 export async function verifiedProof(base, client, index, f, { certificate } = {}) {
   const programId = client?.programId ?? sdk.POF_PROGRAM_ID;
   const keys = await trustedKeys(client);
   const head = await logGet(base, "head", f);
   if (index >= head.treeSize) throw new HttpError(404, "not_found", `log entry ${index} does not exist yet (the log has ${head.treeSize})`);
-  const [entry, proof] = await Promise.all([
-    logGet(base, `entry=${index}`, f),
-    logGet(base, `proof=${index}&size=${head.treeSize}`, f),
-  ]);
+  // a head signed by the active key is mirrored: the proof is computed here, so a proof read costs the log no call
+  let leafHex, proof, mirrored = false;
+  const headOk = !!keys.active && keyEq(keys.active, head.verifierKey) && (await sdk.verifyTreeHead(head, programId).catch(() => false));
+  if (headOk) {
+    const m = mirrorFor(base, f);
+    try {
+      // wait a little for the mirror; a long first sync runs on in the background
+      const sync = m.syncTo(head);
+      sync.catch(() => {});
+      const h = await Promise.race([sync, new Promise((r) => setTimeout(() => r(null), MIRROR_WAIT_MS).unref?.())]);
+      // still paging in: say so, and do not add per-entry reads to a log that is already busy serving the pages
+      if (!h) throw new HttpError(503, "log_syncing", "this server is still reading the transparency log; retry in a few seconds", { retryAfter: 2 });
+      if (index < h.treeSize) {
+        leafHex = await m.leaf(index);
+        proof = { treeSize: h.treeSize, rootHash: h.rootHash, path: m.path(index) };
+        mirrored = true;
+      }
+    } catch (e) {
+      if (!e?.mismatch) throw e;
+    }
+  }
+  if (!mirrored) {
+    const [entry, p] = await Promise.all([logGet(base, `entry=${index}`, f), logGet(base, `proof=${index}&size=${head.treeSize}`, f)]);
+    leafHex = entry.leaf;
+    proof = { treeSize: p.treeSize, rootHash: p.rootHash, path: p.path };
+  }
+  const usedHead = mirrored ? mirrorFor(base, f).head : head;
   const check = await sdk.verifyLogEntry({
-    leaf: entry.leaf, index, proof: { treeSize: proof.treeSize, rootHash: proof.rootHash, path: proof.path }, head, programId, trustedKeys: keys.all, headKeys: keys.active ? [keys.active] : [],
+    leaf: leafHex, index, proof, head: usedHead, programId, trustedKeys: keys.all, headKeys: keys.active ? [keys.active] : [],
   });
+  if (!check.ok && !mirrored) forgetLog(base, `entry=${index}`, `proof=${index}&size=${head.treeSize}`);
   // POF-18: a certificate's log_index is the submitter's word; match the signed bytes instead
   let certificateMatch = null;
   if (certificate && check.leaf && client) {
@@ -262,8 +362,8 @@ export async function verifiedProof(base, client, index, f, { certificate } = {}
   const a = check.leaf?.attestation;
   return {
     index,
-    leaf: entry.leaf,
-    leafHash: entry.leafHash,
+    leaf: leafHex,
+    leafHash: sdk.toHex(await sdk.leafHash(sdk.fromHex(leafHex))),
     attestation: a
       ? {
           bytes: check.leaf.attestationBytes,
@@ -279,6 +379,7 @@ export async function verifiedProof(base, client, index, f, { certificate } = {}
           issuedSlot: a.issuedSlot,
           expirySlot: a.expirySlot,
           payer: a.payer,
+          controller: a.controller,
           nonce: a.nonce,
           signature: check.leaf.signature,
           verifierKey: check.leaf.verifierKey,
@@ -286,11 +387,12 @@ export async function verifiedProof(base, client, index, f, { certificate } = {}
           loggedSlot: check.leaf.loggedSlot,
         }
       : null,
-    proof: { treeSize: proof.treeSize, rootHash: proof.rootHash, path: proof.path },
-    head,
+    proof,
+    head: usedHead,
     trustedKeys: keys.all,
     verified: check.ok && (certificateMatch ? certificateMatch.matches : true),
     checks: check.checks,
     certificateMatch,
+    computedBy: mirrored ? "this server's mirror of the log" : "the log",
   };
 }

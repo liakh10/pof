@@ -1,0 +1,11 @@
+{
+  "name": "@pof/bench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Load and latency benchmarks (k6-style closed-loop generator, no dependencies) for the POF read API, MCP, the Verifier's /api/attest and /api/status, run locally against a mock RPC with injected latency.",
+  "type": "module",
+  "scripts": {
+    "bench": "node run.mjs",
+    "cold": "node coldstart.mjs"
+  }
+}

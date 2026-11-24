@@ -100,7 +100,9 @@ export declare class PofClient {
     getRoom(address: AddressLike): Promise<Room | null>;
     listRooms(): Promise<Room[]>;
     /** A room with its members, each with the live status of the certificate behind it. */
-    getRoomWithMembers(address: AddressLike): Promise<{
+    getRoomWithMembers(address: AddressLike, opts?: {
+        room?: Room;
+    }): Promise<{
         slot: number;
         room: Room;
         members: (Member & {
@@ -114,7 +116,12 @@ export declare class PofClient {
      * The cumulative counters come from the Treasury when it exists (expired certificates are closed, so a scan cannot
      * count them); the per-tier breakdown comes from a scan of the open certificates.
      */
-    stats(): Promise<{
+    stats(opts?: {
+        list?: {
+            slot: number;
+            certificates: LiveCertificate[];
+        };
+    }): Promise<{
         slot: number;
         total: number;
         live: number;

@@ -18,10 +18,26 @@ export function concat(...parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
+const HEX = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
+const NodeBuffer: any = (globalThis as any).Buffer;
+
 export function toHex(b: Uint8Array): string {
+  if (NodeBuffer) return NodeBuffer.from(b.buffer, b.byteOffset, b.byteLength).toString("hex");
   let s = "";
-  for (const x of b) s += x.toString(16).padStart(2, "0");
+  for (let i = 0; i < b.length; i++) s += HEX[b[i]];
   return s;
+}
+
+/** base64 to bytes: Buffer in Node (fast), atob in browsers */
+export function fromBase64(s: string): Uint8Array {
+  if (NodeBuffer) {
+    const b = NodeBuffer.from(s, "base64");
+    return new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+  }
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 export function fromHex(h: string): Uint8Array {

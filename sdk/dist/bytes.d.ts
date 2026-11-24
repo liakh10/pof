@@ -2,6 +2,8 @@
 export declare function utf8(s: string): Uint8Array;
 export declare function concat(...parts: Uint8Array[]): Uint8Array;
 export declare function toHex(b: Uint8Array): string;
+/** base64 to bytes: Buffer in Node (fast), atob in browsers */
+export declare function fromBase64(s: string): Uint8Array;
 export declare function fromHex(h: string): Uint8Array;
 export declare function equalBytes(a: Uint8Array, b: Uint8Array): boolean;
 export declare function u64le(v: bigint | number): Uint8Array;

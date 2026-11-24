@@ -67,7 +67,8 @@ export class Reader {
     }
     bytes(n) {
         this.need(n);
-        const r = this.b.slice(this.o, this.o + n);
+        // a view, not a copy: account data is read once and never written (decoding 5,000 accounts allocates far less)
+        const r = this.b.subarray(this.o, this.o + n);
         this.o += n;
         return r;
     }

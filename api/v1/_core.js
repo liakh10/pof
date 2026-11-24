@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import {
   sdk, HttpError, getClient, remember, lookupSubject, certJson, roomJson, parseIntParam, parseAssetParam, parseTierParam,
-  logBase, verifiedHead, verifiedProof, logGet, readWitnessDoc, trustedKeys,
+  logBase, verifiedHead, verifiedProof, logGet, readWitnessDoc, trustedKeys, LIST_ALL, forgetLog,
 } from "./_lib.js";
 import { renderBadge, badgeState } from "../../embed/svg.js";
 import { checkWitnessDoc } from "../../witness/witness.js";
@@ -92,18 +92,22 @@ export async function handleV1(req) {
         const limit = parseIntParam(q.limit, "limit", { min: 1, max: 500 }) ?? 100;
         const cursor = parseIntParam(q.cursor, "cursor") ?? 0;
         const key = `list:${asset}:${tier}:${subjectKind}`;
-        const all = await remember(key, 10_000, () => client.listCertificates({ asset, tier, subjectKind }));
-        let list = all.certificates;
-        if (minTier !== undefined) list = list.filter((c) => c.tier >= minTier);
-        if (status !== "any") list = list.filter((c) => c.effectiveStatus === status);
-        const page = list.slice(cursor, cursor + limit);
-        return json(200, {
-          slot: all.slot,
-          total: list.length,
-          cursor,
-          nextCursor: cursor + limit < list.length ? String(cursor + limit) : null,
-          certificates: page.map((c) => certJson(c)),
-        }, cache(10, 60));
+        // the scan is shared for 10 s; the serialized page too, so a burst of the same list costs one stringify
+        const body = await remember(`page:${key}:${minTier}:${status}:${cursor}:${limit}`, 10_000, async () => {
+          const all = await remember(key, 10_000, () => client.listCertificates({ asset, tier, subjectKind }));
+          let list = all.certificates;
+          if (minTier !== undefined) list = list.filter((c) => c.tier >= minTier);
+          if (status !== "any") list = list.filter((c) => c.effectiveStatus === status);
+          const page = list.slice(cursor, cursor + limit);
+          return JSON.stringify({
+            slot: all.slot,
+            total: list.length,
+            cursor,
+            nextCursor: cursor + limit < list.length ? String(cursor + limit) : null,
+            certificates: page.map((c) => certJson(c)),
+          });
+        });
+        return { ...json(200, null, cache(10, 60)), body };
       }
     }
 
@@ -158,7 +162,7 @@ export async function handleV1(req) {
 
     if (head === "stats" && rest.length === 0) {
       const client = getClient(env);
-      const s = await remember("stats", 10_000, () => client.stats());
+      const s = await remember("stats", 10_000, async () => client.stats({ list: await remember(LIST_ALL, 10_000, () => client.listCertificates()) }));
       let log = null;
       try {
         const h = await verifiedHead(logBase(env, req.origin), client, req.fetch);
@@ -208,6 +212,7 @@ export async function handleV1(req) {
         const verified = first === 0 || (p.firstRoot && secondRoot
           ? await sdk.verifyConsistency({ size1: first, size2: second, root1: p.firstRoot, root2: secondRoot, proof: p.path })
           : false);
+        if (!verified) forgetLog(base, `consistency=${first}&size=${second}`);
         return json(200, { first, second, firstRoot: p.firstRoot ?? null, secondRoot, secondRootSigned, path: p.path, verified }, cache(10, 60));
       }
       if (rest.length === 2 && rest[0] === "proof") {
@@ -251,7 +256,11 @@ export async function handleV1(req) {
 
     throw new HttpError(404, "no_route", `no endpoint ${req.path}; see GET /v1`);
   } catch (e) {
-    if (e instanceof HttpError) return json(e.status, { error: { code: e.code, message: e.message, ...e.extra } }, e.status >= 500 ? "no-store" : cache(5));
+    if (e instanceof HttpError) {
+      const out = json(e.status, { error: { code: e.code, message: e.message, ...e.extra } }, e.status >= 500 ? "no-store" : cache(5));
+      if (e.extra?.retryAfter) out.headers["retry-after"] = String(e.extra.retryAfter);
+      return out;
+    }
     if (e instanceof sdk.RpcError) return json(502, { error: { code: "rpc_error", message: "the Solana RPC did not answer, try again" } });
     console.error("v1 error", e);
     return json(500, { error: { code: "internal", message: "internal error" } });

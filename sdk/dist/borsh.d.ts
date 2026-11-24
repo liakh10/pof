@@ -45,7 +45,7 @@ export declare class Reader {
     private v;
     constructor(b: Uint8Array, offset?: number);
     need(n: number): void;
-    bytes(n: number): Uint8Array<ArrayBuffer>;
+    bytes(n: number): Uint8Array<ArrayBufferLike>;
     read(idl: Idl, t: IdlType): any;
     struct(idl: Idl, fields: readonly IdlField[]): Record<string, any>;
 }

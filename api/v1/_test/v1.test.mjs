@@ -5,6 +5,16 @@ import { setClient, clearMemo } from "../_lib.js";
 import { makeWorld, makeLog, rand } from "./fixtures.mjs";
 
 let w, log;
+/** a log that serves altered leaves (pages and single entries), so they no longer add up to its signed head */
+const tamperLeaves = (f) => async (url) => {
+  const res = await f(url);
+  if (!/[?&](from|entry)=/.test(url)) return res;
+  const j = await res.json();
+  const flip = (hex) => hex.slice(0, 100) + (hex[100] === "0" ? "1" : "0") + hex.slice(101);
+  if (j.entries) j.entries = j.entries.map((e) => ({ ...e, leaf: flip(e.leaf) }));
+  if (j.leaf) j.leaf = flip(j.leaf);
+  return new Response(JSON.stringify(j), { status: res.status });
+};
 const env = { POF_LOG_URL: "https://pof.test/api/attest/log" };
 const get = async (path, query = {}) => {
   const r = await handleV1({ method: "GET", path, query, env, fetch: log.fetch });
@@ -133,14 +143,10 @@ test("GET /v1/log/head and /v1/log/proof/:id verify the verifier's log", async (
   assert.equal(r.status, 404);
   r = await get("log/proof/abc");
   assert.equal(r.status, 400);
-  // a tampered log answer is caught, not passed through as verified
-  const evil = async (url) => {
-    const res = await log.fetch(url);
-    if (!url.includes("proof=")) return res;
-    const j = await res.json();
-    j.path[0] = "00".repeat(32);
-    return new Response(JSON.stringify(j), { status: 200 });
-  };
+  // a log whose entries do not match its signed head is caught, not passed through as verified
+  const evil = tamperLeaves(log.fetch);
+  const { clearMemo: cm } = await import("../_lib.js");
+  cm();
   const t = await handleV1({ method: "GET", path: "log/proof/2", query: {}, env, fetch: evil });
   assert.equal(JSON.parse(t.body).verified, false);
   assert.equal(JSON.parse(t.body).checks.included, false);
@@ -196,6 +202,7 @@ test("GET /v1/log/consistency verifies against the signed head", async () => {
     j.path[0] = "00".repeat(32);
     return new Response(JSON.stringify(j), { status: 200 });
   };
+  (await import("../_lib.js")).clearMemo();
   const t = await handleV1({ method: "GET", path: "log/consistency", query: { first: "3" }, env, fetch: evil });
   assert.equal(JSON.parse(t.body).verified, false);
 });
@@ -246,4 +253,85 @@ test("GET /v1/witness serves the witness document with its cosignatures checked"
   assert.equal(r.json.latest.treeSize, 7);
   setWitnessSource(null);
   void PofClient;
+});
+
+test("log reads are cached: entries and proofs fetched once; a proof that did not verify is not kept", async () => {
+  const { clearMemo, logStats } = await import("../_lib.js");
+  clearMemo();
+  let n = 0;
+  const counting = async (u) => { n++; return log.fetch(u); };
+  for (let k = 0; k < 5; k++) assert.equal(JSON.parse((await handleV1({ method: "GET", path: "log/proof/3", query: {}, env, fetch: counting })).body).verified, true);
+  assert.ok(n <= 3, `5 identical proof reads cost ${n} log calls (head, entry, proof)`);
+  void logStats;
+  clearMemo();
+  let bad = true;
+  const evil = tamperLeaves(log.fetch);
+  const flaky = (u) => (bad ? evil(u) : log.fetch(u));
+  assert.equal(JSON.parse((await handleV1({ method: "GET", path: "log/proof/4", query: {}, env, fetch: flaky })).body).verified, false);
+  bad = false;
+  assert.equal(JSON.parse((await handleV1({ method: "GET", path: "log/proof/4", query: {}, env, fetch: flaky })).body).verified, true, "the bad answer was not cached");
+  // a log that rate-limits this server reads as 503 with retry-after, not as a broken log
+  const limited = async () => new Response(JSON.stringify({ error: { code: "RATE" } }), { status: 429 });
+  clearMemo();
+  const r = await handleV1({ method: "GET", path: "log/head", query: {}, env, fetch: limited });
+  assert.equal(r.status, 503);
+  assert.equal(r.headers["retry-after"], "5");
+});
+
+test("the log mirror: proofs computed here match the log's own, follow growth, and refuse a log that does not add up", async () => {
+  const { clearMemo, mirrorStats } = await import("../_lib.js");
+  clearMemo();
+  let calls = 0;
+  const counting = async (u) => { calls++; return log.fetch(u); };
+  for (let i = 0; i < 7; i++) {
+    const r = JSON.parse((await handleV1({ method: "GET", path: `log/proof/${i}`, query: {}, env, fetch: counting })).body);
+    assert.equal(r.verified, true);
+    assert.equal(r.computedBy, "this server's mirror of the log");
+    const theirs = await (await log.fetch(`${log.base}?proof=${i}&size=7`)).json();
+    assert.deepEqual(r.proof.path, theirs.path, `entry ${i}`);
+  }
+  assert.ok(calls <= 3, `seven proofs cost ${calls} log calls (head and one page)`);
+  for (const n of [1, 3, 10]) {
+    await log.append(n);
+    clearMemo(); // a new head is read at most every 3 s; the mirror itself is kept below by reading it fresh
+  }
+  const r = JSON.parse((await handleV1({ method: "GET", path: "log/proof/15", query: {}, env, fetch: log.fetch })).body);
+  assert.equal(r.verified, true);
+  assert.equal(r.proof.treeSize, 21);
+  void mirrorStats;
+});
+
+test("LogMirror levels: incremental appends give the RFC 9162 root and audit paths at every size 1..70", async () => {
+  const { LogMirror } = await import("../_logmirror.js");
+  const sdk = await import("../../../sdk/dist/index.js");
+  const big = await makeLog(70);
+  const m = new LogMirror({ entries: async () => [], entry: async () => null, head: async () => null });
+  for (let n = 1; n <= 70; n++) {
+    await m.append(big.hashes[n - 1]);
+    assert.equal(sdk.toHex(m.root()), sdk.toHex(await sdk.merkleRoot(big.hashes.slice(0, n))), `root ${n}`);
+    m.head = { treeSize: n };
+    for (const i of [0, n - 1, Math.floor(n / 2)]) {
+      assert.deepEqual(m.path(i), (await sdk.inclusionPath(i, big.hashes.slice(0, n))).map(sdk.toHex), `path ${i} of ${n}`);
+    }
+  }
+});
+
+test("a burst on a cold mirror pages the log once; a failing log is backed off, not hammered", async () => {
+  const { clearMemo } = await import("../_lib.js");
+  clearMemo();
+  const big = await makeLog(600);
+  await w.rpc.putConfig({ verifier: big.verifierKey });
+  clearMemo();
+  let calls = 0;
+  const counting = async (u) => { calls++; return big.fetch(u); };
+  const rs = await Promise.all(Array.from({ length: 50 }, (_, i) => handleV1({ method: "GET", path: `log/proof/${(i * 37) % 600}`, query: {}, env, fetch: counting })));
+  assert.ok(rs.every((r) => JSON.parse(r.body).verified === true));
+  assert.ok(calls <= 4, `50 cold proofs cost ${calls} log calls (head and three pages)`);
+  clearMemo();
+  let n = 0;
+  const busy = async (u) => { n++; if (u.includes("from=")) return new Response("{}", { status: 429 }); return big.fetch(u); };
+  const out = await Promise.all(Array.from({ length: 30 }, (_, i) => handleV1({ method: "GET", path: `log/proof/${i}`, query: {}, env, fetch: busy })));
+  assert.ok(out.every((r) => r.status === 503));
+  assert.ok(n <= 1 + 4, `30 requests on a busy log cost ${n} calls (head and one round of at most 4 pages)`);
+  await w.rpc.putConfig({ verifier: log.verifierKey });
 });

@@ -1,12 +1,6 @@
 /** A minimal Solana JSON-RPC reader (fetch only). Pass your own RPC URL; no API of ours is involved. */
 import { encodeBase58 } from "./base58.js";
-function b64(s) {
-    const bin = atob(s);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++)
-        out[i] = bin.charCodeAt(i);
-    return out;
-}
+import { fromBase64 as b64 } from "./bytes.js";
 export class RpcError extends Error {
     code;
     constructor(message, code) {

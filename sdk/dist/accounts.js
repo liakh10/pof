@@ -7,7 +7,7 @@ import { POF_IDL, POF_GATE_IDL } from "./idl/index.js";
 import { decodeAccount, fieldOffset, Reader } from "./borsh.js";
 import { toHex, u64le } from "./bytes.js";
 import { findProgramAddress } from "./pda.js";
-import { toAddressBytes } from "./base58.js";
+import { toAddress, toAddressBytes } from "./base58.js";
 import { CERT_STATUS_NAMES, SUBJECT_KIND_NAMES, ASSETS, tierLabel, POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, } from "./constants.js";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const pofIdl = POF_IDL;
@@ -164,8 +164,21 @@ export function isLive(c, currentSlot) {
     return effectiveStatus(c, currentSlot) === "live";
 }
 /* ---------- PDAs (CONTRACT §6) ---------- */
+/** PDAs are pure functions of their seeds; deriving one costs a few SHA-256 and curve checks, so they are remembered. */
+const pdaCache = new Map();
+function cachedPda(key, f) {
+    let p = pdaCache.get(key);
+    if (!p) {
+        p = f();
+        pdaCache.set(key, p);
+        if (pdaCache.size > 20_000)
+            pdaCache.delete(pdaCache.keys().next().value);
+    }
+    return p;
+}
 export async function certificateAddress(subjectHash, asset, programId = POF_PROGRAM_ID) {
-    return findProgramAddress(["cert", subjectHash, Uint8Array.of(asset)], programId);
+    const pid = toAddress(programId);
+    return cachedPda(`c:${pid}:${toHex(subjectHash)}:${asset}`, () => findProgramAddress(["cert", subjectHash, Uint8Array.of(asset)], pid));
 }
 export async function configAddress(programId = POF_PROGRAM_ID) {
     return findProgramAddress(["config"], programId);
@@ -177,7 +190,9 @@ export async function roomAddress(creator, id, gateProgramId = POF_GATE_PROGRAM_
     return findProgramAddress(["room", toAddressBytes(creator), u64le(id)], gateProgramId);
 }
 export async function memberAddress(room, subjectHash, gateProgramId = POF_GATE_PROGRAM_ID) {
-    return findProgramAddress(["member", toAddressBytes(room), subjectHash], gateProgramId);
+    const gid = toAddress(gateProgramId);
+    const r = toAddress(room);
+    return cachedPda(`m:${gid}:${r}:${toHex(subjectHash)}`, () => findProgramAddress(["member", toAddressBytes(r), subjectHash], gid));
 }
 /* ---------- memcmp offsets for getProgramAccounts filters ---------- */
 export const layout = {

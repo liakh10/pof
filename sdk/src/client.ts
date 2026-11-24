@@ -217,17 +217,18 @@ export class PofClient {
   }
 
   /** A room with its members, each with the live status of the certificate behind it. */
-  async getRoomWithMembers(address: AddressLike): Promise<{
+  async getRoomWithMembers(address: AddressLike, opts: { room?: Room } = {}): Promise<{
     slot: number;
     room: Room;
     members: (Member & { certificateStatus: StatusName | "missing"; tier: number | null; live: boolean })[];
   } | null> {
-    const room = await this.getRoom(address);
-    if (!room) return null;
-    const accs = await this.rpc.getProgramAccounts(this.gateProgramId, [
-      memcmp(0, layout.member.discriminator()),
-      memcmp(layout.member.offset("room"), toAddressBytes(room.address)),
+    // the room and its members in parallel: the member filter needs only the room's address
+    const addr = toAddress(address);
+    const [room, accs] = await Promise.all([
+      opts.room ? Promise.resolve(opts.room) : this.getRoom(addr),
+      this.rpc.getProgramAccounts(this.gateProgramId, [memcmp(0, layout.member.discriminator()), memcmp(layout.member.offset("room"), toAddressBytes(addr))]),
     ]);
+    if (!room) return null;
     const members = accs.map((a) => decodeMember(a.address, a.data));
     const certAddrs = await Promise.all(
       members.map(async (m) => m.certificate ?? (await certificateAddress(fromHex(m.subjectHash), room.asset, this.programId))[0]),
@@ -251,7 +252,7 @@ export class PofClient {
    * The cumulative counters come from the Treasury when it exists (expired certificates are closed, so a scan cannot
    * count them); the per-tier breakdown comes from a scan of the open certificates.
    */
-  async stats(): Promise<{
+  async stats(opts: { list?: { slot: number; certificates: LiveCertificate[] } } = {}): Promise<{
     slot: number;
     total: number;
     live: number;
@@ -262,7 +263,7 @@ export class PofClient {
     bySubjectKind: Record<string, number>;
     treasury: (Treasury & { address: string }) | null;
   }> {
-    const [{ slot, certificates }, treasury] = await Promise.all([this.listCertificates(), this.getTreasury()]);
+    const [{ slot, certificates }, treasury] = await Promise.all([opts.list ? Promise.resolve(opts.list) : this.listCertificates(), this.getTreasury()]);
     const out = {
       slot, total: certificates.length, live: 0, revokedSpent: 0, revokedByHolder: 0, expired: 0, treasury,
       byAsset: {} as Record<string, { live: number; certifiedMinimum: number; byTier: Record<number, number> }>,

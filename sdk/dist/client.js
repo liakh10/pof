@@ -192,14 +192,15 @@ export class PofClient {
         return accs.map((a) => decodeRoom(a.address, a.data));
     }
     /** A room with its members, each with the live status of the certificate behind it. */
-    async getRoomWithMembers(address) {
-        const room = await this.getRoom(address);
+    async getRoomWithMembers(address, opts = {}) {
+        // the room and its members in parallel: the member filter needs only the room's address
+        const addr = toAddress(address);
+        const [room, accs] = await Promise.all([
+            opts.room ? Promise.resolve(opts.room) : this.getRoom(addr),
+            this.rpc.getProgramAccounts(this.gateProgramId, [memcmp(0, layout.member.discriminator()), memcmp(layout.member.offset("room"), toAddressBytes(addr))]),
+        ]);
         if (!room)
             return null;
-        const accs = await this.rpc.getProgramAccounts(this.gateProgramId, [
-            memcmp(0, layout.member.discriminator()),
-            memcmp(layout.member.offset("room"), toAddressBytes(room.address)),
-        ]);
         const members = accs.map((a) => decodeMember(a.address, a.data));
         const certAddrs = await Promise.all(members.map(async (m) => m.certificate ?? (await certificateAddress(fromHex(m.subjectHash), room.asset, this.programId))[0]));
         const { slot, accounts: certs } = await this.accountsAt(certAddrs);
@@ -221,8 +222,8 @@ export class PofClient {
      * The cumulative counters come from the Treasury when it exists (expired certificates are closed, so a scan cannot
      * count them); the per-tier breakdown comes from a scan of the open certificates.
      */
-    async stats() {
-        const [{ slot, certificates }, treasury] = await Promise.all([this.listCertificates(), this.getTreasury()]);
+    async stats(opts = {}) {
+        const [{ slot, certificates }, treasury] = await Promise.all([opts.list ? Promise.resolve(opts.list) : this.listCertificates(), this.getTreasury()]);
         const out = {
             slot, total: certificates.length, live: 0, revokedSpent: 0, revokedByHolder: 0, expired: 0, treasury,
             byAsset: {},
