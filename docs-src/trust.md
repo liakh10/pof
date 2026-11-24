@@ -97,11 +97,8 @@ The link itself is never stored on chain: the certificate holds only `sha256("po
 
 The Verifier sees openings and a nullifier key: that proves **control of a ring**, not who owns the money. Borrowed funds
 count ("rent a whale"): lend your vault's keys, certify, hand them back. Revocation catches it the moment the notes move,
-but not if the lender simply leaves them in place. Lending should at least require handing over the key that spends the funds. Today the Verifier checks the subject's
-signature and the ring's `nk`, but the ring owner key itself signs nothing, so `nk` and the openings alone are enough to
-certify any subject against that ring (internal review finding POF-02, High). The fix, a second signature by the ring
-owner over the same subject message, is in progress; until it lands, treat a certificate as proof that someone who knows
-the ring's `nk` vouched for the subject.
+but not if the lender simply leaves them in place. The ring owner key signs every disclosure (the fix for internal review finding POF-02), so lending a certificate
+means handing over the key that spends the funds, not only the nullifier key.
 
 One note backs one live certificate at a time (a keyed index of
 nullifiers at the Verifier), so a single deposit cannot certify a hundred handles at once.

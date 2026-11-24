@@ -58,8 +58,9 @@ against a nullifier without the salts.
 Everything below uses public data and `@pof/sdk` ([Developers](developers), "Verify the transparency log yourself", has the
 code).
 
-1. **Take the Verifier key from the chain, not from the log.** Read `Config` and take the active Verifier key (and any
-   pending key and its slot). An answer that names its own key proves nothing by itself.
+1. **Take the Verifier key from the chain, not from the log.** Read `Config` for the active key (and any pending key and
+   its slot), and the `VerifierSet` events for the keys it had before. An answer that names its own key proves nothing by
+   itself; `@pof/sdk`'s log checks require the trusted keys as an argument for this reason.
 2. **Check the head.** Verify the signed tree head with that key.
 3. **Check it extends the anchor.** Read the Treasury's anchored `{ treeSize, rootHash, slot }` and verify a consistency
    proof from the anchored size to the current size. The head you were shown is then the same history the chain fixed.
@@ -75,6 +76,20 @@ code).
 7. **Check the code that signed.** Every entry names the bundle hash of the Verifier that produced it. Rebuild the bundle
    from the repository (`cd verifier && npm ci && npm run build:check`: same Node major, pinned lockfile and esbuild,
    no timestamps or absolute paths) and compare the hash with `verifier/dist/BUILD.json` and with the entries.
+
+## Witnesses
+
+A witness runs steps 1 to 4 continuously and publishes what it saw (CONTRACT §8). `node witness/run.js` runs one, with
+its own key (`node witness/keygen.js` writes it to `~/.config/pof/witness.json` and prints only the public key). At each
+step it fetches the signed head, requires the key to be one Config lists now or listed before, requires a consistency proof
+from the last head it verified, and requires agreement with the head anchored in the Treasury. Only then does it
+**cosign** the head: ed25519 over `"POF-WIT1" ‖ program id ‖ tree size ‖ root hash ‖ timestamp` (88 bytes). On any
+failure it records an alarm with both signed heads as evidence and cosigns nothing: `log_unreachable`, `unknown_key`,
+`bad_signature`, `log_shrank`, `equivocation`, `inconsistent`, `anchor_mismatch`.
+
+The project runs one witness (`GET /v1/witness` serves its document; before launch its cron is parked). One witness run by
+the operator adds little against the operator; its value is that anyone can run another with the same code, and two
+witnesses that cosigned different heads of the same size are proof of a split view.
 
 ## What the log proves and what it does not
 

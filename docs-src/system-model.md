@@ -61,9 +61,10 @@ registers it in the User Registry, shields SOL or USDC into it, syncs and decryp
 reach a tier, signs the subject statement, builds the disclosure package and keeps the revoke kits (exportable as a
 file). Nothing secret leaves the page except the package sent to the Verifier.
 
-**Vault ring.** A Privacy Ring whose Ed25519 owner key is `sha256("pof/vault/v1" ‖ signature)` over a fixed plain-text
-message the wallet signs. It is recoverable from the wallet alone, and separate from the wallet's own ring, so the
-nullifier key the Verifier sees is never the main ring's.
+**Vault ring.** A Privacy Ring whose Ed25519 owner key is `sha256("pof/vault/v2" ‖ signature)` over a fixed plain-text
+message the wallet signs (or a random key with a passphrase backup, for wallets that do not sign deterministically). It is
+separate from the wallet's own ring, so the nullifier key the Verifier sees is never the main ring's. The vault key signs
+the disclosure message in the page and pays the relayer by withdrawal.
 
 **Verifier** (`verifier/`). Checks a disclosure package against chain state and signs the 240-byte attestation, or refuses
 with a specific error code. Appends each signed attestation to the transparency log. Holds the ed25519 signing key. Keeps
@@ -80,8 +81,9 @@ caps its own spend over a rolling 24-hour window and keeps a balance floor.
 **Keeper.** Holds each certificate's revocation pairs (salt, nullifier), sealed with AES-256-GCM, watches whether any
 disclosed nullifier is spent and calls `revoke_spent` when one is. Also anchors the log head on chain. Off before launch.
 
-**X linker.** Issues a one-time code for a handle, reads the post that carries it through fxtwitter, and on a match issues a
-link id: the Verifier's own signature over the handle and an expiry. Keeps only a hash of the code, for at most 30 minutes.
+**X linker.** Issues a one-time code and a secret for a handle, reads the post that carries the code through fxtwitter, and
+for the holder of the secret issues a link id: the Verifier's own signature over the handle, the controller key and an
+expiry. Keeps only hashes, for at most 30 minutes.
 
 **`pof` program** (`pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`). Rebuilds and checks attestations, keeps the
 certificates, the Config (keys, fee, tier tables) and the Treasury (fees and public counters), verifies spends against the
@@ -91,6 +93,9 @@ Rings accounts, and offers the CPI gate `require_certificate`.
 controller joins with a live certificate; anyone evicts a member whose certificate is no longer good enough. No fees, no
 admin. The bots read it.
 
+**Witnesses.** Anyone running `witness/`: checks each signed log head against the chain and the heads before it, cosigns
+it or records an alarm (CONTRACT §8).
+
 **Readers.** Anyone: the `/v1` API, `@pof/sdk`, the MCP server, the Telegram and Discord bots, other programs by CPI.
 
 ## What each party holds
@@ -98,6 +103,7 @@ admin. The bots read it.
 | party | holds | can | cannot |
 |---|---|---|---|
 | Holder | wallet key, vault keys, kits | certify, renew, revoke, spend | make a tier the notes do not reach |
+| Someone who learned a ring's `nk` | `nk` | see when that ring's deposits are spent, read its merge outputs | spend, or certify against the ring (the owner key signs every disclosure) |
 | Verifier | signing key | sign attestations, append the log | move funds, revoke, keep a certificate alive after a spend is shown |
 | Admin | admin key = program upgrade authority | pause, rotate the Verifier key after a delay, set the fee up to the cap, upgrade the program | sign attestations, change an issued tier's meaning |
 | Relayer | relayer key | pay for and submit `certify` | sign attestations; it can only submit one the Verifier signed naming it as payer |

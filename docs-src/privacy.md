@@ -17,7 +17,7 @@ on chain at the moment you fund the vault. This page lists what each step reveal
 | Shield into the vault | the depositing wallet, **the amount**, and the vault as recipient | nothing |
 | Link an X handle | the post you make (you may delete it after the check) | the handle, your IP |
 | Attest | nothing | the subject, the vault, its `nk`, the openings and amounts of the disclosed notes, your IP |
-| Pay the relayer | the paying account, the amount (fee + rent + a unique tag) and the slot | the payment |
+| Pay the relayer | a withdrawal from the vault (by default), the amount (fee + rent + a unique tag) and the slot | the payment |
 | Certify | subject (hash for a handle), asset, tier, slots, payer, controller, note count | the same |
 | Revoke by holder | the revocation and its slot | the same |
 | Revoke by spend | one disclosed note's nullifier, which matches a spend signed by the vault key | the same |
@@ -43,9 +43,12 @@ similar size land in between.
 private Rings transfer from another ring into the vault hides it (its output has a random blinding and an encrypted
 amount). When you deposit publicly, avoid amounts that sit just above one tier.
 
-**Pay the relayer from somewhere unrelated.** For a handle or badge certificate the relayer submits `certify`, so your
-wallet signs nothing that names it. But the payment to the relayer is public and lands just before the certificate. Pay
-it as a Ring withdrawal or from an account with no link to the funding wallet.
+**Let the relayer submit handle and badge certificates.** The client does this by default: the relayer is the payer, and
+its fee is paid as a withdrawal from the vault, so no wallet appears in the certificate, its event or its log entry. Know
+what remains: a withdrawal is a Rings spend signed by the vault key, and it lands shortly before the relayer's `certify`.
+Someone watching both can pair the vault with the certificate by timing. Paying the relayer from an account that has no
+link to the vault, well before you attest, weakens that pairing. Submitting from your wallet instead names the wallet as
+payer; the client asks for explicit consent before it does that.
 
 **Revoke first, then move.** Spending notes behind a live certificate lets anyone holding the kit revoke it by spend, and
 that reveals a nullifier that matches a transaction signed by the vault. For a handle or badge certificate, revoke it
@@ -55,12 +58,17 @@ with the controller key first (it reveals nothing), wait for confirmation, then 
 counterparty the badge address; they check it live; you revoke or let it expire.
 
 **Keep the kit file private.** The exported kit contains each certificate's salts and nullifiers (which can revoke it and,
-after a spend, link it) and the openings, sealed. Today the seal key is derived from the vault's `nk`, which the Verifier
-has seen (internal review finding POF-10, open): treat the file as sensitive as the vault seed.
+after a spend, link it) and the openings and badge secrets, sealed under a key derived from the vault seed (never from
+`nk`, which the Verifier sees). If your wallet signs non-deterministically, the file also carries the random vault key
+under your passphrase: it is then the only way to recover the vault on another device.
+
+**Never sign the vault message anywhere else.** Its signature is the vault's spending key. The message says so, and names
+its domain.
 
 **Know what the operator sees.** The Verifier operator can link subject, vault and funding wallet for each certificate it
 signs, and the host sees request IP addresses. The code stores no amount, opening or `nk`; it stores the log (no amounts),
-the keeper's sealed pairs and short-lived rate-limit counters. Phase 2 removes the operator's view of amounts and `nk`
+the keeper's sealed pairs, and rate-limit counters named by a keyed hash of the client address per window (swept by the
+keeper). Phase 2 removes the operator's view of amounts and `nk`
 ([Phase 2](phase-2)); it does not remove the host's view of your IP. Use the network path you trust.
 
 ## By subject kind

@@ -29,14 +29,15 @@ min_tier)`; on-chain Rooms and Telegram and Discord bots gate communities on it.
 
 1. The holder's browser derives a **vault ring** from one wallet signature, registers it and shields funds into it.
 2. It picks the fewest notes, each at least 150 slots old, that reach the tier, and sends their openings, the vault's
-   nullifier key and a signed subject statement to the **Verifier**.
+   nullifier key and a disclosure statement signed by the vault key (and by the subject key for a wallet or badge) to
+   the **Verifier**.
 3. The Verifier recomputes each commitment with the Rings hasher, re-hashes the indexer's Merkle path to a root the tree
    account holds on chain, derives each nullifier and proves it unspent (no nullifier PDA, and a non-inclusion path to an
    on-chain nullifier root), checks the sum reaches the tier and that no note backs another live certificate. It then
    signs 240 bytes: domain, program id, subject, asset, tier, the tree root and its slot, the note count, the hash of the
    sorted salted nullifier hashes, issue and expiry slots, payer, controller, nonce.
 4. It appends the attestation to a public **transparency log** (RFC 9162 Merkle hashing, signed tree heads anchored on
-   chain with `anchor_log`) and returns the salts and nullifiers to the holder as a revoke kit.
+   chain with `anchor_log`, checked by witnesses anyone can run) and returns the salts and nullifiers to the holder as a revoke kit.
 5. `certify` rebuilds the 240 bytes on chain and checks them against an Ed25519-program instruction by the active
    Verifier key, within 300 slots of issue. For an X handle or a badge, a **relayer** submits it, so the holder's wallet
    signs nothing public.

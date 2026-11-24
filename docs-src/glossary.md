@@ -80,7 +80,12 @@ proves the spend.
 
 **Transparency log.** The append-only Merkle log of every attestation, RFC 9162 hashing.
 
-**Vault.** The ring the client certifies from, derived from one wallet signature, separate from the wallet's own ring.
+**Vault.** The ring the client certifies from, separate from the wallet's own ring. Its spending key is derived from one
+wallet signature over the vault message (or is random, with a passphrase backup, for wallets that do not sign
+deterministically).
 
 **Verifier.** The off-chain service that checks a disclosure package and signs the attestation. Keeps no amount, opening
 or `nk`.
+
+**Witness.** An independent monitor of the transparency log that checks each signed head against the chain and the heads
+before it, cosigns it, and records alarms (CONTRACT §8).

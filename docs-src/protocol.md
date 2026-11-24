@@ -16,15 +16,23 @@ marked otherwise; Poseidon is BN254 with the circom parameters, exactly the Ring
 The client asks the wallet to sign one plain-text message:
 
 ```
-Proof of Funds vault key
+Proof of Funds: create my POF vault key
+domain: proof-of-funds
 wallet: <wallet address>
-This signature makes your POF vault, a separate Privacy Ring for certificates. Sign it only on Proof of Funds.
+purpose: this signature IS the spending key of a separate Privacy Ring (the POF vault).
+Never sign this message on any other site: whoever has this signature can move the money in the vault.
+version: pof/vault/v2
 ```
 
-The vault's Ed25519 seed is `sha256("pof/vault/v1" ‖ signature)`. From it the Rings SDK derives the vault's nullifier key
-`nk` (31 bytes) and its viewing key. Signing the same message again on any device rebuilds the same vault. The client can
-also use the wallet's own ring (the Rings derivation signature, RINGS.md §6), but then the Verifier sees the main ring's
-`nk`; the vault is the default.
+The vault's Ed25519 seed is `sha256("pof/vault/v2" ‖ signature)`: **the signature is the vault's spending key**, which is
+why the message says so. The first time, the client asks for the signature twice and compares: a wallet that signs
+deterministically rebuilds the same vault on any device. A wallet that does not (some MPC and smart wallets) gets a random
+vault key instead, kept on the device, and the client requires a passphrase-protected backup file before the first shield.
+From the seed the Rings SDK derives the vault's nullifier key `nk` (31 bytes) and its viewing key; the kit sealing key and
+the X controller seed are derived from the seed, never from `nk`, because the Verifier sees `nk`.
+
+The client can also use the wallet's own ring (the Rings derivation signature, RINGS.md §6), but then the Verifier sees the
+main ring's `nk`; the vault is the default.
 
 The vault is registered once in the Rings User Registry (record PDA `["zolana/registry/v0", owner]`, 100 bytes, rent
 0.00115824 SOL). The wallet pays; the vault key co-signs. The record publishes the vault's nullifier public key
@@ -51,32 +59,41 @@ commitment = Poseidon( 3, treeId, hashBytes(mint), amount,
 nullifier  = Poseidon( commitment, blinding, nk )
 ```
 
-## Step 2. The subject proof
+## Step 2. The disclosure message and the subject proof
 
-**Wallet (kind 0) and badge (kind 2).** The subject key signs these lines, joined with `\n`:
+Every package carries one statement, these UTF-8 lines joined with `\n` (CONTRACT §4):
 
 ```
-Proof of Funds: subject proof
+Proof of Funds: disclosure v2
 program: <pof program id>
-subject: <wallet|badge> <value>
-ring: <vault owner key>
+subject: <wallet|x|badge> <value; a handle lowercase, without @>
+ring: <ring owner key>
+controller: <the controller key>
 asset: <SOL|USDC> tier: <tier>
 payer: <payer>
 slot: <a recent slot>
 ```
 
-The `ring:` line binds the subject to the ring the notes sit in. The slot must be within 1,500 slots of the Verifier's read.
-A badge key is made fresh in the page; its secret is kept, sealed, in the kit.
+- **The ring owner always signs it** (`ring.proof`). For the vault the client signs with the vault key in the page, with no
+  wallet prompt. Openings and `nk` alone certify nobody: lending a certificate means handing over the key that spends the
+  funds.
+- **Wallet (kind 0) and badge (kind 2):** the subject key signs the same bytes (`subject.proof`). A wallet that is itself
+  the ring owner signs once. A badge key is made fresh in the page; its secret is kept, sealed, in the kit.
+- The slot must be within 1,500 slots of the Verifier's read.
 
-**X handle (kind 1).**
-1. `POST /api/link/start {handle}` returns a one-time code `pof-xxxxxxxx` (it lives 30 minutes; only its hash is stored).
-2. The holder posts it from the handle.
-3. `POST /api/link/check {handle, post}`: the linker reads the post through fxtwitter, checks that the author is the
-   handle, that the post contains the live code and is not older than the code, and returns a **link id**: the Verifier's
-   own ed25519 signature over the handle and an expiry one hour ahead. After 5 wrong tries the code is burnt.
+**X handle (kind 1).** The client first derives the certificate's **controller** key for the handle from the vault seed,
+so it can be rebuilt on any device. Then:
+1. `POST /api/link/start {handle, controller}` returns a one-time code `pof-xxxxxxxx` to post, and a **secret** the
+   browser keeps (the posted code is public; the secret is not). The code lives 30 minutes; only hashes are stored. A
+   second start never cancels a first.
+2. The holder posts the code from the handle.
+3. `POST /api/link/check {handle, post, secret, controller}`: the linker requires the secret, reads the post through
+   fxtwitter, checks the author is the handle, the post contains the code and is not older than it, and returns a
+   **link id** `<handle>.<controller>.<expiry>.<signature>`: the Verifier's own ed25519 signature over
+   `"POF-LINK2" ‖ program id ‖ handle ‖ 0x00 ‖ controller ‖ expiry (u64)`, valid one hour. After 5 wrong tries the code is
+   burnt.
 
-The link id is the subject proof; no handle state is stored. The client also derives the X certificate's **controller**
-key, `Ed25519(sha256(ctlSeed ‖ "x:" ‖ handle))` with `ctlSeed = sha256("pof:ctl:v1" ‖ vault seed)`.
+The link id is the subject proof, and it certifies only with the controller it names. No handle state is kept on our side.
 
 ## Step 3. The disclosure package
 
@@ -87,7 +104,7 @@ key, `Ed25519(sha256(ctlSeed ‖ "x:" ‖ handle))` with `ctlSeed = sha256("pof:
   "v": 1,
   "subject": { "kind": 0, "value": "<wallet | handle | badge key>", "proof": "<signature | link id>", "slot": "<slot>" },
   "asset": 0, "tier": 3,
-  "ring": { "owner": "<vault owner key>", "nk": "<hex 31>" },
+  "ring": { "owner": "<vault owner key>", "nk": "<hex 31>", "proof": "<ring owner's signature over the disclosure message>" },
   "notes": [ { "tree": "777pvSGe…", "leafIndex": "…", "asset": "<mint>", "amount": "…", "blinding": "<hex 32>",
                "sig": "<transaction that created the note>" } ],
   "payer": "<wallet, or the relayer>", "relay": false,
@@ -103,9 +120,10 @@ In this order, each failure with its own code (`verifier/src/verify.ts`):
 
 1. Version 1; a known asset and tier; 1 to 8 notes; for kind 1 a controller that is not the default key, for kinds 0 and 2
    no controller other than the subject key. With `relay: true`, the payer must be the relayer.
-2. The subject proof: the signature over the subject message by the subject key, with a fresh slot
-   (`BAD_SUBJECT_PROOF`, `SUBJECT_PROOF_STALE`), or a link id this Verifier issued, unexpired, for this handle
-   (`LINK_EXPIRED`).
+2. The signatures: the ring owner's over the disclosure message, always (`BAD_RING_PROOF`); the subject key's over the same bytes for kinds
+   0 and 2, with a fresh slot (`BAD_SUBJECT_PROOF`, `SUBJECT_PROOF_STALE`); for kind 1 a link id this Verifier issued,
+   unexpired, for this handle and bound to this package's controller (`LINK_EXPIRED`, `LINK_OTHER_CONTROLLER`,
+   `LINK_UNBOUND`).
 3. The ring: a User Registry record exists for `ring.owner` (`NO_RING`) and `Poseidon(nk)` equals its `npk`
    (`NULLIFIER_KEY_MISMATCH`).
 4. The tree: one read of the tree account gives the current state root, its slot (the u64 at offset 120), the 500-root
@@ -121,8 +139,8 @@ In this order, each failure with its own code (`verifier/src/verify.ts`):
 8. Age: each note's creating transaction (from the indexer) created that commitment at that leaf, at least 150 slots ago
    (`NOTE_TOO_NEW`).
 9. The sum of the amounts reaches the tier minimum (`BELOW_TIER`). The sum is compared, never returned.
-10. One note, one certificate: a keyed index `HMAC(seal key, nullifier)` refuses a note already behind another live
-    certificate for a different subject or asset (`NOTE_IN_USE`).
+10. One note, one certificate: a keyed index `HMAC(seal key, nullifier)`, taken with an atomic create-if-absent, refuses
+    a note already behind another live certificate for a different subject or asset (`NOTE_IN_USE`).
 
 ## Step 5. Salts, hashes and the 240 bytes
 
@@ -138,7 +156,7 @@ Then it signs, with ed25519, exactly these bytes (CONTRACT §3):
 | 37 | 32 | subject hash: `sha256("pof:wallet:" ‖ base58)`, `sha256("pof:x:" ‖ lowercase handle)`, `sha256("pof:badge:" ‖ base58)` |
 | 69 | 1 | asset (0 SOL, 1 USDC) |
 | 70 | 1 | tier (1 to 5) |
-| 71 | 32 | the Rings state root of tree 0 the notes were found under |
+| 71 | 32 | the Rings state root of tree 0 at the Verifier's read (the head; every note's path reaches a root in the tree's on-chain history up to it) |
 | 103 | 8 | that root's slot (u64) |
 | 111 | 1 | note count |
 | 112 | 32 | `nullset_hash` |
@@ -168,8 +186,10 @@ The program refuses an attestation older than **300 slots** (`max_attest_age`), 
 - **X handle or badge.** The holder asks `GET /api/relay/quote` for the exact lamports (the fee, the certificate rent, a
   network fee, and a few unique lamports that tag the payment), pays that amount to the relayer from any wallet or as a
   Ring withdrawal, then calls `POST /api/relay/certify` with the attestation, its hashes, the log index and the quote. The
-  relayer finds the matching unused payment, checks its rolling 24-hour spend cap and balance floor, and submits the same
-  two instructions as payer.
+  relayer checks its rolling 24-hour spend cap and balance floor before it uses a payment, finds the matching unused
+  payment, and submits the same two instructions as payer; if `certify` fails, the payment is released for another try.
+  The client pays the relayer by default as a withdrawal from the vault, so no wallet appears in the certificate, its
+  event or its log entry.
 
 ## Step 7. What the program checks
 
@@ -191,8 +211,9 @@ and emits `Certified`.
 ## Step 8. Renew
 
 `renew` takes a fresh attestation over the **same notes** (the same salted hashes), the same subject, asset and
-controller, with a newer issued slot. The Verifier re-checks everything in Step 4; the program updates the root, the slots
-and the tier, and charges the fee again.
+controller, with a newer issued slot. The holder sends the package again with the certificate's salts from the kit
+(`salts`, one per note), so the Verifier re-checks everything in Step 4 and produces the same salted hashes. The program
+updates the root, the slots and the tier, and charges the fee again.
 
 ## Step 9. Reading and gating
 
