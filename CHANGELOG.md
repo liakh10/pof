@@ -36,6 +36,8 @@ the first release of each will move its section under a version heading with its
 - `launch.mjs`, `wind-down.mjs`, `ops.mjs`; the suite, wind-down, rehearsal and own-CA tests. (`73d71dd`)
 - `revoke_signed(valid_until)`: the controller's ed25519 signature over the 156 POF-REVOKE1 bytes, submitted and paid by
   anyone, so no wallet signs or pays a holder's revoke. (`b605c03`, `74654cb`)
+- The staged full-depth revoke (`open_path`, `stage_path`, `revoke_spent_staged`, `close_path`) in legacy transactions,
+  tested on a real mainnet path; `revoke_verifier_key` and `void_by_key` (status 4, voided). (`bdfdf93`)
 - The program test report: unit 7/7, suite 32/32 twice, wind-down 7/7, rehearsal 23/23, own-CA 12/12. (`ad07261`)
 #### Changed
 - Config gains `held_delay` and `held_until`; IDLs refreshed. (`73d71dd`)
