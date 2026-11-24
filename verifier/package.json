@@ -10,7 +10,8 @@
     "build:check": "node scripts/build.mjs --check",
     "test": "node --test test/*.test.mjs",
     "keys": "node scripts/keys.mjs",
-    "build:verify": "node scripts/build.mjs --verify"
+    "build:verify": "node scripts/build.mjs --verify",
+    "sync-idl": "node -e \"require('fs').copyFileSync('../program/idl/pof.json', 'idl/pof.json')\" && npm run build"
   },
   "dependencies": {
     "@heliuslabs/spr": "0.9.0-alpha",

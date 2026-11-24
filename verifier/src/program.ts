@@ -3,7 +3,7 @@
      certify     = [ed25519(verifier, §3 bytes), certify(att, log_index)]
      anchor_log  = [ed25519(verifier, §7 signed head), anchor_log(size, head)]
      revoke_spent(index, salt, nullifier, membership?)  (PDA path; the nullifier-tree path when the PDA is gone) */
-import IDL from '../../program/idl/pof.json';
+import IDL from '../idl/pof.json'; // vendored: npm run sync-idl copies it from program/idl, so the bundle reads only files in this folder
 import { PofError, fromB58, toB58 } from './codec.js';
 import { decodeAttestation, revokeBytes, sthBytes } from './contract.js';
 import type { CertificateView, PofChain } from './chain.js';

@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 
+let lastInputs = [];
 async function once(outfile) {
   await build({
     absWorkingDir: here,
@@ -30,7 +31,12 @@ async function once(outfile) {
     charset: 'utf8',
     // web3.js and a few dependencies are CommonJS: give them a require that resolves from the bundle
     banner: { js: "import { createRequire as __pofRequire } from 'node:module'; const require = __pofRequire(import.meta.url);" },
-  });
+    metafile: true,
+  }).then(r => { lastInputs = Object.keys(r.metafile.inputs); });
+  // every input must live in this folder (sources, lib, idl, keepers.json, node_modules from the lockfile): a file elsewhere in
+  // the repo would let another part's commit change the bundle without changing BUILD.json
+  const outside = lastInputs.filter(f => f.startsWith('..') || path.isAbsolute(f));
+  if (outside.length) { console.error('bundle inputs outside verifier/: ' + outside.join(', ')); process.exit(1); }
   return fs.readFileSync(outfile);
 }
 
@@ -55,7 +61,8 @@ if (process.argv.includes('--verify')) {
   process.exit(0);
 }
 const lock = fs.readFileSync(path.join(here, 'package-lock.json'));
-const sources = Object.fromEntries(fs.readdirSync(path.join(here, 'src')).sort().map(f => [f, sha(fs.readFileSync(path.join(here, 'src', f)))]));
+const own = lastInputs.filter(f => !f.startsWith('node_modules/')).sort();
+const sources = Object.fromEntries(own.map(f => [f, sha(fs.readFileSync(path.join(here, f)))]));
 const info = { bundle: 'dist/pof-verifier.mjs', sha256: sha(out), bytes: out.length, esbuild: esbuildVersion, node: process.version.split('.')[0], lockfileSha256: sha(lock), sources };
 fs.writeFileSync(path.join(here, 'dist/BUILD.json'), JSON.stringify(info, null, 2) + '\n');
 console.log(JSON.stringify({ sha256: info.sha256, bytes: info.bytes }));
