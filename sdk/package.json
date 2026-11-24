@@ -34,7 +34,8 @@
     "build": "rm -rf dist && tsc -p tsconfig.json",
     "test": "npm run build && node --test test/",
     "sync-idl": "node scripts/sync-idl.mjs",
-    "pack": "npm run build && npm pack --pack-destination release"
+    "pack": "npm run build && npm pack --pack-destination release",
+    "test:local": "npm run build && zsh scripts/local-chain.sh"
   },
   "devDependencies": {
     "@solana/web3.js": "^1.98.4",

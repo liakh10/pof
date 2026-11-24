@@ -1,0 +1,27 @@
+#!/bin/zsh
+# A local validator with this build of pof and pof_gate (upgradeable, a throwaway upgrade authority), on devx's own ports,
+# then the integration suite against it, then stop. Never starts a 4th validator on the machine.
+#   zsh sdk/scripts/local-chain.sh            (from the repo root or anywhere)
+set -e
+here=${0:A:h}
+root=${here:h:h}
+run=${POF_DEVX_RUN:-${TMPDIR:-/tmp}/pof-devx}
+mkdir -p $run
+n=$(pgrep -x solana-test-validator | wc -l | tr -d ' ')
+if (( n >= 3 )); then echo "$n validators already run on this machine (limit 3): not starting"; exit 2; fi
+rpc_port=51899
+if lsof -nP -iTCP:$rpc_port -sTCP:LISTEN >/dev/null 2>&1; then echo "port $rpc_port is busy"; exit 1; fi
+[[ -f $run/authority.json ]] || solana-keygen new --no-bip39-passphrase -s -o $run/authority.json >/dev/null
+pof_id=$(solana-keygen pubkey $root/program/target/deploy/pof-keypair.json)
+gate_id=$(solana-keygen pubkey $root/program/target/deploy/pof_gate-keypair.json)
+solana-test-validator --reset --quiet --ledger $run/ledger --limit-ledger-size 10000000 \
+  --rpc-port $rpc_port --faucet-port 52900 --gossip-port 51000 --dynamic-port-range 51100-51300 --ticks-per-slot 16 \
+  --upgradeable-program $pof_id $root/program/target/deploy/pof.so $run/authority.json \
+  --upgradeable-program $gate_id $root/program/target/deploy/pof_gate.so $run/authority.json &
+vpid=$!
+trap 'kill $vpid 2>/dev/null; wait $vpid 2>/dev/null; rm -rf $run/ledger' EXIT
+for i in {1..60}; do
+  curl -s -X POST -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' http://127.0.0.1:$rpc_port | grep -q ok && break
+  sleep 1
+done
+POF_LOCAL_RPC=http://127.0.0.1:$rpc_port POF_AUTHORITY=$run/authority.json node --test --test-timeout=300000 $root/sdk/test/integration/
