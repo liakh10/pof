@@ -94,10 +94,12 @@ export function makeCtx({ relayFree = false, env = {} } = {}) {
   const log = new V.TransparencyLog(store, signer, programId);
   const keeper = new V.Keeper(store, sealKey, rings, chain);
   const locks = new V.NoteLocks(store, V.sha256(sealKey), 9000n, chain);
-  const verifier = new V.Verifier({ programId, minAgeSlots: 150n, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 150n, relayer: relayerSigner.address, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, log, keeper, locks);
+  const witnessSecret = new Uint8Array(crypto.randomBytes(32));
+  const escrow = new V.Escrow(store, [{ kid: 'witness-test', operator: 'test witness', x25519: hex(V.x25519Public(witnessSecret)) }]);
+  const verifier = new V.Verifier({ programId, minAgeSlots: 150n, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 150n, relayer: relayerSigner.address, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, log, keeper, locks, escrow);
   const relayer = new V.Relayer({ address: relayerSigner.address, verifierKey: signer.publicKey, programId, dailyCapLamports: 1_000_000_000n, balanceFloorLamports: 50_000_000n, quoteTtlSec: 1800, free: relayFree, hmacKey: V.sha256(sealKey, Uint8Array.of(1)) }, store, chain, log);
   const linker = new V.Linker(store, (h, exp, ctl) => verifier.linkToken(h, exp, ctl));
-  const ctx = { env: { POF_PROGRAM: V.toB58(programId), CRON_SECRET: 'cron-test', ...env }, programId, signer, relayerSigner, store, rings, chain, log, keeper, locks, verifier, relayer, linker, sealKey, dir };
+  const ctx = { env: { POF_PROGRAM: V.toB58(programId), CRON_SECRET: 'cron-test', ...env }, programId, signer, relayerSigner, store, rings, chain, log, keeper, locks, escrow, witnessSecret, verifier, relayer, linker, sealKey, dir };
   return ctx;
 }
 

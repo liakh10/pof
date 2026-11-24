@@ -1,0 +1,10 @@
+{
+  "note": "Keepers that receive every kit sealed to their X25519 key (src/escrow.ts). Add an operator with a reviewed commit; the published bundle hash pins this file. kid is a short stable name.",
+  "keepers": [
+    {
+      "kid": "pof-1",
+      "operator": "Proof of Funds keeper (api/keeper/scan)",
+      "x25519": "30d36e37f3efdb51512bb750c16198ca5e79d00c4a42c56e6d13a372240bea44"
+    }
+  ]
+}

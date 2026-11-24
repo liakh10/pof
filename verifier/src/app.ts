@@ -17,6 +17,7 @@ import { Keeper } from './keeper.js';
 import { Relayer } from './relayer.js';
 import { Linker } from './linker.js';
 import { NoteLocks } from './locks.js';
+import { Escrow } from './escrow.js';
 import { bucket, sweepLimits, windowCap } from './limits.js';
 import type { PofChain } from './chain.js';
 import { makeProgramChain } from './program.js';
@@ -40,7 +41,7 @@ function keyJson(envName: string, file: string): string | null {
 export interface Ctx {
   env: Record<string, string | undefined>;
   programId: Uint8Array; signer: Signer; relayerSigner: Signer | null; store: Store; rings: RingsSource; chain: PofChain | null;
-  log: TransparencyLog; keeper: Keeper; locks: NoteLocks; verifier: Verifier; relayer: Relayer | null; linker: Linker; sealKey: Uint8Array;
+  log: TransparencyLog; keeper: Keeper; locks: NoteLocks; escrow?: Escrow; verifier: Verifier; relayer: Relayer | null; linker: Linker; sealKey: Uint8Array;
 }
 
 let ctx: Ctx | null = null;
@@ -65,7 +66,7 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
   const store: Store = overrides.store || (env.POF_STORE && env.POF_STORE.startsWith('fs:') ? new FsStore(env.POF_STORE.slice(3)) : new BlobStore(env.POF_BLOB_PREFIX || 'pof/'));
   const rpcUrls = String(env.SOLANA_RPC || 'http://127.0.0.1:8899').split(',').map(s => s.trim()).filter(Boolean);
   const rpc = jsonRpc(rpcUrls);
-  const rings = overrides.rings || new HeliusRings(rpc, { url: env.HELIUS_SPR_URL || 'https://mainnet.helius-rpc.com/v1/spr', apiKey: env.HELIUS_API_KEY }, rpcUrls[0]);
+  const rings = overrides.rings || new HeliusRings(rpc, { url: env.HELIUS_SPR_URL || 'https://mainnet.helius-rpc.com/v1/spr', apiKey: env.HELIUS_API_KEY || (() => { const k = String(env.HELIUS_KEYS || '').split(',').map(s => s.trim()).filter(Boolean); return k.length ? k[Math.floor(Math.random() * k.length)] : undefined; })() }, rpcUrls[0]);
   const base = { env, programId, signer, relayerSigner, store, rings, sealKey };
   let chain: PofChain | null = overrides.chain !== undefined ? overrides.chain : chainFactory ? await chainFactory(base as any) : null;
   if (overrides.chain === undefined && !chainFactory && relayerSigner) {
@@ -76,19 +77,20 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
   const certifyWindow = BigInt(env.POF_CERTIFY_WINDOW_SLOTS || 300); // the program's max_attest_age
   const keeper = new Keeper(store, sealKey, rings, chain, certifyWindow);
   const locks = new NoteLocks(store, sha256(text('pof:locks:'), sealKey), certifyWindow, chain);
+  const escrow = new Escrow(store);
   const mints: Record<number, string> = { 0: ASSETS[0].mint, 1: env.POF_USDC_MINT || ASSETS[1].mint };
   const verifier = new Verifier({
-    programId, minAgeSlots: BigInt(env.POF_MIN_AGE_SLOTS ?? 150), validitySlots: BigInt(env.POF_VALIDITY_SLOTS ?? 6_480_000),
+    programId, minAgeSlots: BigInt(env.POF_MIN_AGE_SLOTS ?? 150), validitySlots: BigInt(env.POF_VALIDITY_SLOTS ?? 216_000),
     subjectProofSlots: BigInt(env.POF_SUBJECT_PROOF_SLOTS ?? 1_500), maxRootAgeSlots: 150n, maxRootLagSlots: BigInt(env.POF_MAX_ROOT_LAG_SLOTS ?? 9_000),
     relayer: relayerSigner?.address ?? null, mints, bundleHash: bundleHash(),
-  }, signer, rings, log, keeper, locks);
+  }, signer, rings, log, keeper, locks, escrow);
   const relayer = relayerSigner && chain ? new Relayer({
     address: relayerSigner.address, verifierKey: signer.publicKey, programId,
     dailyCapLamports: BigInt(env.POF_RELAY_DAILY_LAMPORTS ?? 2_000_000_000), balanceFloorLamports: BigInt(env.POF_RELAY_FLOOR_LAMPORTS ?? 50_000_000),
     quoteTtlSec: 1800, free: env.POF_RELAY_FREE === '1', hmacKey: sha256(text('pof:quote:'), sealKey),
   }, store, chain, log) : null;
   const linker = new Linker(store, (h, exp, ctl) => verifier.linkToken(h, exp, ctl));
-  ctx = { env, programId, signer, relayerSigner, store, rings, chain, log, keeper, locks, verifier, relayer, linker, sealKey };
+  ctx = { env, programId, signer, relayerSigner, store, rings, chain, log, keeper, locks, escrow, verifier, relayer, linker, sealKey };
   return ctx;
 }
 
@@ -204,7 +206,17 @@ export const routes = {
     if (c.env.POF_KEEPER_LIVE !== '1') return json({ ok: true, skipped: 'the keeper is off before launch (POF_KEEPER_LIVE)' });
     const rep = await c.keeper.scan();
     const swept = await sweepLimits(c.store).catch(() => 0);
-    return json({ ...rep, sweptLimitWindows: swept });
+    const escrowSwept = c.escrow ? await c.escrow.sweep(BigInt(rep.slot)).catch(() => 0) : 0;
+    return json({ ...rep, sweptLimitWindows: swept, sweptEscrow: escrowSwept });
+  }),
+
+  /** GET /api/keeper/escrow?after=<name>&limit=<n>: every live kit sealed to each registered keeper (public; POF-01) */
+  keeperEscrow: wrap(async (req) => {
+    const c = await context();
+    bucket(`escrow:${clientOf(req)}`, 30, 15);
+    const q = new URL(req.url).searchParams;
+    if (!c.escrow) throw new PofError('ESCROW_OFF', 'no keeper escrow here', 503);
+    return json(await c.escrow.list(q.get('after') || '', Number(q.get('limit') || 100)), 200, { 'cache-control': 'public, max-age=15' });
   }),
 
   /** cron: anchors the log head on chain (anchor_log, the §7 signed head) when the log grew since the last anchor */
@@ -257,5 +269,5 @@ export const areas = {
   log: () => routes.log,
   relay: () => byFn({ quote: routes.relayQuote, certify: routes.relayCertify }),
   link: () => byFn({ start: routes.linkStart, check: routes.linkCheck, verify: routes.linkVerify, link: routes.linkVerify }),
-  keeper: () => byFn({ scan: routes.keeperScan, anchor: routes.keeperAnchor }),
+  keeper: () => byFn({ scan: routes.keeperScan, anchor: routes.keeperAnchor, escrow: routes.keeperEscrow }),
 };

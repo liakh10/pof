@@ -1,16 +1,17 @@
 {
   "bundle": "dist/pof-verifier.mjs",
-  "sha256": "c91822d2e9e185c795edf68394bee4d5e7f65fe9edbc4d45f97d19d8670e5cf8",
-  "bytes": 9753698,
+  "sha256": "c36a3ef71dce13efd6890faf9f664957699f1f1939adbbe911470c498977c25c",
+  "bytes": 9758776,
   "esbuild": "0.28.2",
   "node": "v20",
   "lockfileSha256": "9430500324f9bc92396bc6a464bf88d994b8840508a04eacd12ce1ee61ed4c3a",
   "sources": {
-    "app.ts": "a5047a8eb790a78bfbf3c83504b0066034c557d4075e1accba6aa367172fda3c",
+    "app.ts": "642d103541ab718d15c6170fbd96ca80f56f52efbd84fde2df7a45fa2e41684a",
     "chain.ts": "c3d870965b1d58fa34d44210b66dde8da5ddd124dce04278ad8739eb5043e6a9",
     "codec.ts": "3d380b86222ce55d20c0335da50a9b67afa6b85428070a38174fa3e8e94200c4",
     "contract.ts": "235e2445b0a43805cef5e1234baa5b9741dc7b8f12f584c554ed8e4e0f6b2359",
-    "index.ts": "1c8b3fa450691e9fab6960b235a5353f7df1c0aa3fc58177b8da6f5f307ce6bf",
+    "escrow.ts": "c8bbcae66bd45d0c9d5f2f60a0bc1d4c7569b351c43c7b5e260edb4e7855ad7a",
+    "index.ts": "53f35686290181dd8709f70520e25fad282b65e782ecde5f66bd76492b4582fb",
     "keeper.ts": "47b24e2bd9ebb75bf5576778ad45c020cf6ecca30273c9585e3a150c3702eb3f",
     "keys.ts": "be8cefee811df1b821f0bf423bf63b549cf9c2c04737fe15a9b5e6327780e29d",
     "limits.ts": "a582fbf86d1961a42ed9946f1005e384e7cc43af15ae56ac6a6da269f0d81062",
@@ -22,6 +23,6 @@
     "relayer.ts": "3bc15c362a53d18c7a9140b48d47ebd9b20144c4c5346ee9ae1cb24ba19d582b",
     "rings.ts": "949167070d03d1d234736514766f61389f90834dec11677eceebd9a3f5a0040a",
     "store.ts": "b95cbbadfe71f5e75ac65d657f401f6628d8a297e9e0ec0e4ad6622dfa4bab6e",
-    "verify.ts": "159410bc6591a6230199404658e5ea69d97a75d595b52a5e5ea405f4a0adae97"
+    "verify.ts": "8c9aa581c7d4e43b2079edc1c93851608ad8cecb7937e04e8ece7c6c740ada94"
   }
 }

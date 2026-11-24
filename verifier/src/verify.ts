@@ -13,6 +13,7 @@ import type { RingsSource } from './rings.js';
 import type { TransparencyLog } from './log.js';
 import type { Keeper } from './keeper.js';
 import type { NoteLocks } from './locks.js';
+import type { Escrow } from './escrow.js';
 import crypto from 'node:crypto';
 
 export interface VerifierConfig {
@@ -61,6 +62,8 @@ export interface Disclosure {
   payer: string; relay?: boolean;
   /** kind 1 only: the key the holder's client keeps to revoke the certificate and join rooms with it */
   controller?: string;
+  /** a renew only: the salts of the live certificate (from the holder's kit), one per note in order */
+  salts?: string[];
 }
 
 export interface AttestResult {
@@ -69,7 +72,7 @@ export interface AttestResult {
 }
 
 export class Verifier {
-  constructor(public cfg: VerifierConfig, private signer: Signer, private rings: RingsSource, private log: TransparencyLog, private keeper: Keeper | null, private locks: NoteLocks | null = null) {}
+  constructor(public cfg: VerifierConfig, private signer: Signer, private rings: RingsSource, private log: TransparencyLog, private keeper: Keeper | null, private locks: NoteLocks | null = null, private escrow: Escrow | null = null) {}
 
   get key() { return this.signer.address; }
 
@@ -204,7 +207,12 @@ export class Verifier {
       if (this.locks) await this.locks.take(nullifiers, { subjectHash: hex(sHash), asset, issuedSlot: Number(slot), expirySlot: Number(slot + this.cfg.validitySlots) }, slot);
 
       /* salts, the nullset, the bytes */
-      const salts = notes.map(() => new Uint8Array(crypto.randomBytes(32)));
+      /* a renew reuses the certificate's salts (the holder's kit), so the salted hashes stay those the certificate stores */
+      let salts: Uint8Array[];
+      if (p.salts !== undefined) {
+        if (!Array.isArray(p.salts) || p.salts.length !== notes.length) throw new PofError('BAD_SALTS', 'salts (for a renew) are one hex32 per note, in the notes\' order');
+        salts = p.salts.map((x, i) => unhex(x, 32, `salts[${i}]`));
+      } else salts = notes.map(() => new Uint8Array(crypto.randomBytes(32)));
       const hs = notes.map((_, k) => saltedNullifier(salts[k], nullifiers[k]));
       const sorted = sortHashes(hs);
       const att = encodeAttestation({
@@ -214,7 +222,9 @@ export class Verifier {
       });
       const sig = this.signer.sign(att);
       const logIndex = await this.log.append(logLeaf(att, sig, this.signer.publicKey, this.cfg.bundleHash, slot));
-      if (this.keeper) await this.keeper.hold({ subjectHash: hex(sHash), asset, tree, expirySlot: Number(slot + this.cfg.validitySlots), attestation: hex(att), kit: notes.map((_, k) => ({ h: hex(hs[k]), salt: hex(salts[k]), nullifier: hex(nullifiers[k]) })) });
+      const kit = { subjectHash: hex(sHash), asset, tree, expirySlot: Number(slot + this.cfg.validitySlots), attestation: hex(att), kit: notes.map((_, k) => ({ h: hex(hs[k]), salt: hex(salts[k]), nullifier: hex(nullifiers[k]) })) };
+      if (this.keeper) await this.keeper.hold(kit);
+      if (this.escrow) await this.escrow.put(kit);
       return {
         attestation: hex(att), signature: hex(sig), verifierKey: this.signer.address,
         salts: salts.map(hex), nullifiers: nullifiers.map(hex), hashes: sorted.map(hex), logIndex,

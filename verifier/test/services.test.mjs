@@ -155,3 +155,42 @@ test('HTTP: routes answer JSON, every rejection has a code, limits answer 429, c
   assert.equal(res.status, 404);
   V.setContext(null);
 });
+
+test('keeper escrow (POF-01): every kit is sealed to each registered keeper, who can open it and revoke without us', async () => {
+  const c = makeCtx({ relayFree: true });
+  V.setContext(c);
+  const r = ring(); c.rings.register(r);
+  const a = c.rings.note(r, 2n * SOL);
+  const out = await c.verifier.attest(pkg(c, r, [a]));
+  const res = await V.areas.keeper()(new Request('https://pof.test/api/keeper/escrow'));
+  const list = await res.json();
+  assert.equal(list.entries.length, 1); assert.equal(list.keepers[0].kid, 'witness-test');
+  const e = list.entries[0];
+  const raw = JSON.stringify(e);
+  assert.ok(!raw.includes(out.nullifiers[0]) && !raw.includes(out.salts[0]), 'the escrow listing carries no nullifier or salt in clear');
+  const kit = V.openEnvelope(c.witnessSecret, 'witness-test', Buffer.from(e.attestationHash, 'hex'), e.envelopes[0]);
+  assert.equal(kit.kit[0].nullifier, out.nullifiers[0]); assert.equal(kit.kit[0].salt, out.salts[0]);
+  assert.throws(() => V.openEnvelope(new Uint8Array(32).fill(1), 'witness-test', Buffer.from(e.attestationHash, 'hex'), e.envelopes[0]));
+  assert.throws(() => V.openEnvelope(c.witnessSecret, 'other', Buffer.from(e.attestationHash, 'hex'), e.envelopes[0]));
+  // the witness revokes with what it opened, through the same permissionless instruction
+  await c.chain.certify({ attestation: Buffer.from(out.attestation, 'hex'), signature: Buffer.from(out.signature, 'hex'), logIndex: out.logIndex, hashes: out.hashes.map(h => Buffer.from(h, 'hex')) });
+  c.rings.spend(a.nullifier);
+  const cert = await c.chain.certificate(V.subjectHash(0, r.owner), 0);
+  await c.chain.revokeSpent({ subjectHash: Buffer.from(kit.subjectHash, 'hex'), asset: kit.asset, index: cert.hashes.indexOf(kit.kit[0].h), salt: Buffer.from(kit.kit[0].salt, 'hex'), nullifier: Buffer.from(kit.kit[0].nullifier, 'hex'), tree: kit.tree });
+  assert.equal((await c.chain.certificate(V.subjectHash(0, r.owner), 0)).status, 1);
+  // expired entries are swept
+  assert.equal(await c.escrow.sweep(BigInt(kit.expirySlot) + 10_000n), 1);
+  V.setContext(null);
+});
+
+test('renew: the holder\'s salts give the same salted hashes, so renew keeps the certificate\'s list', async () => {
+  const c = makeCtx();
+  const r = ring(); c.rings.register(r);
+  const a = c.rings.note(r, 2n * SOL);
+  const first = await c.verifier.attest(pkg(c, r, [a]));
+  c.rings.slotNow += 1000n; c.rings.headSlot = c.rings.slotNow - 5n;
+  const again = await c.verifier.attest({ ...pkg(c, r, [a], { slot: c.rings.slotNow }), salts: first.salts });
+  assert.deepEqual(again.hashes, first.hashes);
+  assert.ok(V.decodeAttestation(Buffer.from(again.attestation, 'hex')).issuedSlot > V.decodeAttestation(Buffer.from(first.attestation, 'hex')).issuedSlot);
+  await rej(c.verifier.attest({ ...pkg(c, r, [a], { slot: c.rings.slotNow }), salts: ['00'] }), 'BAD_LENGTH');
+});

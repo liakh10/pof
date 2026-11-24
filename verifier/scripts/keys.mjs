@@ -2,13 +2,13 @@
      node scripts/keys.mjs            make the missing ones in ~/.config/pof/ (dir 700, files 600); print public keys only
      node scripts/keys.mjs --vercel   also push them to the linked Vercel project's env (production + preview), values via stdin
    Files: verifier.json and relayer.json (Solana keypair JSON: 64 numbers), seal.hex (32 bytes: the keeper's AES key and the
-   note-lock / quote HMAC root). An existing file is never overwritten; rotating the verifier is set_verifier on chain. */
+   note-lock / quote HMAC root), keeper.x25519 (our keeper's escrow key; its public half goes into keepers.json). An existing file is never overwritten; rotating the verifier is set_verifier on chain. */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { ed25519 } from '@noble/curves/ed25519.js';
+import { ed25519, x25519 } from '@noble/curves/ed25519.js';
 import { getBase58Decoder } from '@solana/kit';
 
 const dir = path.join(os.homedir(), '.config', 'pof');
@@ -35,8 +35,15 @@ function sealKey() {
   return { file: f, value: fs.readFileSync(f, 'utf8').trim() };
 }
 
-const v = keypair('verifier'), r = keypair('relayer'), s = sealKey();
-console.log(JSON.stringify({ dir, verifier: v.pub, relayer: r.pub, seal: 'present (not shown)' }, null, 2));
+function x25519Key(name) {
+  const f = path.join(dir, name + '.x25519');
+  if (!fs.existsSync(f)) fs.writeFileSync(f, crypto.randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
+  fs.chmodSync(f, 0o600);
+  const sk = Buffer.from(fs.readFileSync(f, 'utf8').trim(), 'hex');
+  return { file: f, pub: Buffer.from(x25519.getPublicKey(sk)).toString('hex'), value: sk.toString('hex') };
+}
+const v = keypair('verifier'), r = keypair('relayer'), s = sealKey(), k = x25519Key('keeper');
+console.log(JSON.stringify({ dir, verifier: v.pub, relayer: r.pub, seal: 'present (not shown)', keeperX25519: k.pub }, null, 2));
 
 if (process.argv.includes('--vercel')) {
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');

@@ -120,7 +120,9 @@ try {
   const relayer = new V.Relayer({ address: keys.relayer.address, verifierKey: keys.verifier.publicKey, programId, dailyCapLamports: 2_000_000_000n, balanceFloorLamports: 50_000_000n, quoteTtlSec: 1800, free: true, hmacKey: V.sha256(sealKey, Uint8Array.of(1)) }, store, chain, log);
 
   // an X handle linked (the link id is what /api/link/check returns), then the package the client builds
-  const linkId = verifier.linkToken('e2e_anon', Math.floor(Date.now() / 1000) + 600);
+  // the link id /api/link/check gives (bound to the vault's controller for this handle; the linker's own flow is unit-tested)
+  const ctlOf = async (h) => (await pof.subject({ kind: 1, value: h, asset: 0, tier: 1, payer: keys.relayer.address, from: 'vault', linkId: 'x' })).controller;
+  const linkId = verifier.linkToken('e2e_anon', Math.floor(Date.now() / 1000) + 600, await ctlOf('e2e_anon'));
   for (let i = 0; i < 20 && (await conn.getSlot('confirmed')) < Number(notes[0].slot ?? 0) + 3; i++) await new Promise(r => setTimeout(r, 400));
   await new Promise(r => setTimeout(r, 1500));
   const pick = await pof.choose({ asset: 0, tier: 1, from: 'vault', list: notes });
@@ -142,7 +144,7 @@ try {
   ok(rep.live === 1 && rep.revoked.length === 0, 'the keeper holds the sealed kit and sees the certificate live, nothing spent');
 
   // the same note cannot back a second handle
-  const link2 = verifier.linkToken('second_anon', Math.floor(Date.now() / 1000) + 600);
+  const link2 = verifier.linkToken('second_anon', Math.floor(Date.now() / 1000) + 600, await ctlOf('second_anon'));
   const subj2 = await pof.subject({ kind: 1, value: 'second_anon', asset: 0, tier: 1, payer: keys.relayer.address, from: 'vault', linkId: link2 });
   await assert.rejects(verifier.attest(JSON.parse(JSON.stringify(pof.disclose({ subject: subj2, asset: 0, tier: 1, notes: pick.notes, payer: keys.relayer.address, relay: true, from: 'vault' })))), e => e.code === 'NOTE_IN_USE');
   ok(true, 'the same note is refused for a second handle (NOTE_IN_USE)');
@@ -182,6 +184,7 @@ try {
   await stopValidator();
   fs.writeFileSync(path.join(SCR, 'e2e-report.txt'), report.join('\n') + '\n');
   console.log(`\nall ${report.length} checks passed`);
+  process.exit(0); // web3's websocket keeps reconnecting to the stopped node otherwise
 } catch (e) {
   console.error('FAILED:', e?.message || e, e?.details ? JSON.stringify(e.details) : '');
   await stopValidator();
