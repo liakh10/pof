@@ -158,7 +158,13 @@ test('local: USDC shield, sync, tiers with 6 decimals, attestation; mixed assets
     paid.set(transferSig, { lamports: 50_000_000n, signers: [rvault.owner] });
     assert.equal((await R.credits.claim({ id: pend.id })).count, 5);
     assert.equal(await R.credits.count(), 5);
-    await assert.rejects(credits.claim(seen.claims.at(-1)), e => e.code === 'ALREADY_CLAIMED');
+    // CR-02: the same claim again (a lost answer) is answered again with signatures for the same set; another set for the
+    // same transfer is refused
+    const again = await credits.claim(seen.claims.at(-1));
+    assert.equal(again.signatures.length, 5);
+    const B0 = await import('../dist/blind.mjs');
+    const otherSet = { ...seen.claims.at(-1), blinded: await Promise.all(Array.from({ length: 5 }, async () => (await B0.blind(creditKey, C.hex(crypto.randomBytes(32)))).blinded)) };
+    await assert.rejects(credits.claim(otherSet), e => e.code === 'ALREADY_CLAIMED' || e.code === 'BAD_CLAIM_PROOF');
     // what the relayer saw at the claim are blinded values, none equal to a token or its FDH image
     const B = await import('../dist/blind.mjs');
     assert.equal(fs.readFileSync(new URL('../dist/blind.mjs', import.meta.url), 'utf8'), fs.readFileSync(new URL('../../verifier/lib/blind.mjs', import.meta.url), 'utf8'));

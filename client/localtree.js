@@ -44,6 +44,30 @@ export function decodeDeposit(data, keys) {
   return { tree: keys[0], depositor: keys[1], deposits: deps };
 }
 
+/* the Rings deposits of one transaction as getTransaction returns it (encoding json, maxSupportedTransactionVersion 1, so
+   legacy, version 0 and version 1 messages all come back): top-level and inner SPP instructions, account keys including
+   those loaded from lookup tables, in order. A spend (transact, merge, ring transact) throws: LocalRings replays deposits only. */
+export function depositsOfTransaction(tx, tree = C.RINGS.tree) {
+  const m = tx.transaction.message;
+  const keys = [...m.accountKeys, ...((tx.meta && tx.meta.loadedAddresses && [...tx.meta.loadedAddresses.writable, ...tx.meta.loadedAddresses.readonly]) || [])];
+  const all = [];
+  m.instructions.forEach((ins, i) => {
+    all.push(ins);
+    const inner = ((tx.meta && tx.meta.innerInstructions) || []).find(x => x.index === i);
+    if (inner) all.push(...inner.instructions);
+  });
+  const out = [];
+  for (const ins of all) {
+    if (keys[ins.programIdIndex] !== SPP) continue;
+    const data = C.b58decode(ins.data);
+    if (data[0] === 16 || data[0] === 17 || data[0] === 19) throw Error('a spend on the local chain: LocalRings only replays deposits');
+    const d = decodeDeposit(data, ins.accounts.map(a => keys[a]));
+    if (!d || d.tree !== tree) continue;
+    for (const dep of d.deposits) out.push({ ...dep, depositor: d.depositor });
+  }
+  return out;
+}
+
 export class LocalRings {
   /* rpc: (method, params) => result, against the local validator */
   constructor(rpc, { tree = C.RINGS.tree, cloned = null } = {}) { this.rpc = rpc; this.tree = tree; this.cloned = cloned; this.base = null; this.leaves = []; this.seen = new Set(); this.memo = new Map(); }
@@ -86,28 +110,14 @@ export class LocalRings {
     for (const s of sigs) {
       this.seen.add(s.signature);
       if (s.err) continue;
-      const tx = await this.rpc('getTransaction', [s.signature, { encoding: 'json', commitment: 'confirmed', maxSupportedTransactionVersion: 0 }]);
+      const tx = await this.rpc('getTransaction', [s.signature, { encoding: 'json', commitment: 'confirmed', maxSupportedTransactionVersion: 1 }]);
       if (!tx) continue;
-      const keys = [...tx.transaction.message.accountKeys, ...((tx.meta.loadedAddresses && [...tx.meta.loadedAddresses.writable, ...tx.meta.loadedAddresses.readonly]) || [])];
-      const all = [];
-      tx.transaction.message.instructions.forEach((ins, i) => {
-        all.push(ins);
-        const inner = (tx.meta.innerInstructions || []).find(x => x.index === i);
-        if (inner) all.push(...inner.instructions);
-      });
-      for (const ins of all) {
-        if (keys[ins.programIdIndex] !== SPP) continue;
-        const data = C.b58decode(ins.data);
-        if (data[0] === 16 || data[0] === 17 || data[0] === 19) throw Error('a spend on the local chain: LocalRings only replays deposits');
-        const d = decodeDeposit(data, ins.accounts.map(a => keys[a]));
-        if (!d || d.tree !== this.tree) continue;
-        for (const dep of d.deposits) {
-          if (dep.memo) throw Error('a deposit with a memo: LocalRings does not hash memos');
-          const leafIndex = this.base.nextIndex + BigInt(this.leaves.length);
-          const blinding = C.depositBlinding(this.tree, leafIndex);
-          const leaf = C.commitment({ ownerHash: dep.ownerHash, asset: dep.asset, amount: dep.amount, blinding });
-          this.leaves.push({ leaf, leafIndex, slot: BigInt(s.slot), sig: s.signature, viewTag: C.b58encode(dep.viewTag), ownerHash: dep.ownerHash, asset: dep.asset, amount: dep.amount, blinding, depositor: d.depositor });
-        }
+      for (const dep of depositsOfTransaction(tx, this.tree)) {
+        if (dep.memo) throw Error('a deposit with a memo: LocalRings does not hash memos');
+        const leafIndex = this.base.nextIndex + BigInt(this.leaves.length);
+        const blinding = C.depositBlinding(this.tree, leafIndex);
+        const leaf = C.commitment({ ownerHash: dep.ownerHash, asset: dep.asset, amount: dep.amount, blinding });
+        this.leaves.push({ leaf, leafIndex, slot: BigInt(s.slot), sig: s.signature, viewTag: C.b58encode(dep.viewTag), ownerHash: dep.ownerHash, asset: dep.asset, amount: dep.amount, blinding, depositor: dep.depositor });
       }
     }
     this.memo.clear();
