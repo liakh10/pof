@@ -18,6 +18,8 @@ const common = { bundle: true, format: 'esm', platform: 'browser', target: 'es20
 for (const f of fs.readdirSync(dist)) if (/^chunk-.*\.js$/.test(f)) fs.rmSync(path.join(dist, f));
 const spr = await esbuild.build({ ...common, entryPoints: { spr: path.join(root, 'src/spr-entry.js'), 'spr-spend': path.join(root, 'src/spend-entry.js') }, outdir: dist, splitting: true, chunkNames: 'chunk-[hash]', plugins: [hasherAlias], metafile: true });
 await esbuild.build({ ...common, entryPoints: [path.join(root, 'src/web3-entry.js')], outfile: path.join(dist, 'web3.js') });
+// the blind RSA credits, byte for byte the Verifier's own module (verifier/lib/blind.mjs, zero dependencies)
+fs.copyFileSync(path.join(root, '../verifier/lib/blind.mjs'), path.join(dist, 'blind.mjs'));
 const H = path.join(root, 'node_modules/@lightprotocol/hasher.rs/dist');
 fs.copyFileSync(path.join(H, 'hasher_wasm_simd_bg.wasm'), path.join(dist, 'hasher-simd.wasm'));
 fs.copyFileSync(path.join(H, 'light_wasm_hasher_bg.wasm'), path.join(dist, 'hasher.wasm'));

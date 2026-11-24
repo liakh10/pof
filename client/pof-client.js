@@ -528,53 +528,99 @@ export async function createPofClient(opts = {}) {
     return spendFromVault('withdraw', { asset, amount, to: to || W.state().address });
   }
 
-  /* ---------------------------------------------------------------- relay credits (audit POF-12, round 2)
-     The relayer is paid ahead of time, in round bundles, by a PRIVATE transfer from the vault to the relayer's house ring
-     (amount and recipient hidden by the proof), and each certificate later spends one credit: no payment lands near a
-     certify, and no amount carries a tag. A credit is a random secret; the relayer keeps only sha256("pof:credit:" ‖ secret).
-     The claim is signed by the vault key that signed the transfer, so nobody who sees the transaction can claim it first.
-     Relayer API (proposed to verifier, BOARD): GET /api/relay/credits → { unitLamports, houseRing, bundles };
-     POST /api/relay/credits { signature, owner, hashes, proof } → { credited }; /api/relay/certify takes { credit }. */
-  const CREDITS = () => 'pof:credits:v1:' + who('vault').owner;
-  const creditHash = async secretHex => C.hex(await C.sha256(C.utf8('pof:credit:'), C.unhex(secretHex, 32)));
-  const claimMessage = ({ signature, owner, hashes }) => C.utf8(['Proof of Funds: relay credits v1', `transfer: ${signature}`, `owner: ${owner}`, `credits: ${hashes.join(',')}`].join('\n'));
-  async function readCredits() { const raw = get(CREDITS()); if (!raw) return []; try { return await unseal(JSON.parse(raw), who('vault').kitKey); } catch { return []; } }
-  async function writeCredits(list) { put(CREDITS(), JSON.stringify(await seal(list, who('vault').kitKey))); }
+  /* ---------------------------------------------------------------- relay credits (audit POF-12): blind tokens
+     The relayer is paid ahead of time, in a fixed bundle, by a PRIVATE transfer from the vault to its house ring (amount and
+     recipient hidden by the proof). For each credit the client makes a random token and blinds it (blind RSA-FDH,
+     dist/blind.mjs = verifier/lib/blind.mjs); the relayer signs the blinded values without seeing the tokens; the client
+     unblinds. A spent credit { kid, token, signature } therefore cannot be tied, even by the relayer, to the purchase that
+     paid for it. The claim is signed by the vault key that signed the transfer (claim message v2), so nobody who only sees
+     the transaction can claim it. Tokens, blinding factors and signatures live only in the sealed store of this vault. */
+  const CREDITS = () => 'pof:credits:v2:' + who('vault').owner;
+  const blindLib = () => import('./dist/blind.mjs');
+  const claimMessage = async ({ signature, owner, kid, blinded }) => C.utf8(['Proof of Funds: relay credits v2', `transfer: ${signature}`, `owner: ${owner}`, `kid: ${kid}`, `blinded: ${C.hex(await C.sha256(C.utf8(blinded.join(''))))}`].join('\n'));
+  async function readCredits() { const raw = get(CREDITS()); if (!raw) return { tokens: [], pending: [] }; try { return await unseal(JSON.parse(raw), who('vault').kitKey); } catch { return { tokens: [], pending: [] }; } }
+  async function writeCredits(v) { put(CREDITS(), JSON.stringify(await seal(v, who('vault').kitKey))); }
   const credits = {
-    async offer() { return jsonCall(relayUrl('credits')); },
-    async count() { return (await readCredits()).filter(c => !c.used).length; },
-    async buy({ count }) {
-      const o = await credits.offer();
+    offer: () => jsonCall(relayUrl('credits')),
+    async count() { return (await readCredits()).tokens.filter(t => !t.used).length; },
+    /* step 1: blind fresh tokens for a bundle, kept sealed before any money moves */
+    async prepare({ count, offer }) {
+      const o = offer || await credits.offer();
       const n = Number(count);
-      if (!o.bundles?.includes(n)) throw Object.assign(Error(`credits come in bundles of ${(o.bundles || []).join(', ')}`), { code: 'BAD_BUNDLE' });
-      const secrets = Array.from({ length: n }, () => C.hex(crypto.getRandomValues(new Uint8Array(32))));
-      const hashes = await Promise.all(secrets.map(creditHash));
-      // the secrets are kept before the transfer, so a crash after it loses nothing that a later claim cannot redo
-      const pending = { secrets, hashes, at: Date.now() };
-      await writeCredits([...(await readCredits()), ...secrets.map((secret, i) => ({ secret, hash: hashes[i], pending: true }))]);
-      const sent = await spendFromVault('transfer', { asset: 0, amount: BigInt(o.unitLamports) * BigInt(n), to: o.houseRing });
-      return credits.claim({ signature: sent.signature, hashes: pending.hashes });
+      if (!o.bundles?.includes(n)) throw Object.assign(Error(`credits come in bundles of ${(o.bundles || []).join(' or ')}`), { code: 'BAD_BUNDLE' });
+      const B = await blindLib();
+      const items = [];
+      for (let i = 0; i < n; i++) { const token = C.hex(crypto.getRandomValues(new Uint8Array(32))); const { blinded, r } = await B.blind(o.key, token); items.push({ token, blinded, r }); }
+      const pend = { id: C.hex(crypto.getRandomValues(new Uint8Array(8))), key: o.key, unitLamports: String(o.unitLamports), houseRing: o.houseRing, items, signature: null };
+      const st = await readCredits(); st.pending.push(pend); await writeCredits(st);
+      return pend;
     },
-    async claim({ signature, hashes }) {
+    /* step 3: claim a paid bundle, unblind, check every signature before keeping it */
+    async claim({ id, signature }) {
+      const st = await readCredits();
+      const pend = st.pending.find(p => p.id === id);
+      if (!pend) throw Object.assign(Error('no prepared bundle with that id'), { code: 'NO_BUNDLE' });
+      if (signature) { pend.signature = signature; await writeCredits(st); }
       const owner = who('vault').owner;
-      const proof = C.hex(who('vault').signing.sign(claimMessage({ signature, owner, hashes })));
-      const r = await jsonCall(relayUrl('credits'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signature, owner, hashes, proof }) });
-      const list = await readCredits();
-      for (const c of list) if (hashes.includes(c.hash)) { delete c.pending; c.signature = signature; }
-      await writeCredits(list);
-      status('credits', { phase: 'claimed', credited: r.credited });
-      return r;
+      const blinded = pend.items.map(x => x.blinded);
+      const proof = C.hex(who('vault').signing.sign(await claimMessage({ signature: pend.signature, owner, kid: pend.key.kid, blinded })));
+      const r = await jsonCall(relayUrl('credits'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signature: pend.signature, owner, blinded, proof }) });
+      const B = await blindLib();
+      const tokens = [];
+      for (const [i, x] of pend.items.entries()) {
+        const sig = B.unblind(pend.key, r.signatures[i], x.r);
+        if (!(await B.verifyCredit(pend.key, x.token, sig))) throw Object.assign(Error('the relayer returned a signature that does not verify'), { code: 'BAD_CREDIT' });
+        tokens.push({ kid: r.kid || pend.key.kid, token: x.token, signature: sig });
+      }
+      const now = await readCredits();
+      now.pending = now.pending.filter(p => p.id !== id); now.tokens.push(...tokens); await writeCredits(now);
+      status('credits', { phase: 'claimed', count: tokens.length });
+      return { count: tokens.length };
     },
+    /* the whole purchase: prepare, pay by private transfer, claim (retried while the house ring indexes the transfer) */
+    async buy({ count }) {
+      const pend = await credits.prepare({ count });
+      const sent = await spendFromVault('transfer', { asset: 0, amount: BigInt(pend.unitLamports) * BigInt(pend.items.length), to: pend.houseRing });
+      for (let i = 0; ; i++) {
+        try { return await credits.claim({ id: pend.id, signature: sent.signature }); }
+        catch (e) { if (e.code !== 'NOT_RECEIVED' || i >= 20) throw e; await new Promise(r => setTimeout(r, 3000)); }
+      }
+    },
+    /* bundles paid but not claimed (a closed tab, an indexer delay): claim them again */
+    async resume() { const st = await readCredits(); const out = []; for (const p of st.pending.filter(x => x.signature)) out.push(await credits.claim({ id: p.id }).catch(e => ({ id: p.id, code: e.code }))); return out; },
     async take() {
-      const list = await readCredits();
-      const c = list.find(x => !x.used && !x.pending);
-      if (!c) return null;
-      c.used = 'reserved'; await writeCredits(list);
-      return { secret: c.secret, done: async ok => { const l = await readCredits(); const x = l.find(y => y.hash === c.hash); if (x) { if (ok) x.used = true; else delete x.used; } await writeCredits(l); } };
+      const st = await readCredits();
+      const t = st.tokens.find(x => !x.used);
+      if (!t) return null;
+      t.used = 'reserved'; await writeCredits(st);
+      return { credit: { kid: t.kid, token: t.token, signature: t.signature }, done: async ok => { const s2 = await readCredits(); const x = s2.tokens.find(y => y.token === t.token); if (x) { if (ok) x.used = true; else delete x.used; } await writeCredits(s2); } };
     },
-    _add: async secrets => writeCredits([...(await readCredits()), ...(await Promise.all(secrets.map(async secret => ({ secret, hash: await creditHash(secret) }))))]),
     claimMessage,
   };
+
+  /* ---------------------------------------------------------------- the relayed revoke (X and badge certificates)
+     The controller signs the 148 POF-REVOKE1 bytes (CONTRACT, verifier contract.ts revokeBytes) and the relayer submits
+     [ed25519(controller, bytes), revoke_signed()], so no wallet pays and no wallet appears. */
+  async function revokeBytesOf(kit) {
+    const att = C.unhex(kit.attestation, 240);
+    const { PublicKey } = await import('./dist/web3.js');
+    const programId = new PublicKey(kit.programId || cfg.programId);
+    const subjectHash = att.slice(37, 69), asset = att[69], nullset = att.slice(112, 144), issued = att.slice(144, 152);
+    const [cert] = PublicKey.findProgramAddressSync([C.utf8('cert'), subjectHash, Uint8Array.of(asset)], programId);
+    const out = new Uint8Array(148); let o = 0;
+    for (const part of [C.utf8('POF-REVOKE1'), programId.toBytes(), cert.toBytes(), subjectHash, Uint8Array.of(asset), nullset, issued]) { out.set(part, o); o += part.length; }
+    return { bytes: out, certificate: cert.toBase58(), subjectHash: C.hex(subjectHash), asset };
+  }
+  async function revokeRelayed(kit, from = 'vault') {
+    if (kit.subject.kind === 0) throw Object.assign(Error('a wallet certificate is revoked by the wallet itself (revoke_by_holder)'), { code: 'RELAY_NOT_FOR_WALLETS' });
+    const ctl = await controllerOf(kit, from);
+    const r = await revokeBytesOf(kit);
+    const signature = C.hex(await ctl.sign(r.bytes));
+    status('revoke', { phase: 'send', certificate: r.certificate });
+    const ans = await jsonCall(relayUrl('revoke'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subjectHash: r.subjectHash, asset: r.asset, signature }) });
+    status('revoke', { phase: 'done', signature: ans.signature });
+    return ans;
+  }
 
   /* the controller key of a kit, as a signer ({ publicKey, sign(message) }) for revoke_by_holder and room joins: the
      wallet itself (kind 0, signs through the wallet), the badge key (kind 2, from the sealed kit), or the X key (kind 1) */
@@ -638,11 +684,11 @@ export async function createPofClient(opts = {}) {
     const payment = credit ? null : await payRelay(quote, { allowWalletPayer, from });
     for (let i = 0; i < 20; i++) {
       try {
-        const done = await jsonCall(relayUrl('certify'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ attestation: answer.attestation, signature: answer.signature, logIndex: answer.logIndex, hashes: answer.hashes, ...(credit ? { credit: credit.secret } : { quote: quote.quote }) }) });
+        const done = await jsonCall(relayUrl('certify'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ attestation: answer.attestation, signature: answer.signature, logIndex: answer.logIndex, hashes: answer.hashes, ...(credit ? { credit: credit.credit } : { quote: quote.quote }) }) });
         if (credit) await credit.done(true);
         status('relay', { phase: 'done', signature: done.signature });
         return { ...answer, relayed: done, payment };
-      } catch (e) { if (e.code !== 'NOT_PAID' || i === 19) { if (credit) await credit.done(e.code === 'CREDIT_USED'); throw e; } await new Promise(r => setTimeout(r, 1500)); }
+      } catch (e) { if (e.code !== 'NOT_PAID' || i === 19) { if (credit) await credit.done(e.code === 'CREDIT_USED' || e.code === 'BAD_CREDIT' || e.code === 'OLD_CREDIT_KEY'); throw e; } await new Promise(r => setTimeout(r, 1500)); }
     }
   }
 
@@ -651,7 +697,7 @@ export async function createPofClient(opts = {}) {
     config: cfg, onStatus: fn => { listeners.add(fn); return () => listeners.delete(fn); },
     ready: () => C.ready(), hasher: S.hasherState,
     connect: id => W.connect(id), wallet: () => W.state(),
-    deriveVault, deriveRing, isRegistered, register, shield, notes, balance, choose, subject, disclose, attest, certify, kits, controllerOf, vaultSigner: () => vaultSigner(), fundVault, withdraw, linkStart, linkCheck, waitForAge, randomDelay, privacy, credits,
+    deriveVault, deriveRing, isRegistered, register, shield, notes, balance, choose, subject, disclose, attest, certify, kits, controllerOf, vaultSigner: () => vaultSigner(), fundVault, withdraw, linkStart, linkCheck, waitForAge, randomDelay, privacy, credits, revokeRelayed, revokeBytesOf,
     progress: () => ({ hasher: S.hasherState(), last: lastStatus }),
     local, identity: from => { const id = from === 'ring' ? ring : vault; return id ? { kind: id.kind, owner: id.owner, ownerHash: C.hex(id.ownerHash) } : null; },
     forget() { for (const id of [vault, ring]) if (id) { id.nk.fill(0); id.kitKey.fill(0); id.ctlSeed.fill(0); } vault = ring = null; },

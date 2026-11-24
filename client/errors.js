@@ -50,6 +50,12 @@ const T = {
   VAULT_LOCKED: ['Your vault key is locked on this device.', 'Enter its passphrase to open it.', true],
   CREDITS_NEEDED: ['No relay credit left.', 'Buy credits ahead of time (a private transfer from the vault), so nothing is paid next to the certificate; or pay now and accept that the payment sits next to it in time.', false],
   BAD_BUNDLE: ['Credits come in fixed bundles.', 'Pick one of the bundle sizes offered.', false],
+  BAD_CREDIT: ['That relay credit does not check out.', 'Buy a new bundle; the old one may be from another relayer key.', false],
+  OLD_CREDIT_KEY: ['That credit was signed by an older relayer key.', 'Buy a new bundle.', false],
+  NOT_RECEIVED: ['The relayer has not seen your credit payment yet.', 'Wait a few seconds; the client claims again by itself.', true],
+  WRONG_AMOUNT: ['The credit payment had the wrong amount.', 'Pay exactly the bundle price shown.', false],
+  ALREADY_CLAIMED: ['That payment was already turned into credits.', 'Your credits are in this vault already.', false],
+  PROGRAM_NOT_READY: ['Relayed revocation is not live yet.', 'Revoke from the wallet that controls the certificate.', false],
   CREDIT_USED: ['That relay credit was already used.', 'Use another credit, or buy a new bundle.', false],
   // the relayer
   RELAY_OFF: ['The relayer is off right now.', 'Submit the certificate from your own wallet.', false],

@@ -16,7 +16,7 @@ No mainnet transaction was sent for any of this. Mainnet was read only: accounts
 | Proxies live (devnet + mainnet, read-only) | `node test/proxy-live.mjs` | 5 | pass |
 | USDC and mixed assets on the clone, relay credits | `node --test test/local-usdc.mjs` | 1 run, 46 assertions | pass |
 | Vault keys: deterministic, changed, random, locked | `node --test test/vault.test.mjs` | 1 run, 17 assertions | pass |
-| The lab in headless Chrome | `node lab/test/lab-e2e.mjs` | 13 | pass |
+| The lab in headless Chrome | `node lab/test/lab-e2e.mjs` | 14 | pass |
 | Wallet matrix in Chrome (stand-ins) | `node lab/test/wallets.mjs` | 9 profiles | pass |
 | Phone timings, 375 px, CPU 4x and 6x | `node lab/test/mobile-perf.mjs` | 2 runs | pass |
 | Prover attestation inside Chrome | `node lab/test/prover-browser.mjs` | 2 networks | pass |
@@ -200,31 +200,51 @@ Network: 150 ms latency, 6.4 Mbit/s (`lab/test/mobile-perf.mjs`, raw results in 
 - **`waitForAge`** emits `status('age', { waitSlots, readyAtSlot })` until ready.
 - **`certify({ delaySlots: [lo, hi] })`** waits a random number of slots first and emits `status('delay', { remainingSlots })`.
 
-### The relay fee without a timing link (audit POF-12, round 2)
-- **Buying credits.** `pof.credits.buy({ count })` pays the relayer ahead of time, in a fixed bundle, by a **private
-  transfer** from the vault to the relayer's house ring. The amount and the recipient are hidden by the proof, and no tag
-  is added.
-- **Claiming them.** The client claims the bundle with the hashes of random credit secrets, signed by the vault key that
-  signed the transfer, so nobody who only sees the transaction can claim it.
-- **Using them.** Each relayed certificate later spends one secret (`credit` in `/api/relay/certify`), so no payment sits
-  next to a certify.
+### The relay fee without a timing link: blind credits (audit POF-12, rounds 2 and 3)
+- **Buying.** `pof.credits.buy({ count })` pays the relayer ahead of time, in a bundle (5 or 20 credits at 0.01 SOL
+  each), by a **private transfer** from the vault to the relayer's house ring. The proof hides the amount and the
+  recipient, and no tag is added.
+- **Blinding.** For each credit the client draws a random 32-byte token and blinds it (blind RSA-FDH, `dist/blind.mjs`,
+  byte for byte the Verifier's `verifier/lib/blind.mjs`, a test checks they are identical).
+- **Claiming.** The claim (message v2) is signed by the vault key that signed the transfer. The relayer signs the blinded
+  values without ever seeing the tokens. The client unblinds, checks every signature, and keeps `{ kid, token, signature }`
+  sealed under the vault-seed key.
+- **Spending.** Each relayed certificate spends one credit in `/api/relay/certify`. **Even the relayer cannot tie a spent
+  credit to the purchase that paid for it.** The v1 hash list this replaces would have let it do so.
+- **Recovery.** A bundle that was paid but not claimed (a closed tab, an indexer delay) is kept and claimed again by
+  `credits.resume()`.
 - **Fallbacks.** Paying at certify time needs `payNow: true` (warned as `NO_CREDIT`). Paying from the wallet needs
   `allowWalletPayer: true` (`WALLET_PAYER`).
-- **Proven so far.** On the clone, against a relayer stand-in: a badge certificate is relayed with a credit, no quote or
-  payment is sent, the credit is used up, the next attempt reports `NO_CREDIT`, and without credits certify refuses
-  (`CREDITS_NEEDED`).
-- **Not proven yet.**
-  - The purchase itself needs the prover (devnet, waiting for devnet SOL).
-  - It needs the relayer side, which is proposed to verifier: `GET /api/relay/credits` and `POST /api/relay/credits`,
-    plus `credit` in certify.
+- **Proven against the Verifier's own `Credits`** (local USDC test, and the lab in Chrome, where the house-ring receipt
+  is simulated):
+  - the wrong bundle size is refused (`BAD_BUNDLE`), an unpaid claim is refused (`NOT_RECEIVED`), and so is a short
+    payment (`WRONG_AMOUNT`);
+  - five tokens are signed, unblinded and verified, and the same transfer cannot be claimed twice (`ALREADY_CLAIMED`);
+  - a badge certificate is relayed with one credit, with no quote and no payment;
+  - none of the values the relayer saw at the claim equals the spent token's hash image;
+  - the spent credit is refused a second time (`CREDIT_USED`);
+  - without credits, certify refuses (`CREDITS_NEEDED`).
+- **Not proven yet.** The private transfer itself needs the prover (devnet, waiting for devnet SOL), and a real house ring
+  must be registered for the relayer key (owner step at launch).
+
+### The relayed revoke (X and badge certificates)
+- **The bytes.** `pof.revokeRelayed(kit)` has the certificate's controller sign the 148 `POF-REVOKE1` bytes: domain,
+  program id, certificate address, subject hash, asset, nullset hash and the certificate's issued slot, so the signature
+  dies with that certificate. The bytes are built from the kit's attestation and the certificate PDA.
+- **The submit.** The client posts them to `/api/relay/revoke`. The relayer submits `[ed25519(controller, bytes),
+  revoke_signed()]`, so no wallet pays and none appears. It answers `PROGRAM_NOT_READY` until the deployed program has
+  `revoke_signed` (it is in the IDL now).
+- **Proven so far.** The client's bytes equal the Verifier's `revokeBytes`, the badge key's signature over them verifies,
+  and a wallet certificate is refused (it revokes from the wallet). The on-chain `revoke_signed` run belongs to the
+  program and verifier suites.
 
 **What still links, for /docs:**
 - **The vault and the wallet** are linked in public: every shield is a public deposit from the wallet naming the vault,
   and `fundVault` is a plain transfer.
 - **Activity is visible.** The vault's private transfers are visible as transactions signed by the vault (amounts and
   recipients hidden).
-- **The operator links everything.** It links a credit to the purchase that paid for it, and so to the vault (no blind
-  signatures). It also learns subject, vault and wallet together at attest time (RINGS §5).
+- **The operator links at attest time.** The Verifier learns subject, vault and wallet together (RINGS §5). The relayer can
+  no longer tie a spent credit to its purchase: the credits are blind.
 - **A revocation after a spend** links the certificate to the vault's spend.
 - **The honest wording:** vault mode isolates the nullifier key, not identity. Shielding from a fresh wallet is the only
   path with no wallet link.

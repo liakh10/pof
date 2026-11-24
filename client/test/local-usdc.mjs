@@ -101,48 +101,69 @@ test('local: USDC shield, sync, tiers with 6 decimals, attestation; mixed assets
   const lie = JSON.parse(JSON.stringify(bad)); lie.notes[0].asset = C.ASSETS[1].mint;   // claim the SOL note is USDC
   await assert.rejects(verifier.attest(lie), e => e.code === 'NOT_IN_TREE');
 
-  // relay credits (audit POF-12 round 2): a badge certificate relayed with a prepaid credit, no payment at certify time
+  // relay credits (audit POF-12): blind RSA tokens against the Verifier's own Credits (verifier/src/credits.ts) with a fake
+  // house ring, then a badge certificate relayed with one; and the relayed revoke bytes against the Verifier's revokeBytes
   const relayer = V.signerFromSeed(new Uint8Array(crypto.randomBytes(32)));
   const rv = new V.Verifier({ ...verifier.cfg, relayer: relayer.address }, signer, rings, new V.TransparencyLog(new V.FsStore(fs.mkdtempSync(path.join(os.tmpdir(), 'pof-relay-'))), signer, programId), null, null);
+  const jwk = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ format: 'jwk' });
+  const h = x => Buffer.from(x, 'base64url').toString('hex');
+  const creditKey = V.creditKeyFromJson(JSON.stringify({ n: h(jwk.n), e: h(jwk.e), d: h(jwk.d) }));
+  const paid = new Map();   // transfer signature → { lamports, signers }: what the house ring "received"
+  const houseRing = 'HouseRing1111111111111111111111111111111111';
+  const credits = new V.Credits(new V.FsStore(fs.mkdtempSync(path.join(os.tmpdir(), 'pof-credits-'))), creditKey, { received: async sig => paid.get(sig) || null }, houseRing, 10_000_000n, [5, 20]);
   const http = await import('node:http');
-  const valid = new Set(); const seen = [];
+  const seen = { certify: [], claims: [], revoke: [] };
   const srv = http.createServer((req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', async () => {
     const send = (code, j) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(j)); };
     try {
       if (req.method === 'GET' && req.url.startsWith('/api/attest')) return send(200, { relayer: relayer.address, minAgeSlots: 0 });
+      if (req.method === 'GET' && req.url.startsWith('/api/relay/credits')) return send(200, credits.offer());
       const j = JSON.parse(b || '{}');
       if (req.url.startsWith('/api/attest')) return send(200, await rv.attest(j));
-      if (req.url.startsWith('/api/relay/certify')) {
-        seen.push(j);
-        const h = C.hex(await C.sha256(C.utf8('pof:credit:'), C.unhex(j.credit || '00'.repeat(32), 32)));
-        if (!valid.has(h)) return send(402, { error: { code: 'CREDIT_USED', message: 'no such credit' } });
-        valid.delete(h);
-        const a = V.decodeAttestation(C.unhex(j.attestation));
-        assert.equal(V.toB58(a.payer), relayer.address);
-        return send(200, { signature: 'stub-certify', certificate: null });
-      }
+      if (req.url.startsWith('/api/relay/credits')) { seen.claims.push(j); return send(200, await credits.claim(j)); }
+      if (req.url.startsWith('/api/relay/certify')) { seen.certify.push(j); await credits.spend(j.credit, j.attestation); return send(200, { signature: 'stub-certify', certificate: null }); }
+      if (req.url.startsWith('/api/relay/revoke')) { seen.revoke.push(j); return send(200, { signature: 'stub-revoke' }); }
       send(404, { error: { code: 'NOT_FOUND' } });
-    } catch (e) { send(400, { error: { code: e.code, message: e.message } }); }
+    } catch (e) { send(e.status || 400, { error: { code: e.code, message: e.message } }); }
   }); });
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   try {
     const R = await createPofClient({ network: 'local', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, minAgeSlots: 0, clonedTree: cloned, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest` });
-    await R.deriveVault();
+    const rvault = await R.deriveVault();
     await assert.rejects(R.certify({ asset: 1, tier: 1, subjectKind: 2 }), e => e.code === 'CREDITS_NEEDED');
-    const secret = C.hex(crypto.randomBytes(32));
-    valid.add(C.hex(await C.sha256(C.utf8('pof:credit:'), C.unhex(secret, 32))));
-    await R.credits._add([secret]);
-    assert.equal(await R.credits.count(), 1);
-    const pv = await R.privacy({ subjectKind: 2, pick: await R.choose({ asset: 1, tier: 1 }) });
-    assert.ok(!pv.warnings.some(w => w.code === 'WALLET_PAYER' || w.code === 'NO_CREDIT'));
+    await assert.rejects(R.credits.prepare({ count: 3 }), e => e.code === 'BAD_BUNDLE');
+    const pend = await R.credits.prepare({ count: 5 });
+    // the private transfer is what devnet proves; here the house ring "received" it from the vault
+    const transferSig = V.toB58(new Uint8Array(crypto.randomBytes(64)));
+    await assert.rejects(R.credits.claim({ id: pend.id, signature: transferSig }), e => e.code === 'NOT_RECEIVED');
+    paid.set(transferSig, { lamports: 40_000_000n, signers: [rvault.owner] });
+    await assert.rejects(R.credits.claim({ id: pend.id }), e => e.code === 'WRONG_AMOUNT');
+    paid.set(transferSig, { lamports: 50_000_000n, signers: [rvault.owner] });
+    assert.equal((await R.credits.claim({ id: pend.id })).count, 5);
+    assert.equal(await R.credits.count(), 5);
+    await assert.rejects(credits.claim(seen.claims.at(-1)), e => e.code === 'ALREADY_CLAIMED');
+    // what the relayer saw at the claim are blinded values, none equal to a token or its FDH image
+    const B = await import('../dist/blind.mjs');
+    assert.equal(fs.readFileSync(new URL('../dist/blind.mjs', import.meta.url), 'utf8'), fs.readFileSync(new URL('../../verifier/lib/blind.mjs', import.meta.url), 'utf8'));
     const done = await R.certify({ asset: 1, tier: 1, subjectKind: 2 });
     assert.equal(done.relayed.signature, 'stub-certify'); assert.equal(done.payment, null);
-    assert.equal(seen[0].quote, undefined); assert.equal(seen[0].credit, secret);
-    assert.equal(await R.credits.count(), 0);
+    const spent = seen.certify[0].credit;
+    assert.equal(seen.certify[0].quote, undefined); assert.ok(/^[0-9a-f]{64}$/.test(spent.token));
+    const fd = (await B.fdh(creditKey, spent.token)).toString(16);
+    assert.ok(!seen.claims[0].blinded.some(x => BigInt('0x' + x).toString(16) === fd), 'the claim never showed the spent token or its hash image');
+    assert.equal(await R.credits.count(), 4);
+    await assert.rejects(credits.spend(spent, 'another attestation'), e => e.code === 'CREDIT_USED');
     const pv2 = await R.privacy({ subjectKind: 2, pick: await R.choose({ asset: 1, tier: 1 }) });
-    assert.ok(pv2.warnings.some(w => w.code === 'NO_CREDIT'));
-    // the claim message the vault key signs names the transfer, the vault and the credit hashes
-    assert.equal(new TextDecoder().decode(R.credits.claimMessage({ signature: 'S', owner: 'O', hashes: ['a', 'b'] })), 'Proof of Funds: relay credits v1\ntransfer: S\nowner: O\ncredits: a,b');
+    assert.ok(!pv2.warnings.some(w => w.code === 'NO_CREDIT'));
+    // the relayed revoke: the client's 148 bytes equal the Verifier's revokeBytes, signed by the badge key
+    const kit = R.kits.list().find(k => k.attestation === done.attestation);
+    const rb = await R.revokeBytesOf(kit);
+    const a = V.decodeAttestation(C.unhex(kit.attestation));
+    assert.equal(C.hex(rb.bytes), C.hex(V.revokeBytes(programId, V.fromB58(rb.certificate, 32, 'cert'), a.subjectHash, a.asset, a.nullsetHash, a.issuedSlot)));
+    const rr = await R.revokeRelayed(kit);
+    assert.equal(rr.signature, 'stub-revoke');
+    assert.ok(V.verifySig(C.unhex(seen.revoke[0].signature), rb.bytes, V.fromB58(kit.controller, 32, 'controller')), 'the controller (badge key) signed the revoke bytes');
+    await assert.rejects(R.revokeRelayed({ ...kit, subject: { kind: 0, value: 'x' } }), e => e.code === 'RELAY_NOT_FOR_WALLETS');
   } finally { srv.close(); }
   void v;
 });

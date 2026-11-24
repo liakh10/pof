@@ -43,12 +43,14 @@ try {
   const att = ((await logText()).match(/attestation ([0-9a-f]{480})/) || [])[1] || '';
   ok(att.length === 480 && att.startsWith('504f4631'), 'the Verifier signed a 240-byte POF1 attestation for the wallet subject', att.slice(0, 40) + ' len ' + att.length);
   await page.selectOption('#kind', '2'); await page.click('#certify');
-  await page.waitForFunction(() => /RELAY_NEEDED|PAYER_LINKS_WALLET/.test(document.getElementById('log').textContent), null, { timeout: 30_000 });
-  ok(true, 'a badge certificate is not paid from the wallet by default (audit POF-12)');
-  await page.check('#walletpay'); await page.click('#certify');
+  await page.waitForFunction(() => /CREDITS_NEEDED/.test(document.getElementById('log').textContent), null, { timeout: 30_000 });
+  ok(true, 'a badge certificate goes through the relayer and asks for a prepaid credit, never the wallet (audit POF-12)');
+  await page.click('#buy'); await waitLog(/credits: 5 blind tokens signed and unblinded/);
+  ok(/5 credits/.test(await page.$eval('#credits', e => e.textContent)), 'five blind credits bought (the Verifier\'s Credits, receipt simulated) and kept in the sealed vault store');
+  await page.click('#certify');
   await page.waitForFunction(() => (document.getElementById('log').textContent.match(/attested ·/g) || []).length >= 2, null, { timeout: 60_000 }).catch(() => {});
   const secondLog = await logText();
-  ok(/attested ·[\s\S]*attested ·/.test(secondLog) || /NOTE_LOCKED|already backs|LOCKED/i.test(secondLog), 'a badge subject is attested too (or refused because the note already backs a live certificate)', secondLog.split('\n').slice(0, 2).join(' | '));
+  ok(/relayed with a credit · lab-not-submitted/.test(secondLog), 'the badge certificate is attested and relayed with one credit (checked and spent by the Verifier\'s code)', secondLog.split('\n').slice(0, 2).join(' | '));
   // an X handle: the real Linker, the post simulated, the controller key signs (POF-26)
   await page.selectOption('#kind', '1'); await page.fill('#handle', '@lab_handle');
   const before = (await logText()).match(/attested ·/g)?.length || 0;

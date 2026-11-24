@@ -7,6 +7,8 @@
 //   POST /api/attest                           the real Verifier (verifier/dist) over LocalRings on the local clone, with a
 //                                              throwaway signing key made at start; local network only
 //   POST /api/link/start|check                 the real Linker; POST /lab/x-post simulates posting the code from the handle
+//   GET|POST /api/relay/credits, POST /api/relay/certify   the Verifier's blind credits (house-ring receipt simulated by
+//                                              POST /lab/house-received); certify checks and spends the credit, submits nothing
 //   GET  /lab/cloned-tree                      the tree account bytes the local validator was started with (base64)
 // Local use only: it binds 127.0.0.1.
 import http from 'node:http';
@@ -26,7 +28,8 @@ const clonedFile = path.join(here, 'rings-local/.run/cloned-tree.b64');
 
 /* the Verifier, built once, for the local network */
 globalThis.isSecureContext ??= true;
-let verifier = null, linker = null;
+let verifier = null, linker = null, credits = null, relayerKey = null;
+const houseReceived = new Map();
 const xPost = { handle: '', text: '' };
 async function localVerifier() {
   if (verifier) return verifier;
@@ -40,7 +43,13 @@ async function localVerifier() {
   const cloned = fs.existsSync(clonedFile) ? new Uint8Array(Buffer.from(fs.readFileSync(clonedFile, 'utf8'), 'base64')) : null;
   const rings = new LocalRings(jsonRpc(LOCAL), { cloned });
   const minAge = BigInt(process.env.POF_MIN_AGE_SLOTS || 0);
-  verifier = new V.Verifier({ programId, minAgeSlots: minAge, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 1_000_000n, maxRootLagSlots: 1_000_000n, relayer: null, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, new V.TransparencyLog(new V.FsStore(dir), signer, programId), null, null);
+  relayerKey = V.signerFromSeed(new Uint8Array(crypto.randomBytes(32)));
+  verifier = new V.Verifier({ programId, minAgeSlots: minAge, validitySlots: 6_480_000n, subjectProofSlots: 1500n, maxRootAgeSlots: 1_000_000n, maxRootLagSlots: 1_000_000n, relayer: relayerKey.address, mints: { 0: V.ASSETS[0].mint, 1: V.ASSETS[1].mint }, bundleHash: V.bundleHash() }, signer, rings, new V.TransparencyLog(new V.FsStore(dir), signer, programId), null, null);
+  // relay credits: the Verifier's own Credits (blind RSA) with a throwaway key; the house ring's receipt is simulated by
+  // POST /lab/house-received (on devnet and mainnet it is a real private transfer the relayer's Ring decrypts)
+  const jwk = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ format: 'jwk' });
+  const h = x => Buffer.from(x, 'base64url').toString('hex');
+  credits = new V.Credits(new V.FsStore(dir), V.creditKeyFromJson(JSON.stringify({ n: h(jwk.n), e: h(jwk.e), d: h(jwk.d) })), { received: async sig => houseReceived.get(sig) || null }, 'LabHouseRing11111111111111111111111111111111', 10_000_000n, [5, 20]);
   // the real Linker; X itself is simulated: POST /lab/x-post stands in for posting the code from the handle
   linker = new V.Linker(new V.FsStore(dir), (h, exp, ctl) => verifier.linkToken(h, exp, ctl), async () => new Response(JSON.stringify({ tweet: { author: { screen_name: xPost.handle }, text: xPost.text, created_timestamp: Math.floor(Date.now() / 1000) } }), { status: 200 }));
   console.log('lab verifier key', signer.address, '· min note age', String(minAge), 'slots');
@@ -73,12 +82,23 @@ http.createServer(async (req, res) => {
       const r = await sprProxy(new Request(url.href, { method: req.method, headers: { 'content-type': 'application/json' }, body: req.method === 'POST' ? body : undefined }), { keys });
       return send(r.status, await r.text());
     }
+    if (url.pathname === '/lab/house-received' && req.method === 'POST') { const j = JSON.parse(body); houseReceived.set(j.signature, { lamports: BigInt(j.lamports), signers: j.signers }); return send(200, '{"ok":true}'); }
+    if (url.pathname.startsWith('/api/relay/')) {
+      try {
+        await localVerifier(); const fn = url.pathname.split('/').pop(); const j = body ? JSON.parse(body) : {};
+        if (fn === 'credits') return send(200, JSON.stringify(req.method === 'GET' ? credits.offer() : await credits.claim(j)));
+        // the lab chain has no POF program: the relayer checks the credit (the Verifier's own code) and stops before submitting
+        if (fn === 'certify') { await credits.spend(j.credit, j.attestation); return send(200, JSON.stringify({ signature: 'lab-not-submitted', certificate: null, note: 'the lab has no POF program; the credit was checked and spent' })); }
+        if (fn === 'revoke') return send(503, JSON.stringify({ error: { code: 'PROGRAM_NOT_READY', message: 'the lab has no POF program' } }));
+        return send(404, JSON.stringify({ error: { code: 'NOT_FOUND' } }));
+      } catch (e) { return send(e.status || 400, JSON.stringify({ error: { code: e.code || 'ERROR', message: String(e.message || e) } })); }
+    }
     if (url.pathname === '/lab/x-post' && req.method === 'POST') { const j = JSON.parse(body); xPost.handle = String(j.handle || ''); xPost.text = String(j.text || ''); return send(200, '{"ok":true}'); }
     if ((url.pathname === '/api/link/start' || url.pathname === '/api/link/check') && req.method === 'POST') {
       try { await localVerifier(); const j = JSON.parse(body); const r = url.pathname.endsWith('start') ? await linker.start(j.handle, j.controller) : await linker.check(j.handle, j.post, j.secret, j.controller); return send(200, JSON.stringify(r)); }
       catch (e) { return send(e.status || 400, JSON.stringify({ error: { code: e.code || 'ERROR', message: String(e.message || e) } })); }
     }
-    if (url.pathname === '/api/attest' && req.method === 'GET') { const v = await localVerifier(); return send(200, JSON.stringify({ verifierKey: v.key, program: PROGRAM, relayer: null, minAgeSlots: Number(v.cfg.minAgeSlots), note: 'the lab Verifier: local clone only, no relayer' })); }
+    if (url.pathname === '/api/attest' && req.method === 'GET') { const v = await localVerifier(); return send(200, JSON.stringify({ verifierKey: v.key, program: PROGRAM, relayer: relayerKey.address, minAgeSlots: Number(v.cfg.minAgeSlots), note: 'the lab Verifier: local clone only; the relayer checks credits but submits nothing' })); }
     if (url.pathname === '/api/attest' && req.method === 'POST') {
       try { const v = await localVerifier(); return send(200, JSON.stringify(await v.attest(JSON.parse(body)))); }
       catch (e) { return send(e.status || 400, JSON.stringify({ error: { code: e.code || 'ERROR', message: String(e.message || e), details: e.details } })); }
