@@ -55,7 +55,10 @@ sequenceDiagram
 | [`api/status/`](api/status/) | the status checks and their uptime history | JS | `node --test api/status/_test/` |
 | [`mcp/`](mcp/) | the MCP server (stdio and Streamable HTTP at `/mcp`), read-only tools | JS | `node --test mcp/test/` |
 | [`bots/`](bots/) | the Telegram gate bot and the Discord role bot | JS | `node --test bots/test/` |
-| [`zk/`](zk/) | phase 2: the Groth16 circuit, its setup, the browser prover (in development, not deployed) | circom, JS | `zk/test/` |
+| [`witness/`](witness/) | an independent log monitor: checks each signed head against the chain and the heads before it, cosigns or raises an alarm (CONTRACT §8) | JS | `witness/test/` |
+| [`cli/`](cli/) | `pof check`, `watch`, `rooms`, `config`, `stats`, `log head`, `log proof`, `log verify` | JS | `cli/` tests |
+| [`embed/`](embed/) | `<pof-badge>`, a web component showing a certificate live | JS | headless Chromium |
+| [`zk/`](zk/) | phase 2: the Groth16 circuit, its setup, the browser prover, `certify_zk` (in development, not deployed; [`docs-src/zk.md`](docs-src/zk.md)) | circom, JS | `zk/test/` |
 | [`audit/`](audit/) | the internal security review's failing proofs, one per finding | JS | `node --test audit/test/` |
 | [`docs-src/`](docs-src/) | the paper, one Markdown page per section | Markdown | |
 
