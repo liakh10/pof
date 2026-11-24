@@ -88,8 +88,9 @@ test("Certificate layout: encode, decode, offsets, effective status", async () =
   assert.equal(sdk.POF_IDL_IS_DRAFT, false);
   assert.equal(sdk.POF_PROGRAM_ID, "pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT");
   assert.equal(sdk.effectiveStatus(c, 150), "live");
-  assert.equal(sdk.effectiveStatus(c, 200), "expired");
-  assert.equal(sdk.isLive(c, 199), true);
+  assert.equal(sdk.effectiveStatus(c, 200), "live", "live through the expiry slot, as on chain");
+  assert.equal(sdk.effectiveStatus(c, 201), "expired");
+  assert.equal(sdk.isLive(c, 200), true);
   assert.equal(data[sdk.layout.certificate.offset("asset")], 0);
   assert.equal(data[sdk.layout.certificate.offset("tier")], 3);
   assert.throws(() => sdk.decodeCertificate("x", new Uint8Array(data.length)), /not a Certificate/);

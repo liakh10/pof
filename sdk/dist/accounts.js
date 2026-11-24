@@ -147,9 +147,9 @@ export function decodeTreasury(data) {
         log: size ? { treeSize: size, rootHash: hex(r.log_head), slot: n("log_slot") } : null,
     };
 }
-/** Live means: status byte live AND the expiry slot not yet reached. */
+/** Live means: status byte live AND `slot <= expiry_slot` (the program's own rule, Certificate::is_live). */
 export function effectiveStatus(c, currentSlot) {
-    if (c.status === 0 && currentSlot >= c.expirySlot)
+    if (c.status === 0 && currentSlot > c.expirySlot)
         return "expired";
     return CERT_STATUS_NAMES[c.status] ?? "live";
 }

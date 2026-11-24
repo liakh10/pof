@@ -123,7 +123,7 @@ export interface Treasury {
     } | null;
 }
 export declare function decodeTreasury(data: Uint8Array): Treasury;
-/** Live means: status byte live AND the expiry slot not yet reached. */
+/** Live means: status byte live AND `slot <= expiry_slot` (the program's own rule, Certificate::is_live). */
 export declare function effectiveStatus(c: Pick<Certificate, "status" | "expirySlot">, currentSlot: number): StatusName;
 export declare function isLive(c: Pick<Certificate, "status" | "expirySlot">, currentSlot: number): boolean;
 export declare function certificateAddress(subjectHash: Uint8Array, asset: number, programId?: AddressLike): Promise<[string, number]>;
