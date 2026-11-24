@@ -393,3 +393,24 @@ test('A2-03: a quote binds its payment by a memo reference; a transfer for anoth
   c.chain.inbox.push({ signature: 'thisQuote', slot: c.rings.slotNow, lamports: BigInt(q.lamports), reference: q.reference });
   assert.equal((await c.relayer.certify(body)).payment, 'thisQuote');
 });
+
+test('log: internal callers skip the public bucket with the secret header (constant-time), others are limited; range reads in parallel', async () => {
+  const c = makeCtx({ env: { POF_INTERNAL_SECRET: 's'.repeat(32) } });
+  V.setContext(c);
+  const req = (h = {}) => new Request('https://pof.test/api/attest/log', { headers: { 'x-real-ip': '198.51.100.7', ...h } });
+  let last;
+  for (let i = 0; i < 70; i++) last = await V.areas.log()(req());
+  assert.equal(last.status, 429);
+  for (let i = 0; i < 70; i++) last = await V.areas.log()(req({ 'x-pof-internal': 's'.repeat(32) }));
+  assert.equal(last.status, 200);
+  last = await V.areas.log()(req({ 'x-pof-internal': 'wrong'.repeat(8) }));
+  assert.equal(last.status, 429);
+  assert.equal(V.internalCaller(req({ 'x-pof-internal': 'x' }), { POF_INTERNAL_SECRET: 'short' }), false);
+  // 40 leaves, read back in order
+  const signer = c.signer;
+  for (let i = 0; i < 40; i++) await c.log.append(V.logLeaf(new Uint8Array(240).fill(i), new Uint8Array(64), signer.publicKey, new Uint8Array(32), BigInt(i)));
+  const fresh = new V.TransparencyLog(c.store, signer, c.programId);
+  const r = await fresh.range(0, 40);
+  assert.equal(r.treeSize, 40); assert.deepEqual(r.entries.map(e => e.index), Array.from({ length: 40 }, (_, i) => i));
+  V.setContext(null);
+});

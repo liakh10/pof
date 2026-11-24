@@ -27,10 +27,13 @@ export class TransparencyLog {
       if (c) for (let o = 0; o + 32 <= c.length; o += 32) this.hashes.push(c.slice(o, o + 32));
     }
     const before = this.hashes.length;
+    // probe forward 8 at a time: the leaves past the cache are usually a few, sometimes many (a cold instance)
     for (;;) {
-      const e = await this.store.get(ek(this.hashes.length));
-      if (!e) break;
-      this.hashes.push(leafHash(e));
+      const base = this.hashes.length;
+      const got = await Promise.all(Array.from({ length: 8 }, (_, k) => this.store.get(ek(base + k))));
+      let k = 0;
+      for (; k < got.length && got[k]; k++) this.hashes.push(leafHash(got[k]!));
+      if (k < got.length) break;
     }
     if (this.hashes.length > before) await this.store.put('log/hashes', concat(...this.hashes)).catch(() => {});
     return this.hashes.length;
@@ -85,8 +88,13 @@ export class TransparencyLog {
   async range(from: number, to: number) {
     const n = await this.sync();
     const a = Math.max(0, from | 0), b = Math.min(n, to | 0, a + 256);
-    const out = [];
-    for (let i = a; i < b; i++) out.push(await this.entry(i));
+    // reads 16 at a time (a sequential walk of 256 Blob reads took about 10 s under load)
+    const idx = Array.from({ length: Math.max(0, b - a) }, (_, k) => a + k);
+    const out: any[] = new Array(idx.length);
+    for (let k = 0; k < idx.length; k += 16) {
+      const part = await Promise.all(idx.slice(k, k + 16).map(i => this.entry(i)));
+      part.forEach((e, j) => { out[k + j] = e; });
+    }
     return { treeSize: n, entries: out };
   }
 

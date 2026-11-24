@@ -132,6 +132,13 @@ export function fail(e: any): Response {
   return json({ error: { code: 'INTERNAL', message: `something broke on our side (ref ${id}); nothing was signed` } }, 500);
 }
 
+/** a caller from this deployment: header x-pof-internal equals POF_INTERNAL_SECRET (constant-time compare) */
+export function internalCaller(req: Request, env: Record<string, string | undefined>): boolean {
+  const want = env.POF_INTERNAL_SECRET, got = req.headers.get('x-pof-internal');
+  if (!want || !got || want.length < 16) return false;
+  const a = crypto.createHash('sha256').update(want).digest(), b = crypto.createHash('sha256').update(got).digest();
+  return crypto.timingSafeEqual(a, b);
+}
 const clientOf = (req: Request) => (req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for') || 'local').split(',')[0].trim();
 async function body(req: Request, max = 16_384): Promise<any> {
   const t = await req.text();
@@ -169,7 +176,8 @@ export const routes = {
   /** GET /api/attest/log?head | ?entry=i | ?proof=i[&size=n] | ?consistency=m[&size=n] | ?from=i&to=j */
   log: wrap(async (req) => {
     const c = await context();
-    bucket(`log:${clientOf(req)}`, 120, 60);
+    // our own server-side readers (/v1, /api/status, the witness) share one address: they show the internal secret instead
+    if (!internalCaller(req, c.env)) bucket(`log:${clientOf(req)}`, 120, 60);
     const q = new URL(req.url).searchParams;
     const n = (k: string) => { const v = q.get(k); if (v === null || v === '') return undefined; if (!/^\d+$/.test(v)) throw new PofError('BAD_QUERY', `${k} must be a non-negative integer`); return Number(v); };
     const cache = { 'cache-control': 'public, max-age=5' };

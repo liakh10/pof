@@ -131,7 +131,12 @@ export class Verifier {
     // one note, one live certificate needs the chain's view of certificates; without it nothing is signed (A2-02)
     if (this.locks && !this.locks.hasChain && !this.cfg.allowNoChain) throw new PofError('CHAIN_OFF', 'the Verifier cannot read the pof program here, so it signs nothing; try again later', 503);
 
-    let slot = await this.rings.slot();
+    /* the three independent reads at once (devx load test): the slot, the owner's registry record, the tree account */
+    const tree = String(p.notes[0]?.tree ?? '');
+    fromB58(tree, 32, 'notes[0].tree');
+    const [slotR, npkR, headR] = await Promise.allSettled([this.rings.slot(), this.rings.registryNullifierKey(owner), this.rings.treeHead(tree)]);
+    if (slotR.status === 'rejected') throw slotR.reason;
+    let slot = slotR.value;
 
     /* the proofs: the ring owner signs the disclosure message (always); the subject key signs it too for a wallet or badge;
        an X subject shows a link id bound to the same controller (POF-02, POF-03) */
@@ -149,7 +154,8 @@ export class Verifier {
     }
 
     /* the Ring's owner and the nullifier key */
-    const npk = await this.rings.registryNullifierKey(owner);
+    if (npkR.status === 'rejected') throw npkR.reason;
+    const npk = npkR.value;
     if (!npk) throw new PofError('NO_RING', 'that ring owner has no User Registry record (register the Ring first)');
     const nkBytes = unhex(ring.nk, 31, 'ring.nk');
     let nk: any;
@@ -159,9 +165,8 @@ export class Verifier {
       const ownerField = S.internal.poseidon([S.internal.solanaOwnerIdentity(ownerBytes), npk]);
 
       /* the notes */
-      const tree = String(p.notes[0].tree);
-      fromB58(tree, 32, 'notes[0].tree');
-      const head = await this.rings.treeHead(tree);
+      if (headR.status === 'rejected') throw headR.reason;
+      const head = headR.value;
       if (slot > head.slot + this.cfg.maxRootAgeSlots) throw new PofError('STALE_ROOT', 'the tree read is too old; try again', 503);
       // the tree was read after the first slot read: issue at the later of the two, so root_slot <= issued_slot always holds
       // (a Rings write between the two reads otherwise looked like a root from the future)
@@ -185,8 +190,20 @@ export class Verifier {
       const seen = new Set(notes.map(n => hex(n.commitment)));
       if (seen.size !== notes.length) throw new PofError('DUPLICATE_NOTES', 'a note is disclosed twice');
 
+      /* nullifiers: derived here, so a note cannot be certified under a nullifier it will never publish */
+      const nullifiers = notes.map(n => nk.nullifier(n.commitment, n.blinding) as Uint8Array);
+      for (const n of notes) if (!n.sig) throw new PofError('BAD_NOTES', `notes[${n.i}].sig (the transaction that created it) is missing`);
+
+      /* the indexer and chain reads for the notes at once; their verdicts are read below in a fixed order */
+      const [pathsR, spentR, ...createdR] = await Promise.allSettled([
+        this.rings.merklePaths(tree, notes.map(n => n.commitment)),
+        this.rings.spent(tree, nullifiers, { nullifierHistory: head.nullifierHistory }),
+        ...notes.map(n => this.rings.creation(n.sig, n.commitment)),
+      ]);
+
       /* membership: re-hash every path with the SDK's Poseidon; the root must be in the on-chain root history */
-      const paths = await this.rings.merklePaths(tree, notes.map(n => n.commitment));
+      if (pathsR.status === 'rejected') throw pathsR.reason;
+      const paths = pathsR.value;
       const history = new Set(head.history.map(hex));
       notes.forEach((n, k) => {
         const pr = paths[k];
@@ -197,15 +214,15 @@ export class Verifier {
         if (pr.path.length !== 32 || !equal(h, pr.root) || !history.has(hex(h))) throw new PofError('NOT_IN_TREE', `notes[${n.i}]: the Merkle path does not reach a root the tree account holds`);
       });
 
-      /* nullifiers: derived here, so a note cannot be certified under a nullifier it will never publish */
-      const nullifiers = notes.map(n => nk.nullifier(n.commitment, n.blinding) as Uint8Array);
-      const spent = await this.rings.spent(tree, nullifiers, { nullifierHistory: head.nullifierHistory });
+      if (spentR.status === 'rejected') throw spentR.reason;
+      const spent = spentR.value;
       spent.forEach((s, k) => { if (s) throw new PofError('NOTE_SPENT', `notes[${notes[k].i}] is already spent`); });
 
       /* age */
-      for (const n of notes) {
-        if (!n.sig) throw new PofError('BAD_NOTES', `notes[${n.i}].sig (the transaction that created it) is missing`);
-        const c = await this.rings.creation(n.sig, n.commitment);
+      for (const [k, n] of notes.entries()) {
+        const cr = createdR[k] as PromiseSettledResult<any>;
+        if (cr.status === 'rejected') throw cr.reason;
+        const c = cr.value;
         if (!c || c.tree !== tree || c.leafIndex !== n.leafIndex) throw new PofError('BAD_NOTES', `notes[${n.i}].sig did not create that note`);
         if (slot < c.slot + this.cfg.minAgeSlots) throw new PofError('NOTE_TOO_NEW', `notes[${n.i}] is too new: wait ${String(c.slot + this.cfg.minAgeSlots - slot)} more slots (this keeps a certificate from pointing at the shield that just happened)`, 400, { waitSlots: Number(c.slot + this.cfg.minAgeSlots - slot) });
       }
@@ -237,10 +254,10 @@ export class Verifier {
       const sig = this.signer.sign(att);
       // held privately until the certificate lands (A2-06): an attestation that is never submitted never becomes public
       const attId = crypto.createHash('sha256').update(att).digest('hex');
-      await this.log.hold(attId, logLeaf(att, sig, this.signer.publicKey, this.cfg.bundleHash, slot));
       const logIndex = null;
       const kit = { subjectHash: hex(sHash), asset, tree, expirySlot: Number(slot + this.cfg.validitySlots), attestation: hex(att), kit: notes.map((_, k) => ({ h: hex(hs[k]), salt: hex(salts[k]), nullifier: hex(nullifiers[k]) })) };
-      if (this.keeper) await this.keeper.hold(kit);
+      // both written before answering (the kit must exist before the attestation can land), in parallel
+      await Promise.all([this.log.hold(attId, logLeaf(att, sig, this.signer.publicKey, this.cfg.bundleHash, slot)), this.keeper ? this.keeper.hold(kit) : null]);
       // the escrow is published by the keeper once the certificate lands (A2-06), not here
       return {
         attestation: hex(att), signature: hex(sig), verifierKey: this.signer.address,
