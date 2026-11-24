@@ -1,6 +1,6 @@
 # Proof of Funds: internal security review
 
-Status: **round 3** (2026-11-25). Round 1's four High findings are fixed and re-tested. Round 2's re-review is in §4b. Round 3 reviewed the phase 2 zero-knowledge circuit and `certify_zk` (§4c), the log witness and the last verifier fixes. Round 3 found **one Critical and three High in the zk path**, which is not deployed and is switched off (`ZkConfig.enabled`). This report is updated as fixes land; every row of the findings table carries its status.
+Status: **round 4** (2026-11-25). Round 1's four High findings are fixed and re-tested; round 2 is in §4b. Round 3 found one Critical and three High in the phase 2 zk path (§4c); that path is off on chain, and its fixes are still in progress, not yet re-reviewed. Round 4 (§4d) reviewed the blind relay credits, the relayed revoke and the remaining fixes. It found no Critical or High.
 Reviewer: the POF `audit` agent. It did not write any of the code reviewed here and edits none of it; fixes are made by the owners of each part.
 
 ## 1. Scope
@@ -37,6 +37,16 @@ Repository head at the end of round 2: `5906c78`.
 | verifier fixes: keeper escrow, renew, POF-26, POF-28 | `035f6a6`, `302a98f` |
 | program fixes: POF-07, POF-17, POF-22 | `73d71dd` |
 
+**Round 4** reviewed the following.
+
+| part | commits |
+|---|---|
+| blind relay credits (RSA-FDH, claim v2), relayed revoke | `432b0cd` (`verifier/lib/blind.mjs`, `verifier/src/credits.ts`, `/api/relay/credits`, `/api/relay/revoke`); client `b22ca29` |
+| POF-30 fix; issue-slot race (ROOT_TOO_OLD) | `11b629a`; `3033364` |
+| witness W-01 to W-03 | `f359010` |
+| program `revoke_signed` (POF-REVOKE1, 148 bytes) | **uncommitted** working tree of `program/programs/pof/src/lib.rs`, read only |
+| launch and wind-down scripts | `program/launch.mjs`, `program/wind-down.mjs`, `program/ops.mjs` at `73d71dd`, key handling and defaults only; not run |
+
 Circuit tests compute the witness with the committed wasm (`$POF_ZK_OUT/build/pof_js/pof.wasm`); circom's `===` checks are asserts in the witness generator. The on-chain Groth16 verifier was tested natively through solana-bn254 (arkworks). The validator suite of `certify_zk` was **not** run by the reviewer, and the proving key was still being generated, so no full proof was made.
 
 **Not covered in this round** (stated so that nobody reads silence as a pass):
@@ -69,6 +79,8 @@ Circuit tests compute the witness with the committed wasm (`$POF_ZK_OUT/build/po
 **Round 3.** zk path: 1 Critical (ZK-01), 3 High (ZK-02, ZK-03, ZK-04), 3 Medium (ZK-05, ZK-06, ZK-08), 2 Low (ZK-07, ZK-09), 1 Info (ZK-10). Witness: 1 Medium (W-01), 2 Low (W-02, W-03). Verifier: 1 new Medium (POF-30).
 Round 1 and 2 rows still open after round 3: POF-11, POF-12, POF-14, POF-16, POF-19, POF-23, POF-25 and POF-27 open; POF-01 and POF-20 partly fixed.
 
+**Round 4.** Credits and revoke: 2 Medium (CR-01, CR-02), 3 Low (CR-03, CR-04, RV-01), 3 Info (CR-05, W-04, LW-01). Fixed: POF-27, POF-30, W-01, W-02, W-03; POF-12 partly. Round 4 tests: `audit/test/round4.test.mjs` 2 of 3 pass (the failure is CR-02); `audit/test/` round 1 and 2 now 19 of 19 (POF-30 fixed).
+
 Proof tests at round 3:
 - `audit/test/` (round 1 and 2): 18 of 19 pass; the failure is POF-30.
 - `audit/zk/`: 3 of 3 fail (ZK-01, ZK-02, ZK-04).
@@ -99,7 +111,7 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 | POF-09 | Medium | Anyone can cancel or lock out another person's pending X code | `verifier/src/linker.ts:20-26,37,42` | **fixed** `d84df76` (a record per start, tries per code); re-tested |
 | POF-10 | Medium | The client seals kits (badge secret, amounts) under a key derived from nk, which the Verifier sees | `client/pof-client.js:68,85,266` | **fixed** `d9bec9f` (kitKey from the vault seed; old kits re-sealed) |
 | POF-11 | Medium | The vault spending key comes from a phishable signMessage, and is lost with a non-deterministic signer | `client/pof-client.js:19,60-62` | partly fixed `d9bec9f` (domain-separated message, double-sign determinism check, random key with a passphrase backup); residual: the domain is a constant string, so phishing the message stays possible; see POF-27 |
-| POF-12 | Medium | Privacy: wallet, vault and handle are linkable on chain and by the operator | `client/pof-client.js:126,291-296,301`; design | partly fixed `d9bec9f` (X and badge certificates go through the relayer; a wallet payer needs consent); **still linkable**, see the round 2 note |
+| POF-12 | Medium | Privacy: wallet, vault and handle are linkable on chain and by the operator | `client/pof-client.js:126,291-296,301`; design | partly fixed: relay credits (blind RSA, bought by a private transfer) `432b0cd` + `b22ca29` remove the payment-next-to-certify link; open items: CR-01 (key not pinned), CR-05 (buy-to-spend timing), the vault funding link (docs `5e82f9f` now say so) |
 | POF-13 | Medium | `/v1` "verified" log answers trust the key the log itself names | `api/v1/_lib.js:180-182`, `sdk/src/log.ts:142,207` | **fixed** `39e02d9` (keys from Config and VerifierSet history, `keyTrusted`) |
 | POF-14 | Medium | Paid upstreams (Helius indexer and prover, RPC) behind open, unauthenticated endpoints | `client/server/spr-proxy.js`, `mcp/core.js:61`, `api/mcp.js` | partly fixed: MCP batch, size and IP caps `39e02d9`; `api/spr` per-instance window only `084ea11`; `/api/status` uncached query strings (round 2) |
 | POF-15 | Low | Bot sweep re-checks only the first 500 grants and members | `bots/sweep.js:17,37` | **fixed** `39e02d9` (cursor), diff read |
@@ -114,10 +126,10 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 | POF-24 | Info | Creator-chosen room names flow into MCP answers and Discord messages | `mcp/tools.js:201,208`, `bots/*` | **fixed** `39e02d9` (MCP quotes names as untrusted text) |
 | POF-25 | Info | The signed `tree_root` is the current head, not the root the notes were found at | `verifier/src/verify.ts:199` | open |
 | POF-26 | Low | X subjects: nobody proves control of the controller key, so a leaked bound link id certifies the handle with a stranger's funds | `verifier/src/verify.ts` (kind 1 branch), CONTRACT §4 v2 | **fixed** `302a98f` (controllerProof); re-tested, see the round 3 correction in §3 |
-| POF-27 | Medium | A random vault seed (non-deterministic wallets) rests in plain text in localStorage | `client/pof-client.js` `deriveVault` (`pof:vaultseed:v2:<wallet>`) | open (not in the round 3 fixes) |
+| POF-27 | Medium | A random vault seed (non-deterministic wallets) rests in plain text in localStorage | `client/pof-client.js` `deriveVault` (`pof:vaultseed:v2:<wallet>`) | **fixed** `b22ca29` (the random seed is kept in a PBKDF2-600k + AES-GCM passphrase box; plain legacy copies are migrated and deleted). Residual: an XSS still reads the unlocked seed in memory, so the CSP is still needed (site) |
 | POF-28 | Low | Lock generations are walked one Blob read at a time; a payment is released after a certify that may have landed | `verifier/src/locks.ts` `newest`, `verifier/src/relayer.ts` catch | **fixed** `302a98f` (lock tombstones with a head hint; refund only a certify that surely did not land), but see POF-30 |
 | POF-29 | Info | The uncommitted Config layout change (held_delay, held_until) must ship with `pof_gate`, the IDLs and the SDK together | `lib.rs` Config, `pof_gate` `read_pof_config` | **fixed** `73d71dd` + `6ee8fa6` (IDLs and SDK 0.2.0 refreshed) |
-| POF-30 | Medium | Relayer: the payment mark is the same for every attestation, so racing requests share one payment | `verifier/src/relayer.ts` (`mark = hex(att).slice(0, 64)`) | open, test |
+| POF-30 | Medium | Relayer: the payment mark is the same for every attestation, so racing requests share one payment | `verifier/src/relayer.ts` (`mark = hex(att).slice(0, 64)`) | **fixed** `11b629a` (marks bound to sha256 of the whole attestation); re-tested |
 | ZK-01 | **Critical** | `certify_zk` accepts any of the 100 nullifier roots, so a note spent long ago proves "unspent" at an older root | `zk/onchain/src/zk.rs` `check_roots` (`(0..NULL_ROOTS).any`) | open, test |
 | ZK-02 | **High** | A zk certificate is live in the same instruction; queued (unfolded) spends pass, so a same-transaction gate admits spent funds | `zk.rs` `handle_certify_zk`; design (`docs-src/zk.md` "Why the escrow") | open, test |
 | ZK-03 | **High** | The committed verifying key is a zero placeholder: an all-zero proof verifies for any statement | `zk/onchain/src/vk.rs`, `groth16.rs` | open, test (Rust) |
@@ -128,9 +140,17 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 | ZK-08 | Medium | Privacy: unsalted tags link every zk certificate of a note and the later spend, after holder revoke or expiry too | `pof.circom` `tag`, `zk.rs` | open (trade-off: it also makes revocation permissionless) |
 | ZK-09 | Low | `set_zk` changes the escrow key and the switch at once, with no delay and no curve check | `zk.rs` `handle_set_zk` | open |
 | ZK-10 | Info | Completeness and setup: nf above the largest folded value; development ceremony on one machine | `pof.circom` `below`, `zk/scripts/ceremony.sh` | open |
-| W-01 | Medium | The certificate monitor skips any certificate whose unsigned `log_index` is past the log head, so an unlogged attestation hides by passing `u64::MAX` | `witness/witness.js` `monitor` | open |
-| W-02 | Low | Heads signed by any past verifier key are cosigned | `witness/witness.js` `allowedKeys` | open |
-| W-03 | Low | No gossip between witnesses, and the project runs its own: a split view shown to different witnesses goes unseen | design, CONTRACT §8 | open |
+| W-01 | Medium | The certificate monitor skips any certificate whose unsigned `log_index` is past the log head, so an unlogged attestation hides by passing `u64::MAX` | `witness/witness.js` `monitor` | **fixed** `f359010` (the leaf is found by its signed bytes; unlogged and `u64::MAX` certificates alarm after a grace period) |
+| W-02 | Low | Heads signed by any past verifier key are cosigned | `witness/witness.js` `allowedKeys` | **fixed** `f359010` (heads accepted only from the active key) |
+| W-03 | Low | No gossip between witnesses, and the project runs its own: a split view shown to different witnesses goes unseen | design, CONTRACT §8 | **fixed** `f359010` (peer gossip, `split_view` alarm); see W-04 |
+| CR-01 | Medium | The client takes the credit key (and the house ring) from the relayer's live offer, so a relayer can give each buyer its own key and recognise the spend by `kid` | `client/pof-client.js` `credits.prepare` (`o.key`), `verifier/src/credits.ts` `offer` | open |
+| CR-02 | Medium | A claim whose answer is lost cannot be repeated (`ALREADY_CLAIMED`): the holder paid and holds no credits | `verifier/src/credits.ts` `claim` (record keeps only count and kid) | open, test |
+| CR-03 | Low | The RSA signing is JavaScript BigInt square-and-multiply: not constant time, no RSA blinding, no CRT | `verifier/lib/blind.mjs` `modPow`, `signBlinded` | open |
+| CR-04 | Low | A credit-key rotation voids every unspent credit (`OLD_CREDIT_KEY`) | `credits.ts` `spend` | open |
+| CR-05 | Info | What still links credits: the claim names the vault, and a spend soon after a purchase links by time | design | open |
+| RV-01 | Low | The relayed revoke is sent without checking the signature first; a signed revoke never expires | `verifier/src/relayer.ts` `revoke`; `lib.rs` `revoke_bytes` | open |
+| W-04 | Info | Gossip trusts the key a peer document names, and the monitor reads the whole log to index nonces | `witness/witness.js` `gossip`, `monitor` | open |
+| LW-01 | Info | When phase 2 ships, `wind-down.mjs` must close `ZkConfig` and every `["znote", tag]` lock before it closes the program | `program/wind-down.mjs` | open |
 
 ### POF-01 · Medium · Spend-revocation is custodial in practice
 `revoke_spent` is permissionless on chain, but it needs a note's secret `salt` and its `nullifier`. Only two parties hold them:
@@ -493,6 +513,58 @@ The admin can swap the escrow key K, or switch `certify_zk` on and off, at once.
 - **Proof:** `round2.test.mjs` POF-30 (two attestations, one payment, both relayed).
 - **Fix:** mark with `sha256(attestation)`, and compare the full value.
 
+## 4d. Round 4: blind relay credits, the relayed revoke, remaining fixes
+
+### Blind relay credits (`verifier/lib/blind.mjs`, `credits.ts`, client `b22ca29`)
+What was checked, and holds up:
+- **Key and hashing.** RSA 3072 (`scripts/keys.mjs`), a key used for credits only. The message is `MGF1-SHA256("pof:credit:v1" ‖ token)`, cut to one byte under the modulus; it has its own domain, and its multiplicative structure is unusable.
+- **Unblinding.** The holder blinds with r coprime to n, unblinds, and **verifies each signature before keeping it**, so a bad signature cannot tag a holder.
+- **Purchase.** A purchase must be a private SOL transfer into the house ring, of exactly `unit × count`, in a transaction the claimer signed. The claim message, signed by the vault key, binds the transfer, owner, kid and the blinded set. A transfer is claimed once (create-if-absent).
+- **Double spend.** A spent token is a create-if-absent key bound to `sha256(attestation)`. Racing spends of one token: exactly one wins (tested). A retry of the same attestation after an uncertain send may use its own credit again, and a surely-failed certify returns the credit.
+- **Storage.** Tokens and blinding factors are kept sealed in the vault store; a token never travels with its purchase.
+
+**CR-01 · Medium · Key not pinned.** The client blinds against whatever `{ n, e, kid }` (and `houseRing`) the relayer's offer returns. A relayer that wants to link can:
+- give each buyer its own key, and recognise the buyer when a credit is spent (by `kid`, or by which key verifies);
+- serve a degenerate e or n that makes the blinding leak.
+
+That undoes the property the credits exist for: being unlinkable even against the relayer.
+**Fix:**
+- Pin the credit public key and the house ring address in the client build (and in the Verifier's published bundle, as `keepers.json` is), and refuse any other offer.
+- Require `e = 65537`, and a modulus length of 3072 bits or more.
+- Show the pinned kid on /status.
+
+**CR-02 · Medium · A lost claim answer loses the bundle.** The claim record stores only `{ count, kid }`. If the answer never reaches the client, its `resume()` gets `ALREADY_CLAIMED`, and the paid credits are gone.
+- **Proof:** `round4.test.mjs` CR-02.
+- **Fix:** store `sha256(blinded set)` with the claim. A repeat with the same transfer and the same blinded values gets the same signatures again; RSA is deterministic, so this mints nothing new. Anything else stays refused.
+
+**CR-03 · Low · Signing in BigInt.** `modPow` branches on the bits of d, and V8 BigInt arithmetic is not constant time. There is no RSA blinding and no CRT (a 3072-bit signature costs hundreds of ms, and a bundle of 20 several seconds). Claims are paid, so gathering timing samples is expensive. **Fix:** sign with `crypto.privateDecrypt({ key, padding: RSA_NO_PADDING })` (OpenSSL, with blinding and CRT); keep `blind.mjs` for the client side.
+
+**CR-04 · Low · Rotation voids credits.** `spend` refuses any kid but the current one. **Fix:** keep the retired public keys for verification for as long as credits are honoured, and announce rotations.
+
+**CR-05 · Info · What still links.** The relayer knows which vault bought how many credits, and when (the claim names the owner). A credit spent minutes after its purchase links the two by time. Bundles of 5 and 20 at a fixed price are good. The client should spend the first credit of a bundle only after a random delay, and the docs (`5e82f9f`) should keep saying so.
+
+### Relayed revoke (`revoke_signed`, `/api/relay/revoke`)
+`revoke_signed` is in the program working tree, not committed. Read as it is:
+- The 148 bytes are `"POF-REVOKE1"` ‖ program ‖ certificate address ‖ subject hash ‖ asset ‖ nullset hash ‖ issue slot.
+- They are checked through the same `signed_before` (exactly one signature, all offsets inside the Ed25519 instruction), against `cert.controller`, and only while the certificate is live.
+- A renew or remake changes `nullset_hash` and `issued_slot`, so an old signature cannot revoke the new certificate. The domain is distinct from every other signed message in POF.
+
+**RV-01 · Low.**
+- `/api/relay/revoke` builds and sends the transaction without first checking the signature against the certificate's controller. Preflight catches a bad one, but it costs an RPC simulation per call. Verify locally first.
+- A signed revoke never expires. A holder who prepares one in advance and then loses it has given anyone a revoke button for as long as that attestation stands. Optionally add a `valid_until` slot.
+- The client should report "revoked" only after it sees the revocation on chain, never on the relayer's word, before it moves any funds.
+
+### Other fixes
+- **POF-30** fixed (`11b629a`): the payment and credit marks are bound to `sha256` of the whole attestation, and the race test passes.
+- **Issue-slot race** (`3033364`): the attestation is issued at the later of the slot read and the tree read, so `root_slot <= issued_slot` always holds. Correct. The note-age check uses that later slot, which is more lenient by at most a few slots. Harmless.
+- **W-01 to W-03** fixed (`f359010`). **W-04 · Info:**
+  - Gossip accepts a peer document signed by whatever key it names. Pin the peer witness keys in the operator's configuration, and check the verifier signature carried in a peer's `latest`, so that a `split_view` alarm is evidence and not just a claim.
+  - `byNonce` reads every log entry once per step. Cache it across steps.
+- **Launch and wind-down scripts** (key handling).
+  - What is fine: keys are read from the given files, base58 or JSON. The `pump` mint key is ground in a 0700 temporary folder and saved with mode 600. No secret and no Helius key is printed by the script's own lines. `--dry` simulates everything. `--buy` defaults to 0. Both scripts stop unless the wallet is the admin and the upgrade authority.
+  - **Info:** an uncaught web3.js error could print the RPC URL, which carries the Helius key; wrap the top level and scrub `api-key=`. `launch.mjs` only prints a NOTE when the Config's verifier differs from `~/.config/pof/verifier.json`. Stop there instead, because a mismatched key makes every attestation fail after launch.
+  - **LW-01 · Info:** once phase 2 ships, `wind-down.mjs` must close `ZkConfig` and every `["znote", tag]` lock (their rent belongs to their payers) **before** step 7 closes the program, or that rent is lost for good.
+
 ## 5. What held up
 These were checked specifically and found sound at the reviewed commits:
 - `ext::signed_before` reads the instruction at `current - 1`, requires exactly one signature, and requires all three instruction indexes to be `u16::MAX` (data inside the Ed25519 instruction itself). The pubkey and message are read from the offsets the precompile verified.
@@ -515,5 +587,6 @@ These were checked specifically and found sound at the reviewed commits:
 
 ## 7. Changes
 - 2026-11-25 · audit · round 1: 25 findings, 9 failing proof tests (`cf763b5`). High findings posted on `_x/pof/BOARD.md` and sent to the lead.
+- 2026-11-25 · audit · round 4: blind relay credits and the relayed revoke reviewed (CR-01 to CR-05, RV-01), W-04, LW-01; POF-27, POF-30 and W-01 to W-03 fixed; zk fixes not yet re-reviewed.
 - 2026-11-25 · audit · round 3: zk path (1 Critical, 3 High, 3 Medium, 2 Low, 1 Info), witness (1 Medium, 2 Low), POF-30. The round 2 POF-26 test was corrected (controllerSigner: null; the verifier's claim was right). Round 1 and 2 statuses updated.
 - 2026-11-25 · audit · round 2: all 4 High fixed and re-tested (9/9 plus round 2 controls). Statuses updated; 4 new findings (POF-26 to POF-29); POF-07 and POF-17 fixes reviewed in the working tree, not yet committed.
