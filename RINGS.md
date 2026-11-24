@@ -10,9 +10,9 @@ Short answers first:
   None has ever been closed. After a batch it can *also* be proven by an indexed-tree membership path (40 Poseidon hashes).
 - The nullifier **cannot** be checked from the opening alone. The verifier needs the wallet's nullifier secret `nk`.
   That is the biggest trust point of v1 (section 5).
-- The commitment formula and both trees are the same on devnet. The Helius indexer answers on mainnet and devnet. The
-  Helius prover did not answer the attestation from here. Local tests use a cloned validator and our own tree
-  reconstruction (section 8).
+- Devnet has the same programs and tree address. The Helius indexer and prover answer on both networks through
+  `https://<net>.helius-rpc.com/v1/spr` with a key. Local tests use a cloned validator and our own tree reconstruction;
+  devnet tests run the full stack, real spends included (section 8).
 
 ## 1. Program ids and accounts (mainnet = devnet, same addresses)
 
@@ -214,9 +214,12 @@ Not proven:
   `777pv…` owned by SPP) **[devnet read]**. The Helius indexer answers on **`https://devnet.helius-rpc.com/v1/spr`** and on
   **`https://mainnet.helius-rpc.com/v1/spr`** with a Helius key (`?api-key=`). The cloudfront URLs in the README return 403
   from here.
-- **The prover** (needed only for spends: transfer and withdraw, not for register, deposit, sync or certify): TEE attestation
-  answered `unavailable` on both networks through the Helius base and the cloudfront hosts. POF's own flow never needs a
-  proof. The one place it matters is the local "spend then revoke" test, which we simulate (below).
+- **The prover** (needed only for spends: transfer and withdraw; not for register, deposit, sync or certify): the Nitro TEE
+  attestation **succeeds on mainnet and devnet** when the Helius key rides in the prover URL itself
+  (`proverUrl: "https://<net>.helius-rpc.com/v1/spr?api-key=…"`, `proverTee: SignedTeePolicy.forNetwork(net)`). The SDK
+  passes `apiKey` only to the indexer. **[mainnet + devnet read: `attestProver()` ok, platform aws-nitro]**
+- So **devnet runs the whole stack** (RPC, indexer, prover) with the same programs: a real spend and a real nullifier PDA
+  can be produced there with devnet SOL, no mainnet transaction.
 - **The indexer cannot serve a local validator.** Local testing therefore uses:
   1. a validator with SPP, the registry, the tree, the protocol config and the SOL interface **cloned from mainnet** (the
      hush recipe), warped past the tree's last-update slot (offset 120), since the tree refuses an older slot;
@@ -244,3 +247,4 @@ Not proven:
 
 ## Changes
 - 2026-11-25 · rings · first version.
+- 2026-11-25 · rings · §8: the prover attests on mainnet and devnet with the key in the prover URL; devnet runs the full stack.
