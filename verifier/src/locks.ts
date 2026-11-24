@@ -26,11 +26,16 @@ export class NoteLocks {
     return slot <= BigInt(l.issuedSlot) + this.certifyWindow;
   }
 
-  /** the newest generation: [gen, lock] or [-1, null] */
+  /** the newest generation: [gen, lock] or [-1, null]. Generations are never deleted (a release is a tombstone generation on
+   *  top), so the chain has no gaps and the first missing generation ends it; a head hint skips the old ones. */
   private async newest(base: string): Promise<[number, Lock | null]> {
+    const hint = Number(Buffer.from((await this.store.get(base + '/head')) || new Uint8Array()).toString() || 0) || 0;
     let g = -1, l: Lock | null = null;
-    for (let i = 0; i < 1000; i++) { const x = await getJson<Lock>(this.store, gk(base, i)); if (!x) break; g = i; l = x; }
-    return [g, l];
+    let i = Math.max(0, hint - 1);
+    if (i > 0 && !(await this.store.get(gk(base, i)))) i = 0; // a bad hint: read from the start
+    for (let n = 0; n < 10_000; n++, i++) { const x = await getJson<Lock>(this.store, gk(base, i)); if (!x) break; g = i; l = x; }
+    if (g >= 0 && g + 1 > hint) await this.store.put(base + '/head', new Uint8Array(Buffer.from(String(g + 1)))).catch(() => {});
+    return [g, l && (l as any).released ? null : l];
   }
 
   async take(nullifiers: Uint8Array[], lock: Lock, slot: bigint) {
@@ -52,7 +57,11 @@ export class NoteLocks {
         }
       }
     } catch (e) {
-      for (const k of made) await this.store.del(k).catch(() => {});
+      // give back what this call took: a tombstone generation on top of each (if someone already built on top, theirs stands)
+      for (const k of made) {
+        const base = k.slice(0, k.lastIndexOf('/')), g = Number(k.slice(k.lastIndexOf('/') + 1));
+        await this.store.create(gk(base, g + 1), new Uint8Array(Buffer.from(JSON.stringify({ released: true, subjectHash: '', asset: -1, issuedSlot: 0, expirySlot: 0 })))).catch(() => {});
+      }
       throw e;
     }
   }

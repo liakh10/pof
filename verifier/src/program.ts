@@ -78,15 +78,21 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
     const bh = await conn.getLatestBlockhash('confirmed');
     tx.recentBlockhash = bh.blockhash;
     tx.sign(payer);
-    let sig: string;
-    try {
-      sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
-      const r = await conn.confirmTransaction({ signature: sig, ...bh }, 'confirmed');
-      if (r.value.err) throw new Error(JSON.stringify(r.value.err));
-    } catch (e: any) {
+    let sig = '';
+    const refused = (e: any) => {
       const logs: string[] = e?.logs || e?.transactionLogs || [];
       const m = logs.map(l => l.match(/Error Code: (\w+)\. Error Number: \d+\. Error Message: (.*)/)).find(Boolean);
-      throw new PofError('CHAIN_REJECTED', m ? `${what}: the program refused (${m[1]}: ${m[2]})` : `${what}: the transaction failed (${String(e?.message || e).slice(0, 160)})`, 502);
+      return new PofError('CHAIN_REJECTED', m ? `${what}: the program refused (${m[1]}: ${m[2]})` : `${what}: the transaction was refused (${String(e?.message || e).slice(0, 160)})`, 502);
+    };
+    try { sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 }); }
+    catch (e: any) { throw refused(e); } // the preflight simulation refused it: it never reached a block
+    try {
+      const r = await conn.confirmTransaction({ signature: sig, ...bh }, 'confirmed');
+      if (r.value.err) throw Object.assign(refused({ message: JSON.stringify(r.value.err) }), { landedFailed: true });
+    } catch (e: any) {
+      if (e?.landedFailed) throw e; // it landed and failed: nothing changed but the fee
+      // no answer before the blockhash expired, or the node dropped the connection: it may or may not have landed
+      throw new PofError('CHAIN_UNCERTAIN', `${what}: sent as ${sig}, but its confirmation did not arrive; check it before retrying`, 504, { signature: sig });
     }
     const after = BigInt(await conn.getBalance(payer.publicKey));
     return { signature: sig, lamports: before > after ? before - after : 0n };

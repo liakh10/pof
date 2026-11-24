@@ -28,7 +28,7 @@ test('relayer: quote → exact payment → certify; the payment cannot be used t
   assert.equal(r.payment, 'payRight'); assert.ok(r.certificate);
   assert.equal(c.chain.sent.filter(x => x.kind === 'certify').length, 1);
   await rej(c.relayer.certify(body), 'NOT_PAID');                       // payRight is used
-  await rej(c.relayer.certify({ ...body, quote: q.quote.replace(/.$/, '0') }), 'BAD_QUOTE');
+  await rej(c.relayer.certify({ ...body, quote: q.quote.replace(/.$/, ch => (ch === '0' ? '1' : '0')) }), 'BAD_QUOTE');
   await rej(c.relayer.certify({ ...body, signature: '00'.repeat(64) }), 'BAD_SIGNATURE');
   await rej(c.relayer.certify({ ...body, hashes: [...out.hashes].reverse().concat(['11'.repeat(32)]) }), 'BAD_HASHES');
 });
@@ -193,4 +193,40 @@ test('renew: the holder\'s salts give the same salted hashes, so renew keeps the
   assert.deepEqual(again.hashes, first.hashes);
   assert.ok(V.decodeAttestation(Buffer.from(again.attestation, 'hex')).issuedSlot > V.decodeAttestation(Buffer.from(first.attestation, 'hex')).issuedSlot);
   await rej(c.verifier.attest({ ...pkg(c, r, [a], { slot: c.rings.slotNow }), salts: ['00'] }), 'BAD_LENGTH');
+});
+
+test('keeper scan has a time budget and resumes where it stopped', async () => {
+  const c = makeCtx();
+  for (let i = 0; i < 4; i++) { const r = ring(); c.rings.register(r); await c.verifier.attest(pkg(c, r, [c.rings.note(r, 1n * SOL)])); }
+  const a = await c.keeper.scan({ budgetMs: -1 });
+  assert.equal(a.complete, false); assert.equal(a.pending, 0);
+  const b = await c.keeper.scan();
+  assert.equal(b.complete, true); assert.equal(b.pending, 4);
+  const last = JSON.parse(Buffer.from(await c.store.get('keeper/last-scan.json')).toString());
+  assert.equal(last.complete, true); assert.equal(last.kits, 4);
+});
+
+test('relayer: an uncertain certify keeps the payment for the same attestation; a landed one is not refunded', async () => {
+  const c = makeCtx();
+  const r = ring(); c.rings.register(r); const ctl = ring();
+  const out = await c.verifier.attest(pkg(c, r, [c.rings.note(r, 3n * SOL)], { kind: 1, value: 'anon2', proof: c.verifier.linkToken('anon2', Math.floor(Date.now() / 1000) + 600, ctl.owner), relay: true, controller: ctl.owner }));
+  const q = await c.relayer.quote();
+  c.chain.inbox.push({ signature: 'payU', slot: c.rings.slotNow, lamports: BigInt(q.lamports) });
+  const body = { attestation: out.attestation, signature: out.signature, logIndex: out.logIndex, quote: q.quote, hashes: out.hashes };
+  const real = c.chain.certify.bind(c.chain);
+  c.chain.certify = async () => { throw new V.PofError('CHAIN_UNCERTAIN', 'no confirmation', 504, { signature: 'sigX' }); };
+  await rej(c.relayer.certify(body), 'CHAIN_UNCERTAIN');
+  assert.ok(await c.store.get('relay/paid/payU'), 'the payment stays bound to this attestation');
+  c.chain.certify = real;
+  const ok = await c.relayer.certify(body);                           // the same attestation retries with the same payment
+  assert.equal(ok.payment, 'payU');
+  // a certify that errors after landing is reported as landed, not refunded
+  c.chain.certify = async (x) => { await real(x); throw new V.PofError('CHAIN_UNCERTAIN', 'late', 504, { signature: 'sigY' }); };
+  const r2 = ring(); c.rings.register(r2);
+  const out2 = await c.verifier.attest(pkg(c, r2, [c.rings.note(r2, 3n * SOL)], { kind: 1, value: 'anon3', proof: c.verifier.linkToken('anon3', Math.floor(Date.now() / 1000) + 600, ctl.owner), relay: true, controller: ctl.owner }));
+  const q2 = await c.relayer.quote();
+  c.chain.inbox.push({ signature: 'payL', slot: c.rings.slotNow, lamports: BigInt(q2.lamports) });
+  const res = await c.relayer.certify({ attestation: out2.attestation, signature: out2.signature, logIndex: out2.logIndex, quote: q2.quote, hashes: out2.hashes });
+  assert.equal(res.signature, 'sigY');
+  assert.ok(await c.store.get('relay/paid/payL'));
 });

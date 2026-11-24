@@ -14,11 +14,15 @@ export const TREE = '777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor';
 export const hex = (b) => Buffer.from(b).toString('hex');
 export const tmpdir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pofv-test-'));
 
+/** every key the tests make, by address, so a package can be signed by whichever key it names (the client holds them all) */
+export const signers = new Map();
 export function ring() {
   const seed = new Uint8Array(crypto.randomBytes(32));
   const kp = spr.ShieldedKeypair.fromKeypair(spr.SigningKey.fromEd25519Bytes(seed));
   const addr = kp.shieldedAddress();
-  return { seed, kp, owner: addr.solanaAddress(), npk: addr.nullifierPublicKey, nk: kp.nullifierKey().secretBytes(), signing: addr.signingPublicKey, wallet: V.signerFromSeed(seed) };
+  const r = { seed, kp, owner: addr.solanaAddress(), npk: addr.nullifierPublicKey, nk: kp.nullifierKey().secretBytes(), signing: addr.signingPublicKey, wallet: V.signerFromSeed(seed) };
+  signers.set(r.owner, r.wallet);
+  return r;
 }
 
 export class MemoryRings {
@@ -107,7 +111,7 @@ export function makeCtx({ relayFree = false, env = {} } = {}) {
  *  badge subject the subject key signs it too (`subjectSigner`, default: the ring's own wallet for kind 0); an X subject
  *  carries a link id bound to its controller (an unbound one passed in is re-issued bound, as a client that linked with its
  *  controller would hold) */
-export function pkg(ctx, r, notes, { kind = 0, value, asset = 0, tier = 1, relay = false, proof, slot, controller, subjectSigner, ringSigner } = {}) {
+export function pkg(ctx, r, notes, { kind = 0, value, asset = 0, tier = 1, relay = false, proof, slot, controller, subjectSigner, ringSigner, controllerSigner } = {}) {
   const payer = relay ? ctx.relayerSigner.address : r.owner;
   const v = value ?? (kind === 0 ? r.owner : undefined);
   const s = slot ?? ctx.rings.slotNow - 10n;
@@ -122,7 +126,9 @@ export function pkg(ctx, r, notes, { kind = 0, value, asset = 0, tier = 1, relay
   let subjectProof = link;
   if (kind === 0) subjectProof = proof ?? (subjectSigner ? hex(subjectSigner.sign(msg)) : undefined);
   if (kind === 2) subjectProof = proof ?? hex(subjectSigner.sign(msg));
-  const out = { v: 1, subject: { kind, value: v, slot: String(s), ...(subjectProof !== undefined ? { proof: subjectProof } : {}) }, asset, tier, ring: { owner: r.owner, nk: hex(r.nk), proof: ringProof }, notes: notes.map(n => n.opening), payer, relay };
+  // the controller's signature: `controllerSigner` (null = the client does not hold that key), else the key the tests made
+  const ctlSigner = kind === 1 && ctl ? (controllerSigner !== undefined ? controllerSigner : signers.get(ctl)) : null;
+  const out = { v: 1, subject: { kind, value: v, slot: String(s), ...(subjectProof !== undefined ? { proof: subjectProof } : {}), ...(ctlSigner ? { controllerProof: hex(ctlSigner.sign(msg)) } : {}) }, asset, tier, ring: { owner: r.owner, nk: hex(r.nk), proof: ringProof }, notes: notes.map(n => n.opening), payer, relay };
   if (kind === 1 && ctl) out.controller = ctl;
   return out;
 }

@@ -154,6 +154,11 @@ test('X handle subject: a link id from the Verifier, case-insensitive, expiry en
   const forged = link.slice(0, -4) + '0000';
   await code(c.verifier.attest(pkg(c, r, [m], { kind: 1, value: 'someanon', proof: forged, relay: true, controller: ctl.owner })), 'BAD_SUBJECT_PROOF');
   // an unbound link (the bots' kind) cannot certify
+  // the controller must sign too: a leaked bound link id alone certifies nobody (POF-26)
+  const noSig = pkg(c, r, [m], { kind: 1, value: 'someanon', proof: link, relay: true, controller: ctl.owner }); delete noSig.subject.controllerProof;
+  await code(c.verifier.attest(noSig), 'BAD_CONTROLLER_PROOF');
+  const wrongSig = pkg(c, r, [m], { kind: 1, value: 'someanon', proof: link, relay: true, controller: ctl.owner }); wrongSig.subject.controllerProof = hex(r.wallet.sign(Buffer.from('x')));
+  await code(c.verifier.attest(wrongSig), 'BAD_CONTROLLER_PROOF');
   const unbound = c.verifier.linkToken('someanon', Math.floor(Date.now() / 1000) + 600);
   assert.equal(c.verifier.checkLinkToken('someanon', unbound), null);
   await code(Promise.resolve().then(() => c.verifier.checkLinkToken('someanon', unbound, ctl.owner)), 'LINK_UNBOUND');

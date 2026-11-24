@@ -30,13 +30,19 @@ export class Keeper {
   /** one pass over every kit; returns what it did, without salts or nullifiers. A kit is kept while it can still land
    *  (issued + maxAttestAge) or while its certificate is live; it is never dropped because another attestation of the same
    *  subject is live (POF-05). Dead kits go at the first scan after they can no longer land (POF-06). */
-  async scan({ maxRevokes = 10, graceSlots = 9000n, maxAttestAge = this.maxAttestAge } = {}) {
+  async scan({ maxRevokes = 10, graceSlots = 9000n, maxAttestAge = this.maxAttestAge, budgetMs = 40_000 } = {}) {
+    const started = Date.now();
     if (!this.rings || !this.chain) throw new PofError('KEEPER_OFF', 'the keeper has no chain configured', 503);
     const slot = await this.chain.slot();
     const report = { slot: Number(slot), kits: 0, live: 0, pending: 0, dropped: 0, revoked: [] as { certificate: string; index: number; signature: string }[], errors: [] as string[] };
-    const names = await this.names();
-    report.kits = names.length;
+    /* a time budget with a resume cursor (POF-06): a pass that runs out of time saves where it stopped, the next starts there */
+    const all = await this.names();
+    report.kits = all.length;
+    const cur = Buffer.from((await this.store.get('keeper/cursor')) || new Uint8Array()).toString();
+    const names = [...all.filter(n => n > cur), ...all.filter(n => n <= cur)];
+    let stoppedAt: string | null = null;
     for (const name of names) {
+      if (Date.now() - started > budgetMs) { stoppedAt = name; break; }
       let k: Kit;
       try { k = await this.read(name); } catch { report.errors.push(`${name.split('/')[2]}: unreadable`); continue; }
       try {
@@ -64,7 +70,10 @@ export class Keeper {
         await this.store.del(name);
       } catch (e: any) { report.errors.push(`${k.subjectHash.slice(0, 8)}: ${String(e?.code || e?.message).slice(0, 80)}`); }
     }
-    await putJson(this.store, 'keeper/last-scan.json', { slot: report.slot, kits: report.kits, live: report.live, pending: report.pending, dropped: report.dropped, revoked: report.revoked, errors: report.errors.length, at: new Date().toISOString() }).catch(() => {});
+    (report as any).complete = !stoppedAt;
+    if (stoppedAt) { const i = names.indexOf(stoppedAt); await this.store.put('keeper/cursor', new Uint8Array(Buffer.from(i > 0 ? names[i - 1] : ''))); }
+    else await this.store.del('keeper/cursor').catch(() => {});
+    await putJson(this.store, 'keeper/last-scan.json', { slot: report.slot, kits: report.kits, live: report.live, pending: report.pending, dropped: report.dropped, revoked: report.revoked, errors: report.errors.length, complete: !stoppedAt, at: new Date().toISOString() }).catch(() => {});
     return report;
   }
 }

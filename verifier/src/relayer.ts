@@ -73,15 +73,30 @@ export class Relayer {
     if (!this.cfg.free) {
       const quote = this.parseQuote(input.quote);
       const inc = await this.chain.incoming(quote.slot - 150n);
+      const mark = new Uint8Array(Buffer.from(hex(att).slice(0, 64)));
       for (const t of inc) {
         if (t.lamports !== quote.lamports) continue;
-        if (await this.store.create(`relay/paid/${t.signature}`, new Uint8Array(Buffer.from(hex(att).slice(0, 64))))) { paid = t.signature; break; }
+        if (await this.store.create(`relay/paid/${t.signature}`, mark)) { paid = t.signature; break; }
+        // a payment already bound to this same attestation (an earlier try whose outcome was uncertain) may be used again
+        const was = await this.store.get(`relay/paid/${t.signature}`);
+        if (was && Buffer.from(was).equals(Buffer.from(mark))) { paid = t.signature; break; }
       }
       if (!paid) throw new PofError('NOT_PAID', `no unused payment of exactly ${quote.lamports} lamports to ${this.cfg.address} yet; it can take a few seconds to land`, 402);
     }
+    /* the payment comes back only when the certify surely did not land (refused before a block, or landed and failed) and
+       the certificate does not hold this attestation; an uncertain send keeps the payment bound to this attestation, so the
+       same request can be retried with it (POF-28) */
+    const landed = async () => { const c = await this.chain.certificate(a.subjectHash, a.asset).catch(() => null); return !!c && c.hashes.length === hashes.length && hashes.every(h => c.hashes.includes(hex(h))); };
     let r;
     try { r = await this.chain.certify({ attestation: att, signature: sig, verifierKey: this.cfg.verifierKey, logIndex, hashes: sortHashes(hashes) }); }
-    catch (e) { if (paid) await this.store.del(`relay/paid/${paid}`).catch(() => {}); throw e; } // a failed certify gives the payment back
+    catch (e: any) {
+      if (await landed()) r = { signature: e?.details?.signature || 'landed', lamports: 0n };
+      else {
+        if (paid && e?.code === 'CHAIN_REJECTED') await this.store.del(`relay/paid/${paid}`).catch(() => {});
+        throw e;
+      }
+    }
+    if (paid) await this.store.put(`relay/paid/${paid}`, new Uint8Array(Buffer.from('done:' + r.signature))); // used: never again
     spend.push([Math.floor(Date.now() / 1000), String(r.lamports)]);
     await putJson(this.store, 'relay/spend.json', spend);
     return { signature: r.signature, payment: paid, certificate: (await this.chain.certificate(a.subjectHash, a.asset))?.address ?? null };

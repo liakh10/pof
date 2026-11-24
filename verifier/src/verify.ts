@@ -55,7 +55,7 @@ function sigBytes(v: unknown, name: string): Uint8Array {
 
 export interface Disclosure {
   v: 1;
-  subject: { kind: number; value: string; proof?: string; slot: string | number };
+  subject: { kind: number; value: string; proof?: string; slot: string | number; controllerProof?: string };
   asset: number; tier: number;
   ring: { owner: string; nk: string; proof: string };
   notes: { tree: string; leafIndex: string; asset: string; amount: string; blinding: string; sig: string; dataHash?: string; ringDataHash?: string; ringProgramId?: string }[];
@@ -138,7 +138,11 @@ export class Verifier {
     if (kind === SUBJECT.wallet || kind === SUBJECT.badge) {
       const same = kind === SUBJECT.wallet && value === owner && (subj.proof === undefined || subj.proof === ring.proof);
       if (!same && (subj.proof == null || !verifySig(sigBytes(subj.proof, 'subject.proof'), msg, fromB58(value, 32, 'subject')))) throw new PofError('BAD_SUBJECT_PROOF', 'the subject signature does not match the disclosure message');
-    } else if (kind === SUBJECT.x) this.checkLinkToken(value, subj.proof, toB58(controller));
+    } else if (kind === SUBJECT.x) {
+      this.checkLinkToken(value, subj.proof, toB58(controller));
+      // the controller signs too, so a leaked link id alone certifies nobody (POF-26)
+      if (subj.controllerProof == null || !verifySig(sigBytes(subj.controllerProof, 'subject.controllerProof'), msg, controller)) throw new PofError('BAD_CONTROLLER_PROOF', 'subject.controllerProof must be the controller key\'s signature over the disclosure message');
+    }
 
     /* the Ring's owner and the nullifier key */
     const npk = await this.rings.registryNullifierKey(owner);
