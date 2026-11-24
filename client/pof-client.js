@@ -709,17 +709,45 @@ export async function createPofClient(opts = {}) {
     if (!r.ok || j.error) throw Object.assign(Error(j.error?.message || `the server answered ${r.status}`), { code: j.error?.code, details: j.error?.details });
     return j;
   }
-  async function payRelay(quote, { allowWalletPayer, from }) {
+  /* paying a quote now (the fallback when there is no credit; audit2 A2-03): ONE transaction holding a SystemProgram
+     transfer of exactly quote.lamports to quote.payTo and a Memo "pof:<reference>", so only the payment made for this quote
+     pays it. From the vault's public SOL by default (signed by the vault key in the page; fundVault tops it up), or from
+     the wallet with allowWalletPayer. */
+  const MEMO = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+  async function payRelay(quote, { allowWalletPayer }) {
     const lamports = BigInt(quote.lamports);
     if (lamports === 0n) return null;
+    if (!quote.reference || quote.memo !== `pof:${quote.reference}`) throw Object.assign(Error('the relayer quote carries no payment reference'), { code: 'BAD_QUOTE' });
+    const { SystemProgram, PublicKey, Transaction, TransactionInstruction, Buffer } = await import('./dist/web3.js');
+    const memo = new TransactionInstruction({ programId: new PublicKey(MEMO), keys: [], data: Buffer.from(quote.memo, 'utf8') });
     if (allowWalletPayer) {
-      const { SystemProgram, PublicKey } = await import('./dist/web3.js');
       status('relay', { phase: 'pay', from: 'wallet', lamports: quote.lamports });
-      const r = await W.send([SystemProgram.transfer({ fromPubkey: new PublicKey(W.state().address), toPubkey: new PublicKey(quote.payTo), lamports: Number(lamports) })]);
+      const r = await W.send([SystemProgram.transfer({ fromPubkey: new PublicKey(W.state().address), toPubkey: new PublicKey(quote.payTo), lamports: Number(lamports) }), memo]);
       await r.wait(); return r.signature;
     }
+    const id = who('vault');
+    const have = BigInt((await rpc('getBalance', [id.owner, { commitment: 'confirmed' }])).value);
+    if (have < lamports + 10_000n) throw Object.assign(Error(`The vault needs ${C.formatUnits(lamports + 10_000n - have, 9)} SOL more to pay the relayer now (fundVault), or use a relay credit.`), { code: 'VAULT_NEEDS_SOL', missingLamports: String(lamports + 10_000n - have) });
     status('relay', { phase: 'pay', from: 'vault', lamports: quote.lamports });
-    return (await withdraw({ asset: 0, amount: lamports, to: quote.payTo, from })).signature;
+    const { blockhash, lastValidBlockHeight } = (await rpc('getLatestBlockhash', [{ commitment: 'confirmed' }])).value;
+    const tx = new Transaction({ feePayer: new PublicKey(id.owner), blockhash, lastValidBlockHeight });
+    tx.add(SystemProgram.transfer({ fromPubkey: new PublicKey(id.owner), toPubkey: new PublicKey(quote.payTo), lamports: Number(lamports) }), memo);
+    tx.addSignature(new PublicKey(id.owner), Buffer.from(id.signing.sign(new Uint8Array(tx.serializeMessage()))));
+    const raw = tx.serialize();
+    const signature = await rpc('sendTransaction', [Buffer.from(raw).toString('base64'), { encoding: 'base64', preflightCommitment: 'confirmed' }]);
+    for (let i = 0; i < 60; i++) {
+      const st = (await rpc('getSignatureStatuses', [[signature]])).value[0];
+      if (st && st.confirmationStatus) { if (st.err) throw Error('the relay payment failed: ' + JSON.stringify(st.err)); return signature; }
+      await new Promise(r => setTimeout(r, 800));
+    }
+    throw Error('the relay payment was not confirmed in time');
+  }
+  /* the arguments for a holder-submitted certify (wallet subjects): the Verifier publishes only landed attestations
+     (audit2 A2-06), so attest answers logIndex null and the holder passes log_index = u64::MAX; the keeper publishes it
+     after its scan */
+  const U64_MAX = (1n << 64n) - 1n;
+  function holderCertifyArgs(answer) {
+    return { attestation: C.unhex(answer.attestation, 240), signature: C.unhex(answer.signature, 64), verifierKey: answer.verifierKey, hashes: (answer.hashes || []).map(h => C.unhex(h, 32)), logIndex: answer.logIndex == null ? U64_MAX : BigInt(answer.logIndex) };
   }
   async function certify({ asset, tier, subjectKind = 0, handle, linkId, payer, relay, allowWalletPayer = false, payNow = false, from = 'vault', delaySlots, signal }) {
     await randomDelay(delaySlots ?? cfg.defaultDelaySlots, signal);
@@ -743,11 +771,12 @@ export async function createPofClient(opts = {}) {
     const pkg = disclose({ subject: subj, asset, tier, notes: pick.notes, payer: pay, relay: viaRelay, from });
     const answer = await attest(pkg, { from, subject: subj });
     if (!viaRelay) return answer;   // the holder submits certify from the wallet (the program's IDL; the /get page does it)
-    const payment = credit ? null : await payRelay(quote, { allowWalletPayer, from });
+    const payment = credit ? null : await payRelay(quote, { allowWalletPayer });
     for (let i = 0; i < 20; i++) {
       try {
         const done = await jsonCall(relayUrl('certify'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ attestation: answer.attestation, signature: answer.signature, logIndex: answer.logIndex, hashes: answer.hashes, ...(credit ? { credit: credit.credit } : { quote: quote.quote }) }) });
         if (credit) await credit.done(true);
+        if (done.logIndex != null) { const all = await readKits(from); const k = all.find(x => x.attestation === answer.attestation); if (k) { k.logIndex = done.logIndex; await writeKits(all, from); } }
         status('relay', { phase: 'done', signature: done.signature });
         return { ...answer, relayed: done, payment };
       } catch (e) { if (e.code !== 'NOT_PAID' || i === 19) { if (credit) await credit.done(e.code === 'CREDIT_USED' || e.code === 'BAD_CREDIT' || e.code === 'OLD_CREDIT_KEY'); throw e; } await new Promise(r => setTimeout(r, 1500)); }
@@ -759,7 +788,7 @@ export async function createPofClient(opts = {}) {
     config: cfg, onStatus: fn => { listeners.add(fn); return () => listeners.delete(fn); },
     ready: () => C.ready(), hasher: S.hasherState,
     connect: id => W.connect(id), wallet: () => W.state(),
-    deriveVault, deriveRing, isRegistered, register, shield, notes, balance, choose, subject, disclose, attest, certify, kits, controllerOf, vaultSigner: () => vaultSigner(), fundVault, withdraw, linkStart, linkCheck, waitForAge, randomDelay, privacy, credits, revokeRelayed, revokeBytesOf,
+    deriveVault, deriveRing, isRegistered, register, shield, notes, balance, choose, subject, disclose, attest, certify, kits, controllerOf, vaultSigner: () => vaultSigner(), fundVault, withdraw, linkStart, linkCheck, waitForAge, randomDelay, privacy, credits, revokeRelayed, revokeBytesOf, holderCertifyArgs,
     progress: () => ({ hasher: S.hasherState(), last: lastStatus }),
     local, identity: from => { const id = from === 'ring' ? ring : vault; return id ? { kind: id.kind, owner: id.owner, ownerHash: C.hex(id.ownerHash) } : null; },
     forget() { for (const id of [vault, ring]) if (id) { id.nk.fill(0); id.kitKey.fill(0); id.ctlSeed.fill(0); } vault = ring = null; },

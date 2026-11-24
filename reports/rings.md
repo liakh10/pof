@@ -219,7 +219,10 @@ Network: 150 ms latency, 6.4 Mbit/s (`lab/test/mobile-perf.mjs`, raw results in 
   a wrong house ring, a wrong kid and an unpinned network; the lab shows the fingerprint.
 - **Recovery.** A bundle that was paid but not claimed (a closed tab, an indexer delay) is kept and claimed again by
   `credits.resume()`.
-- **Fallbacks.** Paying at certify time needs `payNow: true` (warned as `NO_CREDIT`). Paying from the wallet needs
+- **Fallbacks.** Paying at certify time needs `payNow: true` (warned as `NO_CREDIT`). Since audit2 A2-03 that payment is one
+  transaction: a SystemProgram transfer of exactly the quote to the relayer plus a Memo `pof:<reference>`. By default it is
+  paid from the vault's public SOL and signed by the vault key (`VAULT_NEEDS_SOL` until `fundVault` tops it up). Tested on
+  the clone: the vault, not the wallet, is the source, and the memo carries the quote's reference. Paying from the wallet needs
   `allowWalletPayer: true` (`WALLET_PAYER`).
 - **Proven against the Verifier's own `Credits`** (local USDC test, and the lab in Chrome, where the house-ring receipt
   is simulated):
@@ -277,6 +280,9 @@ Network: 150 ms latency, 6.4 Mbit/s (`lab/test/mobile-perf.mjs`, raw results in 
   message (POF-26). The lab links a handle through the real Linker, with a simulated post, and the Verifier attests it.
 
 ### Audit2 fixes (client)
+- **Log index after landing** (A2-06). `attest` answers `logIndex: null`. A relayed certificate's kit takes the relayer's
+  index once the certificate lands. For a holder-submitted certify, `pof.holderCertifyArgs(answer)` gives
+  `log_index = u64::MAX`, and the keeper publishes the entry at its scan.
 - **Kits at rest.** The whole kit list of a vault is one AES-GCM box under its kit key, so the device's storage shows no
   salt, nullifier, handle or vault (tested). The export file is sealed the same way and opens only in the same vault;
   `export({ plain: true })` writes a clear file on request. Kits stored in clear by older builds are moved into the box on

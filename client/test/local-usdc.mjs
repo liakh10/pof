@@ -113,6 +113,7 @@ test('local: USDC shield, sync, tiers with 6 decimals, attestation; mixed assets
   const credits = new V.Credits(new V.FsStore(fs.mkdtempSync(path.join(os.tmpdir(), 'pof-credits-'))), creditKey, { received: async sig => paid.get(sig) || null }, houseRing, 10_000_000n, [5, 20]);
   const http = await import('node:http');
   const seen = { certify: [], claims: [], revoke: [] };
+  const quotes = new Map(), paidBy = [];
   const srv = http.createServer((req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', async () => {
     const send = (code, j) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(j)); };
     try {
@@ -121,8 +122,23 @@ test('local: USDC shield, sync, tiers with 6 decimals, attestation; mixed assets
       const j = JSON.parse(b || '{}');
       if (req.url.startsWith('/api/attest')) return send(200, await rv.attest(j));
       if (req.url.startsWith('/api/relay/credits')) { seen.claims.push(j); return send(200, await credits.claim(j)); }
-      if (req.url.startsWith('/api/relay/certify')) { seen.certify.push(j); await credits.spend(j.credit, j.attestation); return send(200, { signature: 'stub-certify', certificate: null }); }
+      if (req.url.startsWith('/api/relay/certify')) {
+        seen.certify.push(j);
+        if (j.credit) { await credits.spend(j.credit, j.attestation); return send(200, { signature: 'stub-certify', certificate: null, logIndex: 7 }); }
+        // A2-03: the payment is one transaction with a transfer of exactly the quote to payTo and the memo pof:<reference>
+        const ref = quotes.get(j.quote);
+        const sigs = await W.rpc('getSignaturesForAddress', [relayer.address, { limit: 5, commitment: 'confirmed' }]);
+        for (const x of sigs) {
+          const tx = await W.rpc('getTransaction', [x.signature, { encoding: 'jsonParsed', commitment: 'confirmed', maxSupportedTransactionVersion: 1 }]);
+          const ixs = tx.transaction.message.instructions;
+          const pay = ixs.find(i => i.program === 'system' && i.parsed?.type === 'transfer' && i.parsed.info.destination === relayer.address && i.parsed.info.lamports === 1234567);
+          const memo = ixs.find(i => i.program === 'spl-memo' && String(i.parsed).trim() === 'pof:' + ref);
+          if (pay && memo) { paidBy.push(pay.parsed.info.source); return send(200, { signature: 'stub-certify-paid', certificate: null, logIndex: 8 }); }
+        }
+        return send(402, { error: { code: 'NOT_PAID', message: 'not yet' } });
+      }
       if (req.url.startsWith('/api/relay/revoke')) { seen.revoke.push(j); return send(200, { signature: 'stub-revoke' }); }
+      if (req.url.startsWith('/api/relay/quote')) { const reference = crypto.randomBytes(16).toString('hex'); quotes.set('q-' + reference, reference); return send(200, { quote: 'q-' + reference, lamports: '1234567', payTo: relayer.address, reference, memo: 'pof:' + reference }); }
       send(404, { error: { code: 'NOT_FOUND' } });
     } catch (e) { send(e.status || 400, { error: { code: e.code, message: e.message } }); }
   }); });
@@ -191,6 +207,17 @@ test('local: USDC shield, sync, tiers with 6 decimals, attestation; mixed assets
     const sentBytes = (await R.revokeBytesOf(kit, { validUntil: BigInt(sent.validUntil) })).bytes;
     assert.ok(V.verifySig(C.unhex(sent.signature), sentBytes, V.fromB58(kit.controller, 32, 'controller')), 'the controller (badge key) signed the 156 bytes with that validUntil');
     await assert.rejects(R.revokeRelayed({ ...kit, subject: { kind: 0, value: 'x' } }), e => e.code === 'RELAY_NOT_FOR_WALLETS');
+    // the relayer's log index after landing is kept in the kit (A2-06: attest answers null)
+    assert.equal(kit.logIndex, 7);
+    // paying now, without credits (A2-03): from the vault's public SOL, one transaction with the transfer and the memo
+    while (await R.credits.count()) await (await R.credits.take()).done(true);
+    await assert.rejects(R.certify({ asset: 1, tier: 1, subjectKind: 2, payNow: true }), e => e.code === 'VAULT_NEEDS_SOL');
+    await R.fundVault(20_000_000);
+    const paidNow = await R.certify({ asset: 1, tier: 1, subjectKind: 2, payNow: true });
+    assert.equal(paidNow.relayed.signature, 'stub-certify-paid'); assert.ok(paidNow.payment);
+    assert.equal(paidBy[0], rvault.owner, 'the vault paid, not the wallet');
+    // a holder-submitted certify takes log_index = u64::MAX when attest answered null
+    assert.equal(R.holderCertifyArgs({ attestation: kit.attestation, signature: '00'.repeat(64), hashes: [], logIndex: null }).logIndex, (1n << 64n) - 1n);
   } finally { srv.close(); }
   void v;
 });

@@ -39,7 +39,7 @@ try {
   await page.waitForFunction(() => document.getElementById('picked').textContent.length > 0, null, { timeout: 30_000 });
   const picked = await page.$eval('#picked', e => e.textContent);
   ok(/ready: 1 note/.test(picked) && /excess 1000000000/.test(picked), 'tier 1 takes the single 2 SOL note (fewest notes, least excess): ' + picked);
-  await page.click('#certify'); await waitLog(/attested · log index \d+/);
+  await page.click('#certify'); await waitLog(/attested · log index (\d+|after landing)/);
   const att = ((await logText()).match(/attestation ([0-9a-f]{480})/) || [])[1] || '';
   ok(att.length === 480 && att.startsWith('504f4631'), 'the Verifier signed a 240-byte POF1 attestation for the wallet subject', att.slice(0, 40) + ' len ' + att.length);
   await page.selectOption('#kind', '2'); await page.click('#certify');

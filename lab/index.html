@@ -165,7 +165,7 @@ $('certify').onclick = run(async () => {
   }
   const r = await pof.certify({ asset, tier, subjectKind: kind, handle: $('handle').value, linkId, from: 'vault', allowWalletPayer: $('walletpay').checked });
   if (r.relayed) log('relayed with a credit · ' + r.relayed.signature, 'ok');
-  log(`attested · log index ${r.logIndex} · subject ${r.subjectHash.slice(0, 16)}… · expiry slot ${r.expirySlot} · controller ${r.controller}\nattestation ${r.attestation}`, 'ok');
+  log(`attested · log index ${r.logIndex ?? (r.relayed?.logIndex ?? 'after landing')} · subject ${r.subjectHash.slice(0, 16)}… · expiry slot ${r.expirySlot} · controller ${r.controller}\nattestation ${r.attestation}`, 'ok');
 });
 $('buy').onclick = run(async () => {
   const pend = await pof.credits.prepare({ count: 5 });

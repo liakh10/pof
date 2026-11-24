@@ -53,6 +53,8 @@ const T = {
   CREDIT_KEY_MISMATCH: ['The relayer offered a credit key this site does not trust.', 'Nothing was paid. Do not buy credits until the site is updated; tell the POF team.', false],
   NO_CREDIT_PIN: ['Relay credits are not available on this network yet.', 'Use a wallet subject, or try again after the next release.', false],
   BAD_CREDIT_PIN: ['This build carries a wrong credit key.', 'Do not buy credits; tell the POF team.', false],
+  VAULT_NEEDS_SOL: ['The vault has too little SOL to pay the relayer now.', 'Use a relay credit, or top up the vault (a public transfer from your wallet).', false],
+  BAD_QUOTE: ['The relayer quote could not be used.', 'Ask for a new quote.', true],
   BAD_CREDIT: ['That relay credit does not check out.', 'Buy a new bundle; the old one may be from another relayer key.', false],
   OLD_CREDIT_KEY: ['That credit was signed by an older relayer key.', 'Buy a new bundle.', false],
   NOT_RECEIVED: ['The relayer has not seen your credit payment yet.', 'Wait a few seconds; the client claims again by itself.', true],
