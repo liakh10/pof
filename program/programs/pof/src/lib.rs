@@ -62,7 +62,7 @@ pub const STATUS_EXPIRED: u8 = 3;
 pub const ATTESTATION_LEN: usize = 240;
 pub const DOMAIN_CERT: &[u8; 4] = b"POF1";
 /// A controller's signed revoke (CONTRACT §5): "POF-REVOKE1" ‖ program id ‖ certificate ‖ subject_hash ‖ asset ‖ nullset_hash ‖
-/// issued_slot (148 bytes).
+/// issued_slot ‖ valid_until (156 bytes).
 pub const DOMAIN_REVOKE: &[u8; 11] = b"POF-REVOKE1";
 /// CONTRACT §7: the transparency log's signed tree head.
 pub const DOMAIN_LOG: &[u8; 8] = b"POF-STH1";
@@ -348,11 +348,12 @@ pub fn log_bytes(program_id: &Pubkey, size: u64, head: &[u8; 32]) -> [u8; 80] {
     b
 }
 
-/// The 148 bytes a certificate's controller signs to revoke it without sending a transaction itself (anyone, e.g. the relayer,
+/// The 156 bytes a certificate's controller signs to revoke it without sending a transaction itself (anyone, e.g. the relayer,
 /// submits them): "POF-REVOKE1" (11) ‖ program id (32) ‖ certificate address (32) ‖ subject_hash (32) ‖ asset (1) ‖ nullset_hash
-/// (32) ‖ issued_slot u64 LE (8). Bound to the certificate's current attestation: a renew or remake needs a new signature.
-pub fn revoke_bytes(program_id: &Pubkey, certificate: &Pubkey, cert: &Certificate) -> [u8; 148] {
-    let mut b = [0u8; 148];
+/// (32) ‖ issued_slot u64 LE (8) ‖ valid_until u64 LE (8). Bound to the certificate's current attestation (a renew or remake
+/// needs a new signature) and refused after valid_until, so a signed revoke cannot be held back for later.
+pub fn revoke_bytes(program_id: &Pubkey, certificate: &Pubkey, cert: &Certificate, valid_until: u64) -> [u8; 156] {
+    let mut b = [0u8; 156];
     b[0..11].copy_from_slice(DOMAIN_REVOKE);
     b[11..43].copy_from_slice(program_id.as_ref());
     b[43..75].copy_from_slice(certificate.as_ref());
@@ -360,6 +361,7 @@ pub fn revoke_bytes(program_id: &Pubkey, certificate: &Pubkey, cert: &Certificat
     b[107] = cert.asset;
     b[108..140].copy_from_slice(&cert.nullset_hash);
     b[140..148].copy_from_slice(&cert.issued_slot.to_le_bytes());
+    b[148..156].copy_from_slice(&valid_until.to_le_bytes());
     b
 }
 
@@ -788,17 +790,18 @@ pub mod pof {
     }
 
     /// Anyone submits the controller's signed revoke (Ed25519 instruction right before, signed by the certificate's controller
-    /// key over the 148 POF-REVOKE1 bytes). The holder's wallet never signs or pays: for an X-handle or badge certificate the
-    /// relayer submits it.
-    pub fn revoke_signed(ctx: Context<RevokeSigned>) -> Result<()> {
+    /// key over the 156 POF-REVOKE1 bytes, usable until `valid_until`). The holder's wallet never signs or pays: for an X-handle
+    /// or badge certificate the relayer submits it.
+    pub fn revoke_signed(ctx: Context<RevokeSigned>, valid_until: u64) -> Result<()> {
         let slot = Clock::get()?.slot;
         let a = ctx.accounts;
         let key = a.certificate.key();
         let cert = &mut a.certificate;
         require!(cert.status == STATUS_LIVE, PofError::NotLive);
+        require!(slot <= valid_until, PofError::Expired);
         let (signer, msg) = ext::signed_before(&a.instructions)?;
         require_keys_eq!(signer, cert.controller, PofError::NotController);
-        require!(msg.as_slice() == revoke_bytes(&crate::ID, &key, cert), PofError::AttestationMismatch);
+        require!(msg.as_slice() == revoke_bytes(&crate::ID, &key, cert, valid_until), PofError::AttestationMismatch);
         revoke(&a.config, &mut a.treasury, cert, STATUS_REVOKED_HOLDER, slot);
         emit!(Revoked { subject_hash: cert.subject_hash, asset: cert.asset, tier: cert.tier, status: STATUS_REVOKED_HOLDER, slot, by: a.caller.key(), index: u8::MAX, salt: [0; 32], nullifier: [0; 32], path: 4 });
         Ok(())

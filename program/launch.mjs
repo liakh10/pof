@@ -43,6 +43,11 @@ const bs58m = require('bs58'), bs58 = bs58m.default || bs58m;
 const { Connection, Keypair, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, ComputeBudgetProgram, AddressLookupTableProgram, LAMPORTS_PER_SOL } = web3;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+// an uncaught error never prints the RPC's api key
+const scrub = e => String((e && (e.stack || e.message)) || e).replace(/api-key=[\w-]+/g, 'api-key=…');
+process.on('uncaughtException', e => { console.log('\n  stopped: ' + scrub(e) + '\n'); process.exit(1); });
+process.on('unhandledRejection', e => { console.log('\n  stopped: ' + scrub(e) + '\n'); process.exit(1); });
+
 const SITE = path.resolve(here, '..');
 const argv = process.argv.slice(2);
 const flag = (n, d) => { const i = argv.indexOf('--' + n); return i < 0 ? d : argv[i + 1]; };
@@ -165,7 +170,7 @@ if (!h) {
 }
 if (h) {
   if (h.admin !== dev.toBase58()) { console.log(`  the admin is ${h.admin}, not this wallet: stopped\n`); process.exit(1); }
-  if (h.verifier !== VERIFIER.toBase58()) console.log(`  NOTE: the config's verifier is ${h.verifier}, not ${VERIFIER.toBase58()} (rotate with set_verifier: it takes the rotation delay)`);
+  if (h.verifier !== VERIFIER.toBase58() || h.relayer !== RELAYER.toBase58()) { console.log(`  STOPPED: the config names verifier ${h.verifier} and relayer ${h.relayer}, but this machine's keys are ${VERIFIER.toBase58()} and ${RELAYER.toBase58()}. Certificates signed by this Verifier would be refused. Bring the right ~/.config/pof keys (or rotate with set_verifier, which waits the rotation delay), then run again.\n`); process.exit(1); }
   console.log(`  config: verifier ${h.verifier.slice(0, 8)}…, relayer ${h.relayer.slice(0, 8)}…, fee ${sol(h.params.fee_lamports)} SOL, fees to ${h.dev === dev.toBase58() ? 'the dev' : h.dev}`);
 }
 const prog = h;

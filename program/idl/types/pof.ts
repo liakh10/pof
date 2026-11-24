@@ -704,8 +704,8 @@ export type Pof = {
       "name": "revokeSigned",
       "docs": [
         "Anyone submits the controller's signed revoke (Ed25519 instruction right before, signed by the certificate's controller",
-        "key over the 148 POF-REVOKE1 bytes). The holder's wallet never signs or pays: for an X-handle or badge certificate the",
-        "relayer submits it."
+        "key over the 156 POF-REVOKE1 bytes, usable until `valid_until`). The holder's wallet never signs or pays: for an X-handle",
+        "or badge certificate the relayer submits it."
       ],
       "discriminator": [
         224,
@@ -770,7 +770,12 @@ export type Pof = {
           "address": "Sysvar1nstructions1111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "validUntil",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "revokeSpent",

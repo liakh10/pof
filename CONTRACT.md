@@ -154,13 +154,14 @@ subject message is gone), the X link takes a secret and binds the controller (`P
   A Verifier-signed "spent" statement is not needed and not accepted.
 - The keeper holds `(salt, nullifier)` encrypted at rest; the holder holds a copy. After a revoke, salt and nullifier are public
   (on the certificate: `revealed_index`, `revealed_salt`, `revealed_nullifier`, and in the `Revoked` event).
-2026-11-25 (program): revoke_signed with the verifier's 148 POF-REVOKE1 bytes added (no wallet signs a holder's revoke).
+2026-11-25 (program): revoke_signed with the verifier's POF-REVOKE1 bytes added (no wallet signs a holder's revoke); audit RV-01: valid_until appended (156 bytes).
 
-- `revoke_by_holder`: the controller signs the transaction. `revoke_signed()`: the controller signs only these 148 bytes with
-  ed25519, in an Ed25519 instruction right before, and anyone (the relayer) submits and pays, so no wallet links to the handle:
-  `"POF-REVOKE1" (11) ‖ program_id (32) ‖ certificate address (32) ‖ subject_hash (32) ‖ asset u8 (1) ‖ nullset_hash (32) ‖
-  issued_slot u64 LE (8)` (the certificate's own values; a renew or remake needs a new signature). Accounts: caller (signer,
-  pays), config, treasury, certificate, instructions sysvar.
+- `revoke_by_holder`: the controller signs the transaction. `revoke_signed(valid_until)`: the controller signs only these 156
+  bytes with ed25519, in an Ed25519 instruction right before, and anyone (the relayer) submits and pays, so no wallet links to
+  the handle: `"POF-REVOKE1" (11) ‖ program_id (32) ‖ certificate address (32) ‖ subject_hash (32) ‖ asset u8 (1) ‖
+  nullset_hash (32) ‖ issued_slot u64 LE (8) ‖ valid_until u64 LE (8)` (the certificate's own values; a renew or remake needs a
+  new signature; refused once the slot is past valid_until, so a signed revoke cannot be held back; suggested window: now +
+  1,500 slots). Accounts: caller (signer, pays), config, treasury, certificate, instructions sysvar.
 
 2026-11-25 (program): the on-chain check of revoke_spent fixed (both paths, built and unit-tested against a real mainnet path).
 2026-11-25 (verifier): the keeper seals each kit with AES-256-GCM (key name as associated data) in Blob, revokes by the PDA

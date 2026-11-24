@@ -16,6 +16,10 @@ import { web3, flag, has, home, sol, t, pickUrl, isLocal, loadKey, makeSender, s
 import { makePof } from './js/pof.mjs';
 const { PublicKey } = web3;
 
+// an uncaught error never prints the RPC's api key
+const scrub = e => String((e && (e.stack || e.message)) || e).replace(/api-key=[\w-]+/g, 'api-key=…');
+process.on('uncaughtException', e => { console.log('\n  stopped: ' + scrub(e) + '\n'); process.exit(1); });
+process.on('unhandledRejection', e => { console.log('\n  stopped: ' + scrub(e) + '\n'); process.exit(1); });
 const DRY = has('dry');
 const url = await pickUrl();
 const LOCAL = isLocal(url);

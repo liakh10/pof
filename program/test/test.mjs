@@ -299,24 +299,29 @@ await check('revoke_by_holder: only the controller (the X-handle key, not the re
   await refuses(doCertify(relayer, b), 'newer');
   eq((await k.cert(b.subject_hash)).status, 2);
 });
-await check('revoke_signed: the controller signs the 148 POF-REVOKE1 bytes, the relayer submits and pays, no wallet signs; a wrong key, tampered bytes, another certificate, a replay, and a signature from before a remake refused', async () => {
+await check('revoke_signed: the controller signs the 156 POF-REVOKE1 bytes, the relayer submits and pays, no wallet signs; a wrong key, tampered bytes, another certificate, a replay, a lapsed valid_until and a signature from before a remake refused', async () => {
   const ctl = Keypair.generate();
   const a = await k.attestation({ kind: 1, handle: 'sig' + rand(3).toString('hex'), controller: ctl.publicKey, tier: 1 });
   await doCertify(relayer, a);
   const cp = q.certPda(a.subject_hash, 0), c = await k.cert(a.subject_hash);
-  const rv = (signer, msg, cert = cp) => send([q.signIx(signer, msg), q.P.ix('revoke_signed', {}, { caller: relayer.publicKey, certificate: cert })], [relayer], 100_000);
-  const good = q.revokeBytes(cp, c);
-  eq(good.length, 148, 'POF-REVOKE1 bytes');
+  const until = BigInt(await k.slotNow()) + 300n;
+  const rv = (signer, msg, vu = until, cert = cp) => send([q.signIx(signer, msg), q.P.ix('revoke_signed', { valid_until: vu }, { caller: relayer.publicKey, certificate: cert })], [relayer], 100_000);
+  const good = q.revokeBytes(cp, c, until);
+  eq(good.length, 156, 'POF-REVOKE1 bytes');
   await refuses(rv(relayer, good), 'controller');
-  await refuses(rv(ctl, q.revokeBytes(cp, { ...c, issued_slot: c.issued_slot - 1n })), 'differ');
-  await refuses(rv(ctl, q.revokeBytes(cp, { ...c, nullset_hash: rand(32) })), 'differ');
-  await refuses(rv(ctl, q.revokeBytes(cp, c, Keypair.generate().publicKey)), 'differ');
+  await refuses(rv(ctl, good, until + 1n), 'differ');
+  await refuses(rv(ctl, q.revokeBytes(cp, { ...c, issued_slot: c.issued_slot - 1n }, until)), 'differ');
+  await refuses(rv(ctl, q.revokeBytes(cp, { ...c, nullset_hash: rand(32) }, until)), 'differ');
+  await refuses(rv(ctl, q.revokeBytes(cp, c, until, Keypair.generate().publicKey)), 'differ');
+  // a signed revoke whose valid_until has passed: refused, it cannot be held back for later
+  const lapsed = BigInt(await k.slotNow()) - 1n;
+  await refuses(rv(ctl, q.revokeBytes(cp, c, lapsed), lapsed), 'expired');
   // the same controller holds a second certificate: a signature for one never revokes the other
   const b2 = await k.attestation({ kind: 1, handle: 'sig2' + rand(3).toString('hex'), controller: ctl.publicKey, tier: 1 });
   await doCertify(relayer, b2);
   const cp2 = q.certPda(b2.subject_hash, 0);
-  await refuses(rv(ctl, good, cp2), 'differ');
-  await refuses(send([q.P.ix('revoke_signed', {}, { caller: relayer.publicKey, certificate: cp })], [relayer], 100_000), 'ed25519');
+  await refuses(rv(ctl, good, until, cp2), 'differ');
+  await refuses(send([q.P.ix('revoke_signed', { valid_until: until }, { caller: relayer.publicKey, certificate: cp })], [relayer], 100_000), 'ed25519');
   const sig = await rv(ctl, good);
   unit('revoke_signed');
   eq((await k.cert(a.subject_hash)).status, 2); eq((await k.ev(sig, 'Revoked')).path, 4);
@@ -325,7 +330,7 @@ await check('revoke_signed: the controller signs the 148 POF-REVOKE1 bytes, the 
   const again = await k.attestation({ kind: 1, subject_hash: a.subject_hash, controller: ctl.publicKey, tier: 1 });
   await doCertify(relayer, again);
   await refuses(rv(ctl, good), 'differ');
-  await rv(ctl, q.revokeBytes(cp, await k.cert(a.subject_hash)));
+  await rv(ctl, q.revokeBytes(cp, await k.cert(a.subject_hash), until));
   eq((await k.cert(a.subject_hash)).status, 2);
 });
 await check('certify over a revoked certificate: a newer attestation remakes it; its old payer gets the rent back (and must be passed)', async () => {
