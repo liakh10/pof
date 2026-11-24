@@ -1,0 +1,9 @@
+spr.js                  9578 B  gzip     3603 B  budget 200000
+spr-spend.js          673899 B  gzip   201764 B  budget 260000
+chunk-BN2N37T5.js         72 B  gzip       82 B  budget 200000
+chunk-E7THDS3Q.js     446872 B  gzip   135653 B  budget 200000
+chunk-REJ4SE35.js         83 B  gzip       87 B  budget 200000
+chunk-YVSA2ZOB.js        780 B  gzip      446 B  budget 200000
+web3.js               266187 B  gzip    81621 B  budget 110000
+hasher-simd.wasm     1282379 B  gzip   420485 B  budget 440000
+hasher.wasm          1990996 B  gzip   559535 B  budget 580000
