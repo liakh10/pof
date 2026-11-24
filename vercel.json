@@ -75,5 +75,5 @@
       "destination": "/api/link/verify"
     }
   ],
-  "buildCommand": "npm --prefix verifier ci && npm --prefix verifier run build"
+  "buildCommand": "npm --prefix verifier ci && npm --prefix verifier run build:verify"
 }

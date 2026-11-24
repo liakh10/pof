@@ -1,6 +1,7 @@
 /* Deterministic build of the Verifier bundle.
    node scripts/build.mjs          builds dist/pof-verifier.mjs and writes dist/BUILD.json (the published bundle hash)
    node scripts/build.mjs --check  builds twice into a temp dir and checks both match dist/BUILD.json
+   node scripts/build.mjs --verify builds dist/pof-verifier.mjs and fails unless it matches dist/BUILD.json (the Vercel build)
    Reproduce: same Node major, `npm ci` (the lockfile pins every dependency and esbuild), then `npm run build:check`.
    The bundle has no timestamps, no absolute paths (esbuild writes paths relative to this folder) and no source maps. */
 import { build, version as esbuildVersion } from 'esbuild';
@@ -45,6 +46,14 @@ if (check) {
 }
 fs.mkdirSync(path.join(here, 'dist'), { recursive: true });
 const out = await once(path.join(here, 'dist/pof-verifier.mjs'));
+if (process.argv.includes('--verify')) {
+  // the deploy build: writes the bundle, never BUILD.json, and fails unless the bundle is the published one
+  const want = JSON.parse(fs.readFileSync(path.join(here, 'dist/BUILD.json'), 'utf8')).sha256;
+  const got = sha(out);
+  console.log(JSON.stringify({ built: got, published: want, match: got === want }));
+  if (got !== want) { console.error('the bundle differs from the published hash in verifier/dist/BUILD.json: refusing to deploy'); process.exit(1); }
+  process.exit(0);
+}
 const lock = fs.readFileSync(path.join(here, 'package-lock.json'));
 const sources = Object.fromEntries(fs.readdirSync(path.join(here, 'src')).sort().map(f => [f, sha(fs.readFileSync(path.join(here, 'src', f)))]));
 const info = { bundle: 'dist/pof-verifier.mjs', sha256: sha(out), bytes: out.length, esbuild: esbuildVersion, node: process.version.split('.')[0], lockfileSha256: sha(lock), sources };

@@ -41,8 +41,9 @@ offset size field
 37     32   subject_hash  §1
 69     1    asset         §2
 70     1    tier          §2
-71     32   tree_root     the Rings STATE root of tree 0 (777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor) at which every
-                          disclosed note was found (one root: all notes of one attestation in one tree)
+71     32   tree_root     the Rings STATE root head of tree 0 (777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor) the Verifier
+                          read and proved every disclosed note under (the tree is append-only, so the head holds every
+                          earlier note; one root: all notes of one attestation in one tree)
 103    8    root_slot     u64 LE, the u64 at tree offset 120 read with that root
 111    1    note_count    1..=8
 112    32   nullset_hash  sha256 of the sorted salted nullifier hashes (§5)
@@ -66,6 +67,9 @@ What the program checks on chain besides the signature (Config parameters, launc
 2026-11-25 (program): `controller` added at 192 (the bytes are 240 now, the nonce moved to 224): an X-handle certificate
 needs a key that can revoke it and join rooms, and the relayer pays for it. `tree_root`/`root_slot` fixed per RINGS §9.
 The transparency log leaf (§7) carries these 240 bytes.
+2026-11-25 (program, audit round 1): renew refuses an expired certificate (POF-22) and needs the SAME salted hashes, so the
+Verifier's renew path must take the holder's old salts back; `log_index` is not signed (POF-18): readers find the log entry by
+the attestation bytes (nonce, nullset_hash), never by the index alone; tree_root wording per POF-25.
 
 ## §4 The disclosure package (owner: verifier; producer: rings client)
 What the browser sends to `POST /api/attest`. It carries the openings of the chosen notes only, over TLS; the Verifier keeps
@@ -75,11 +79,12 @@ none of it (no amount, no opening, no `nk` is stored or logged; `nk` lives in me
 {
   "v": 1,
   "subject": { "kind": 0, "value": "<base58 wallet | handle | base58 badge pubkey>",
-               "proof": "<hex or base58 ed25519 signature (kind 0, 2) | link id from /api/link/check (kind 1)>",
-               "slot": "<u64 decimal: the recent slot named in the signed message (kind 0, 2)>" },
+               "proof": "<kind 0, 2: the subject key's signature over the disclosure message (omit for kind 0 when the wallet is ring.owner) | kind 1: the link id>",
+               "slot": "<u64 decimal: the recent slot named in the disclosure message>" },
   "asset": 0,
   "tier": 3,
-  "ring": { "owner": "<base58 Ed25519 key that owns the notes>", "nk": "<hex 31: the ring's nullifier secret>" },
+  "ring": { "owner": "<base58 Ed25519 key that owns the notes>", "nk": "<hex 31: the ring's nullifier secret>",
+            "proof": "<the ring owner's ed25519 signature over the disclosure message (always)>" },
   "notes": [ { "tree": "<base58>", "leafIndex": "<u64 decimal>", "asset": "<base58 mint, SOL = 1111…1111>",
                "amount": "<u64 decimal>", "blinding": "<hex 32>", "sig": "<base58 signature of the transaction that created it>",
                "dataHash": "<hex 32, only if present>", "ringDataHash": "<hex 32, only if present>", "ringProgramId": "<base58, only if present>" } ],
@@ -88,28 +93,39 @@ none of it (no amount, no opening, no `nk` is stored or logged; `nk` lives in me
   "controller": "<base58, kind 1 only: the key the client keeps to revoke and join rooms>"
 }
 ```
-**The subject message** (kind 0 by the wallet, kind 2 by the badge key) is these UTF-8 lines joined with `\n`, signed raw
-(Phantom `signMessage`):
+**The disclosure message** is these UTF-8 lines joined with `\n`, signed raw (Phantom `signMessage`, or the vault key in
+the client). The **ring owner always signs it** (`ring.proof`): openings plus `nk` alone certify nobody (audit POF-02). For
+kind 0 and 2 the subject key signs the same bytes (`subject.proof`); a wallet that is itself `ring.owner` signs once.
 ```
-Proof of Funds: subject proof
+Proof of Funds: disclosure v2
 program: <pof program id base58>
-subject: <wallet|x|badge> <value>
+subject: <wallet|x|badge> <value; a handle lowercase, no @>
 ring: <ring.owner>
+controller: <the §3 controller: the wallet or badge key itself; the client's controller key for kind 1>
 asset: <SOL|USDC> tier: <tier>
 payer: <payer>
 slot: <subject.slot>
 ```
-The `ring:` line is the vault link: a wallet may certify from a separate vault ring (RINGS §5), and the one signature binds
-both. The slot must be within 1,500 slots of the Verifier's read.
+Signatures are hex (128) or base58. The slot must be within 1,500 slots of the Verifier's read.
+
+**The X link** (`/api/link`): `POST /api/link/start { handle, controller? }` → `{ handle, code, secret, controller,
+expiresInSec, post }`: post the `post` text from the handle; keep `secret` in the browser only (the posted code is public).
+`POST /api/link/check { handle, post, secret, controller? }` → `{ handle, controller, link, expiresInSec }`. Only the secret's
+holder redeems a code (POF-03); a second start never cancels a first (POF-09). The link id is
+`<handle>.<controller base58>.<unix expiry>.<hex signature>`, the Verifier's signature over
+`"POF-LINK2" ‖ program_id ‖ handle ‖ 0x00 ‖ controller(32) ‖ expiry u64 LE`; it certifies only with that controller. A link
+made without a controller is bound to the default key: it proves the handle (bots) but cannot certify.
+`GET /api/link?id=<link id>` → `{ verified: true, handle, controller (null when unbound), expiresAt }` or `{ verified: false,
+handle, reason }`.
 
 **What the Verifier checks**, in order, each with its own error code (`verifier/src/verify.ts`): the version, asset, tier,
-1..8 notes; the subject proof (kind 1: the link id is the Verifier's own signature over the handle and an expiry); a User
+1..8 notes; the ring owner's signature and the subject's (kind 1: the link id, bound to the package's controller); a User
 Registry record for `ring.owner` and `Poseidon(nk) == npk`; per note the asset's mint, the commitment recomputed with the SDK
 (`ownerUtxoHash`), the indexer's Merkle path re-hashed with the SDK's Poseidon to a root in the tree account's on-chain
 history, at the stated leaf index; all notes in one tree; every nullifier derived from `nk` and unspent (no PDA, and the
 indexer's non-inclusion path re-hashed to an on-chain nullifier root); each note's creating transaction (`sig`) older than
 the minimum age (150 slots); the sum ≥ the tier (never returned); `root_slot` within 9,000 slots; no note behind another live
-certificate (a keyed index of nullifiers, no amounts). `relay: true` requires `payer` = the relayer.
+certificate (a keyed index of nullifiers, no amounts, taken by an atomic create: POF-04). `relay: true` requires `payer` = the relayer.
 
 **The answer**: `{ attestation: hex240, signature: hex64, verifierKey, salts: [hex32], nullifiers: [hex32] (same order as
 notes), hashes: [hex32] (sorted, the certificate's list), logIndex, subjectHash, controller, issuedSlot, expirySlot,
@@ -119,6 +135,9 @@ bundleHash, certificate: { seeds } }`. The salts and nullifiers are the holder's
 
 2026-11-25 (verifier): the package fixed from RINGS §9 (`ring.owner` + `ring.nk`, per-note `asset` and `sig`), the subject
 message with the `ring:` line (vault mode), `controller` for kind 1, the answer and the checks written out.
+
+2026-11-25 (verifier): audit fixes: `ring.proof` required over the disclosure message v2 (adds the controller line; the v1
+subject message is gone), the X link takes a secret and binds the controller (`POF-LINK2`), link verify returns `controller`.
 
 ## §5 Salted nullifiers and revocation (owner: verifier, with program)
 - For each disclosed note: `salt` = 32 random bytes; `h = sha256("pof:null:" ‖ salt ‖ nullifier)`.
@@ -201,8 +220,9 @@ offset size field
 - **Signed tree head**: the Verifier signs with the same ed25519 key the 80 bytes
   `"POF-STH1" (8) ‖ program_id (32) ‖ tree_size u64 (8) ‖ root_hash (32)`. JSON: `{ treeSize, rootHash, slot, signature,
   verifierKey }` (`slot` is informational, not signed: the anchor below fixes the time).
-- **Anchor on chain**: a Memo-program instruction with the UTF-8 text `pof:log:<tree_size>:<root_hash hex>` inside every
-  relayed `certify` transaction, and a periodic memo from the keeper (off before launch). Anyone can match a head to a slot.
+- **Anchor on chain**: `anchor_log(size, head)` after an Ed25519 instruction over the 80-byte signed head; the program keeps
+  the newest head in the Treasury (`log_size`, `log_head`, `log_slot`) and emits `LogAnchored`. The keeper anchors when the
+  log grew (cron, off before launch). Anyone can match a head to a slot and check any entry against it.
 - **Entry id**: the leaf index (u64, from 0). `logIndex` in the §4 answer and on the Certificate is this index.
 - HTTP (served by `pof/api/attest/log*`, devx may proxy under `/v1/log/*`): `GET /api/attest/log?head` → STH JSON;
   `GET /api/attest/log?entry=<i>` → `{ index, leaf: hex377, leafHash, attestation, signature, verifierKey, bundleHash, loggedSlot }`; `GET /api/attest/log?proof=<i>&size=<n>` →
