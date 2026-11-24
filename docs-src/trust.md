@@ -59,6 +59,10 @@ The program accepts attestations signed by one ed25519 key at a time, stored in 
   enable or disable an asset. A tier table, once set,
   cannot be changed, so an issued tier never changes meaning.
 
+- **revoke a Verifier key at once** (`revoke_verifier_key`, up to 4 keys): from that slot every certificate the key signed
+  stops passing `require_certificate` and Rooms, and anyone can mark each one voided (`void_by_key`). This is the remedy
+  for a leaked key; it also means the admin can end every certificate one key signed, in one transaction.
+
 The admin cannot sign attestations. The `pof` program is deployed with the upgradeable loader, and its upgrade
 authority is the admin key: whoever holds it can change the program. Check the current authority on chain
 (`solana program show pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`); any change to it is recorded in the

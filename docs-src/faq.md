@@ -67,8 +67,10 @@ you. The program checks the spend against the Rings accounts itself ([Revocation
 certificate unlinked, revoke it yourself first, then move.
 
 **Can it be revoked when I did not spend?**
-No. `revoke_spent` needs a salted nullifier that matches one stored on the certificate and a proof from the Rings
-accounts that it is spent. Only the controller can revoke it otherwise.
+Not by spend: `revoke_spent` needs a salted nullifier that matches one stored on the certificate and a proof from the
+Rings accounts that it is spent. Otherwise only the controller can revoke it, with one exception: if the admin revokes
+the Verifier key that signed it (a leaked or retired key), the certificate stops counting at once and can be marked
+voided. Certify again with the current key; the funds are untouched ([Revocation](revocation)).
 
 **How long does a certificate last?**
 Until it is revoked, or until its expiry slot: 216,000 slots after the Verifier signed (the launch value; the program never

@@ -6,7 +6,7 @@ summary: The three ways a certificate ends, what each one reveals, and who can d
 
 # Revocation
 
-A certificate ends in one of three ways. Each one is an instruction anyone can check on chain, and each one emits an event.
+A certificate ends in one of these ways. Each one is an instruction anyone can check on chain, and each one emits an event.
 
 | how | who | when | what becomes public |
 |---|---|---|---|
@@ -14,6 +14,7 @@ A certificate ends in one of three ways. Each one is an instruction anyone can c
 | `revoke_by_holder` | the certificate's controller, signing the transaction | any time | nothing beyond the revocation (status 2) |
 | `revoke_signed` | anyone (normally the relayer) submitting the controller's signed revoke statement | any time, until the statement's `valid_until` slot | the same as `revoke_by_holder` (status 2) |
 | `expire` | anyone | after `expiry_slot` (or during the wind-down) | nothing; the account closes and its rent goes back to its payer |
+| `void_by_key` | anyone | after the admin revoked the Verifier key that signed it (`revoke_verifier_key`) | that its signing key was revoked (status 4, voided) |
 
 A certificate whose status byte is still "live" but whose `expiry_slot` has passed reads as **expired** everywhere (the
 program's gate, the SDK, the API) before anyone calls `expire`.
@@ -32,9 +33,15 @@ program: 11 bytes, first byte 8. The program checks the account at that address 
 **(b) The nullifier tree.** The pool may later close nullifier PDAs once their batch is folded into the indexed nullifier
 tree (height 40). Then the caller passes `membership = { leaf_index, next_value, path }`: the leaf
 `Poseidon(nullifier, next_value)` and its siblings must hash to one of the 100 nullifier roots stored at offset 17,232 of
-the tree account. About 35,000 compute units with the Poseidon syscall. A full 40-level path does not fit a legacy
-transaction; a staged variant that writes the path into a buffer account over two transactions (`open_path`,
-`stage_path`, `revoke_spent_staged`) is being added to the program (CONTRACT §5 (b')).
+the tree account. About 35,000 compute units with the Poseidon syscall.
+
+**(b') The staged path.** A full 40-level path does not fit a legacy transaction, so it can also be written in steps:
+`open_path` creates the revoker's own buffer account `["path", revoker, certificate]` with the nullifier, its next value,
+its leaf index and the first 20 siblings; `stage_path` adds the other 20; `revoke_spent_staged(index, salt)` hashes all
+40 levels to a root, requires it to be one of the 100 nullifier roots the tree account holds at that moment, checks the
+salted hash, revokes, and closes the buffer (its rent back to the revoker). Each step is a legacy transaction (about
+22,600, 5,300 and 68,400 compute units). Only the revoker writes its buffer; `close_path` drops it. It was tested
+against a real mainnet path.
 
 An absent or closed PDA is never read as "unspent"; there is no path that trusts a statement from the Verifier or from us.
 
@@ -101,6 +108,14 @@ names the certificate's own values, so it cannot revoke a renewed or remade cert
 is past `valid_until` (the client suggests the current slot plus 1,500), so a signed revoke cannot be held back and used
 later.
 
+## void_by_key: when a Verifier key is revoked
+
+If a Verifier key leaks, or is retired after a rotation, the admin calls `revoke_verifier_key(key)` (up to 4 revoked keys
+are kept in Config). From that slot the key signs nothing the program accepts, and **every certificate it signed fails
+`require_certificate` and Rooms at once**, whether or not anyone has touched it yet. Anyone may then call `void_by_key` on
+each such certificate to mark it voided (status 4) and update the Treasury's counters. A holder whose certificate was
+voided this way certifies again with the current key; the notes are unaffected.
+
 ## expire
 
 After `expiry_slot`, anyone may call `expire`. The account closes and its rent goes back to the certificate's payer:
@@ -125,3 +140,4 @@ their sweep after launch.
 | revoked_spent at slot s | a disclosed note was spent at or before s, proven from the Rings accounts |
 | revoked_by_holder at slot s | the controller withdrew it at s |
 | expired | the attestation is older than its validity; the notes were not re-checked |
+| voided at slot s | the Verifier key that signed it was revoked by the admin; it says nothing about the notes |

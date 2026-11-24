@@ -84,6 +84,8 @@ proves the spend.
 wallet signature over the vault message (or is random, with a passphrase backup, for wallets that do not sign
 deterministically).
 
+**Voided.** Status 4: the certificate was signed by a Verifier key the admin has since revoked (`void_by_key`).
+
 **Verifier.** The off-chain service that checks a disclosure package and signs the attestation. Keeps no amount, opening
 or `nk`.
 
