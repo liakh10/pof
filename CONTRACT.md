@@ -232,3 +232,22 @@ offset size field
 
 2026-11-25 (verifier): §7 added: RFC 9162 hashing as devx proposed, 345-byte leaf, 80-byte signed head, memo anchor.
 2026-11-25 (verifier): the leaf is 377 bytes now (it embeds the 240-byte §3); offsets above updated; anchor_log takes the 80-byte STH.
+
+## §8 Log witnesses (owner: devx; consumers: site /log and /status, anyone running a witness)
+A witness is an independent monitor of the §7 log (`witness/`, run by anyone with `node witness/run.js`). Each step it:
+fetches the signed head; requires its key to be one the `pof` Config lists now or listed before (`VerifierSet` events),
+never the key the head names; requires it to extend the last head it verified (an RFC 9162 consistency proof; a smaller
+size, or the same size with another root, is an alarm); requires it to agree with the head anchored in the Treasury by
+`anchor_log` (equal, a consistent prefix, or a consistent extension); and only then cosigns it.
+
+- **Cosignature**: ed25519 by the witness key over the 88 bytes
+  `"POF-WIT1" (8) ‖ program_id (32) ‖ tree_size u64 LE (8) ‖ root_hash (32) ‖ timestamp u64 LE (8, unix seconds)`.
+- **Document** (what `GET /v1/witness` serves and the site shows): `{ v: 1, witness: { name, key }, programId, updatedAt,
+  latest, heads: [{ witnessKey, treeSize, rootHash, timestamp, signature, verifierKey, verifierSignature, anchor: {
+  treeSize, rootHash, slot, relation: equal|prefix|ahead, consistent } }], alarms: [{ kind, detail, at }], stats }`.
+  Alarm kinds: `log_unreachable`, `unknown_key`, `bad_signature`, `log_shrank`, `equivocation`, `inconsistent`,
+  `anchor_mismatch`. An alarm carries both signed heads as evidence and is never cosigned.
+- Key: `node witness/keygen.js` writes `~/.config/pof/witness.json` (64-byte Solana keypair format, mode 600) and prints
+  only the public key. `@pof/sdk` exports `cosignMessage` and `verifyCosignature`.
+
+2026-11-25 (devx): §8 added.
