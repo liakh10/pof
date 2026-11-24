@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proof of Funds · post proof, not wallet</title>
+<meta name="description" content="A public certificate that you hold at least a tier of SOL or USDC, proven from Helius Privacy Rings without showing the amount. It revokes itself the moment the money moves.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#12110f">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/ui/fonts/ubuntu-sans-mono.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/design/night/night.css">
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/design/night/night.js"></script>
+</head>
+<body data-page="wall">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg viewBox="-50 -50 100 100" width="26" height="26" aria-hidden="true"><circle r="47.5" fill="none" stroke="var(--ink)" stroke-width="1"/><circle r="40" fill="none" stroke="var(--signal)" stroke-width="5"/><circle r="29" fill="var(--ink)"/><path d="M -12 0 L -3.5 8.5 L 13 -8" stroke="var(--paper)" stroke-width="6.5" fill="none" stroke-linecap="square"/></svg><span>Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs">Docs</a><a href="/developers">Developers</a></nav>
+  <button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button>
+</header>
+
+<main id="main">
+<section class="cover" aria-labelledby="h">
+  <div class="meta">
+    <span>On Helius Privacy Rings</span>
+    <span class="m-hide">A minimum, never an amount</span>
+    <span class="m-hide">Revoked the moment the money moves</span>
+    <span class="meta-slot mono"><span class="dot" aria-hidden="true"></span><span data-meta-slot>slot</span></span>
+  </div>
+
+  <h1 id="h" class="mega"><span class="l1">Post proof,</span><span class="l2">not <em>wallet.</em></span></h1>
+
+  <div class="cover-foot">
+    <div class="c-func">
+      <p class="lead">A public certificate that you hold at least a tier of SOL or USDC. It never shows the amount, it can hide the wallet, and it revokes itself the moment the money moves.</p>
+      <div class="actions"><a class="btn" href="/get">Get certified</a><a class="btn ghost" href="#check">Verify anyone</a></div>
+    </div>
+    <div class="c-live" data-live>
+      <p class="label" data-live-label>Solana mainnet slot, read live</p>
+      <p class="live-num" data-live-num aria-live="off">&nbsp;</p>
+      <p class="live-sub" data-live-sub>Certificates appear here the moment the first one lands on chain.</p>
+    </div>
+    <div class="c-film">
+      <svg class="halo" data-halo aria-hidden="true" viewBox="-1400 -1400 2800 2800"></svg>
+      <button class="disc" type="button" data-film-jump aria-label="Play the film, 36 seconds, with sound"><svg viewBox="-74 -74 148 148" aria-hidden="true"><defs><path id="rim" d="M 0 -60 A 60 60 0 1 1 -0.01 -60"/></defs><circle r="73" class="disc-fill"/><circle r="51" class="disc-hair"/><text class="disc-rim"><textPath href="#rim" textLength="372" lengthAdjust="spacing">THE FILM · 0:36 · VOICE AND CAPTIONS · PROOF OF FUNDS ·</textPath></text><path class="disc-play" d="M -13 -20 L 23 0 L -13 20 Z"/></svg></button>
+    </div>
+  </div>
+
+  <div class="ticker" data-ticker aria-label="Certificates, read from chain">
+    <div class="ticker-track" data-track></div>
+  </div>
+</section>
+
+<section class="filmband" id="film" aria-labelledby="film-h" data-band>
+  <div class="band-x" aria-hidden="true"><span class="bar" data-bar></span></div>
+  <div class="band-head"><h2 id="film-h" class="band-title">The film</h2><p class="mono quiet">0:36 · voice and captions</p></div>
+  <div class="band-video" data-film>
+    <video data-video playsinline preload="metadata" poster="/film/poster.jpg" aria-label="The Proof of Funds film"><source src="/film/pof.mp4" type="video/mp4"><track kind="captions" src="/film/pof.vtt" srclang="en" label="English" default></video>
+    <button class="band-play" type="button" data-play aria-label="Play the film"><svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="39" class="bp-ring"/><circle cx="40" cy="40" r="31" class="bp-hair"/><path d="M33 26 L55 40 L33 54 Z" class="bp-tri"/></svg></button>
+  </div>
+  <p class="band-cap" data-cap aria-live="off"></p>
+  <div class="band-ctl"><button type="button" data-toggle>Play</button><button type="button" data-mute>Sound off</button><span class="mono" data-time>0:00 / 0:36</span></div>
+</section>
+
+<section class="says" aria-labelledby="says-h">
+  <p class="label signal">What a certificate says</p>
+  <h2 id="says-h" class="says-h">A minimum.<br>Never an amount.</h2>
+  <div class="says-cols">
+    <div>
+      <h3>It proves</h3>
+      <ol>
+        <li>The disclosed notes exist in the Rings tree and were unspent at the slot it names.</li>
+        <li>Together they reach the tier: at least 1,000 SOL means at least 1,000 SOL.</li>
+        <li>The subject signed for this vault, so the tier is bound to it.</li>
+        <li>It is still true now: a spend revokes it on chain.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>It does not prove</h3>
+      <ol>
+        <li>How much you hold in total, or anything about the rest of your Ring.</li>
+        <li>That the money was never borrowed. Revocation catches the return, not the loan.</li>
+        <li>Anything about the past. It starts at the slot it was certified.</li>
+        <li>Anonymity. A wallet subject names the wallet; choose a badge to name nobody.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="check" id="check" aria-labelledby="check-h">
+  <h2 id="check-h" class="label signal">Verify anyone</h2>
+  <form class="check-form" data-check role="search" autocomplete="off">
+    <label class="sr" for="q">A wallet, an @handle or a badge</label>
+    <input id="q" name="q" type="text" spellcheck="false" autocapitalize="off" placeholder="@handle or wallet">
+    <button type="submit">Check</button>
+  </form>
+  <div class="check-out" data-check-out aria-live="polite"><p class="quiet">Read from the chain. No account, no wallet connection.</p></div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="foot-lead">
+    <p class="foot-claim">Post proof, not wallet.</p>
+    <div class="ca" data-ca></div>
+    <div class="foot-links" data-token-links></div>
+  </div>
+  <nav class="foot-nav" aria-label="Footer">
+    <div><h2>Protocol</h2><a href="/docs">The paper</a><a href="/docs/trust">Trust points</a><a href="/docs/threat-model">Threat model</a><a href="/docs/revocation">Revocation</a><a href="/docs/fees">Fees</a></div>
+    <div><h2>Check</h2><a href="/verify">Verify a subject</a><a href="/log">Transparency log</a><a href="/rooms">Rooms</a><a href="/status">Status</a></div>
+    <div><h2>Build</h2><a href="/developers">Developers</a><a href="/developers#http-api">HTTP API</a><a href="/developers#the-sdk">SDK</a><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></div>
+  </nav>
+  <dl class="foot-facts mono">
+    <div><dt>Program</dt><dd>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</dd></div>
+    <div><dt>Gate program</dt><dd>gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</dd></div>
+  </dl>
+</footer>
+</body>
+</html>

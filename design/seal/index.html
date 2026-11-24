@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proof of Funds · post proof, not wallet</title>
+<meta name="description" content="A public certificate that you hold at least a tier of SOL or USDC, proven from Helius Privacy Rings without showing the amount. It revokes itself the moment the money moves.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/ui/fonts/ubuntu-sans-mono.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/design/seal/seal.css">
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/design/seal/seal.js"></script>
+</head>
+<body data-page="wall">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg viewBox="-50 -50 100 100" width="28" height="28" aria-hidden="true"><circle r="47" fill="none" stroke="var(--ink)" stroke-width="1.5"/><circle r="41" fill="none" stroke="var(--ink)" stroke-width="1"/><circle r="35" fill="none" stroke="var(--signal)" stroke-width="5"/><circle r="26" fill="var(--ink)"/><path d="M -11 0 L -3 8 L 13 -8" stroke="var(--paper)" stroke-width="6.5" fill="none" stroke-linecap="square"/></svg><span>Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs">Docs</a><a href="/developers">Developers</a></nav>
+  <span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span>
+  <button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button>
+</header>
+
+<main id="main">
+<section class="stage" data-stage aria-labelledby="h">
+  <div class="stage-x" aria-hidden="true"></div>
+
+  <div class="col-left">
+    <div class="intro">
+      <p class="label">On Helius Privacy Rings</p>
+      <h1 id="h" class="mega">Post proof,<br>not <em>wallet.</em></h1>
+    </div>
+    <p class="lead">A public certificate that you hold at least a tier of SOL or USDC. It never shows the amount, it can hide the wallet, and it revokes itself the moment the money moves.</p>
+    <div class="actions">
+      <a class="btn" href="/get">Get certified</a>
+      <button class="film-btn" type="button" data-film-play aria-label="Play the film, 36 seconds, with sound"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="23.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="24" cy="24" r="18.5" fill="none" stroke="currentColor" stroke-width=".75"/><path class="tri" d="M19.5 15.5 L33 24 L19.5 32.5 Z"/><g class="bars"><rect x="17.5" y="16" width="4.5" height="16"/><rect x="26" y="16" width="4.5" height="16"/></g></svg><span class="film-meta"><span class="film-t">The film</span><span class="film-len mono">0:36</span></span></button>
+      <button class="film-mute mono" type="button" data-film-mute hidden>Sound off</button>
+    </div>
+    <p class="film-cap" data-film-cap aria-live="off"></p>
+    <div class="live" data-live>
+      <p class="label quiet" data-live-label>Solana mainnet slot, read live</p>
+      <p class="live-num" data-live-num aria-live="off">&nbsp;</p>
+      <p class="live-sub" data-live-sub>The seal fills from the chain the moment the first certificate lands.</p>
+      <p class="live-ev mono" data-event aria-live="polite"></p>
+    </div>
+  </div>
+
+  <figure class="seal-wrap" data-seal>
+    <div class="seal-box">
+      <svg class="field" data-field viewBox="-500 -500 1000 1000" xmlns="http://www.w3.org/2000/svg" role="img" tabindex="0" aria-label="The seal. Every ring is one certificate on chain, newest at the centre. Use the arrow keys to read them one by one." aria-describedby="cc">
+        <defs><mask id="sweep" maskUnits="userSpaceOnUse" x="-500" y="-500" width="1000" height="1000"><circle class="sweep" r="345" fill="none" stroke="#fff" stroke-width="300" pathLength="1000" transform="rotate(-90)"/></mask></defs>
+        <g class="reg" aria-hidden="true"><g transform="translate(-478 -478)"><circle r="7"/><path d="M-14 0H14M0 -14V14"/></g><g transform="translate(478 -478)"><circle r="7"/><path d="M-14 0H14M0 -14V14"/></g><g transform="translate(-478 478)"><circle r="7"/><path d="M-14 0H14M0 -14V14"/></g><g transform="translate(478 478)"><circle r="7"/><path d="M-14 0H14M0 -14V14"/></g></g>
+        <path class="ticks" d="M470 0L494 0M481.7 16.8L493.7 17.2M480.8 33.6L492.8 34.5M479.4 50.4L491.3 51.6M477.3 67.1L489.2 68.8M474.7 83.7L486.5 85.8M471.5 100.2L483.2 102.7M467.7 116.6L479.3 119.5M463.3 132.9L474.9 136.2M458.4 148.9L469.8 152.7M452.9 164.9L464.2 169M446.9 180.6L458 185.1M440.3 196L451.3 200.9M433.2 211.3L444 216.6M425.6 226.3L436.2 231.9M407 235L427.8 247M408.8 255.4L418.9 261.8M399.6 269.5L409.5 276.2M389.9 283.3L399.7 290.4M379.8 296.7L389.3 304.1M369.2 309.8L378.4 317.5M358.2 322.5L367.1 330.6M346.7 334.8L355.4 343.2M334.8 346.7L343.2 355.4M322.5 358.2L330.6 367.1M309.8 369.2L317.5 378.4M296.7 379.8L304.1 389.3M283.3 389.9L290.4 399.7M269.5 399.6L276.2 409.5M255.4 408.8L261.8 418.9M235 407L247 427.8M226.3 425.6L231.9 436.2M211.3 433.2L216.6 444M196 440.3L200.9 451.3M180.6 446.9L185.1 458M164.9 452.9L169 464.2M148.9 458.4L152.7 469.8M132.9 463.3L136.2 474.9M116.6 467.7L119.5 479.3M100.2 471.5L102.7 483.2M83.7 474.7L85.8 486.5M67.1 477.3L68.8 489.2M50.4 479.4L51.6 491.3M33.6 480.8L34.5 492.8M16.8 481.7L17.2 493.7M0 470L0 494M-16.8 481.7L-17.2 493.7M-33.6 480.8L-34.5 492.8M-50.4 479.4L-51.6 491.3M-67.1 477.3L-68.8 489.2M-83.7 474.7L-85.8 486.5M-100.2 471.5L-102.7 483.2M-116.6 467.7L-119.5 479.3M-132.9 463.3L-136.2 474.9M-148.9 458.4L-152.7 469.8M-164.9 452.9L-169 464.2M-180.6 446.9L-185.1 458M-196 440.3L-200.9 451.3M-211.3 433.2L-216.6 444M-226.3 425.6L-231.9 436.2M-235 407L-247 427.8M-255.4 408.8L-261.8 418.9M-269.5 399.6L-276.2 409.5M-283.3 389.9L-290.4 399.7M-296.7 379.8L-304.1 389.3M-309.8 369.2L-317.5 378.4M-322.5 358.2L-330.6 367.1M-334.8 346.7L-343.2 355.4M-346.7 334.8L-355.4 343.2M-358.2 322.5L-367.1 330.6M-369.2 309.8L-378.4 317.5M-379.8 296.7L-389.3 304.1M-389.9 283.3L-399.7 290.4M-399.6 269.5L-409.5 276.2M-408.8 255.4L-418.9 261.8M-407 235L-427.8 247M-425.6 226.3L-436.2 231.9M-433.2 211.3L-444 216.6M-440.3 196L-451.3 200.9M-446.9 180.6L-458 185.1M-452.9 164.9L-464.2 169M-458.4 148.9L-469.8 152.7M-463.3 132.9L-474.9 136.2M-467.7 116.6L-479.3 119.5M-471.5 100.2L-483.2 102.7M-474.7 83.7L-486.5 85.8M-477.3 67.1L-489.2 68.8M-479.4 50.4L-491.3 51.6M-480.8 33.6L-492.8 34.5M-481.7 16.8L-493.7 17.2M-470 0L-494 0M-481.7 -16.8L-493.7 -17.2M-480.8 -33.6L-492.8 -34.5M-479.4 -50.4L-491.3 -51.6M-477.3 -67.1L-489.2 -68.8M-474.7 -83.7L-486.5 -85.8M-471.5 -100.2L-483.2 -102.7M-467.7 -116.6L-479.3 -119.5M-463.3 -132.9L-474.9 -136.2M-458.4 -148.9L-469.8 -152.7M-452.9 -164.9L-464.2 -169M-446.9 -180.6L-458 -185.1M-440.3 -196L-451.3 -200.9M-433.2 -211.3L-444 -216.6M-425.6 -226.3L-436.2 -231.9M-407 -235L-427.8 -247M-408.8 -255.4L-418.9 -261.8M-399.6 -269.5L-409.5 -276.2M-389.9 -283.3L-399.7 -290.4M-379.8 -296.7L-389.3 -304.1M-369.2 -309.8L-378.4 -317.5M-358.2 -322.5L-367.1 -330.6M-346.7 -334.8L-355.4 -343.2M-334.8 -346.7L-343.2 -355.4M-322.5 -358.2L-330.6 -367.1M-309.8 -369.2L-317.5 -378.4M-296.7 -379.8L-304.1 -389.3M-283.3 -389.9L-290.4 -399.7M-269.5 -399.6L-276.2 -409.5M-255.4 -408.8L-261.8 -418.9M-235 -407L-247 -427.8M-226.3 -425.6L-231.9 -436.2M-211.3 -433.2L-216.6 -444M-196 -440.3L-200.9 -451.3M-180.6 -446.9L-185.1 -458M-164.9 -452.9L-169 -464.2M-148.9 -458.4L-152.7 -469.8M-132.9 -463.3L-136.2 -474.9M-116.6 -467.7L-119.5 -479.3M-100.2 -471.5L-102.7 -483.2M-83.7 -474.7L-85.8 -486.5M-67.1 -477.3L-68.8 -489.2M-50.4 -479.4L-51.6 -491.3M-33.6 -480.8L-34.5 -492.8M-16.8 -481.7L-17.2 -493.7M0 -470L0 -494M16.8 -481.7L17.2 -493.7M33.6 -480.8L34.5 -492.8M50.4 -479.4L51.6 -491.3M67.1 -477.3L68.8 -489.2M83.7 -474.7L85.8 -486.5M100.2 -471.5L102.7 -483.2M116.6 -467.7L119.5 -479.3M132.9 -463.3L136.2 -474.9M148.9 -458.4L152.7 -469.8M164.9 -452.9L169 -464.2M180.6 -446.9L185.1 -458M196 -440.3L200.9 -451.3M211.3 -433.2L216.6 -444M226.3 -425.6L231.9 -436.2M235 -407L247 -427.8M255.4 -408.8L261.8 -418.9M269.5 -399.6L276.2 -409.5M283.3 -389.9L290.4 -399.7M296.7 -379.8L304.1 -389.3M309.8 -369.2L317.5 -378.4M322.5 -358.2L330.6 -367.1M334.8 -346.7L343.2 -355.4M346.7 -334.8L355.4 -343.2M358.2 -322.5L367.1 -330.6M369.2 -309.8L378.4 -317.5M379.8 -296.7L389.3 -304.1M389.9 -283.3L399.7 -290.4M399.6 -269.5L409.5 -276.2M408.8 -255.4L418.9 -261.8M407 -235L427.8 -247M425.6 -226.3L436.2 -231.9M433.2 -211.3L444 -216.6M440.3 -196L451.3 -200.9M446.9 -180.6L458 -185.1M452.9 -164.9L464.2 -169M458.4 -148.9L469.8 -152.7M463.3 -132.9L474.9 -136.2M467.7 -116.6L479.3 -119.5M471.5 -100.2L483.2 -102.7M474.7 -83.7L486.5 -85.8M477.3 -67.1L489.2 -68.8M479.4 -50.4L491.3 -51.6M480.8 -33.6L492.8 -34.5M481.7 -16.8L493.7 -17.2"/>
+        <circle class="frame" r="497.5"/>
+        <circle class="frame thin" r="466"/>
+        <g data-orbits></g>
+        <path class="crack" d="M 184.0 -124.1 L 414.5 -279.6"/>
+        <g data-rings mask="url(#sweep)"></g>
+        <g class="spin"><circle r="211" pathLength="1000" stroke-dasharray="210 22 120 22 300 22 50 22 120 22 92 0"/></g>
+        <circle class="inner-hair" r="218"/>
+        <circle class="disc" r="198"/>
+        <circle class="disc-hair" r="186"/>
+        <path class="arc" d="M -129 122 A 177 177 0 0 0 129 122"/>
+        <path class="check check-d" d="M -64 -76 L -22 -34 L 62 -118"/>
+        <path class="check check-m" d="M -84 -6 L -28 50 L 82 -60"/>
+        <circle class="prog" data-film-progress r="392" pathLength="1000" transform="rotate(-90)"/>
+      </svg>
+      <div class="video-slot" data-video-slot></div>
+    </div>
+    <form class="probe" data-probe role="search" autocomplete="off">
+      <label class="probe-label" for="probe">Check any wallet or @handle</label>
+      <div class="probe-row"><input id="probe" name="q" type="text" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="wallet or @handle" aria-describedby="cc"><button type="submit" aria-label="Check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5 L9.5 18 L20 6.5"/></svg></button></div>
+    </form>
+  </figure>
+
+  <article class="cc" id="cc" data-card aria-live="polite" data-state="empty">
+    <span class="cc-pin" data-card-pin aria-hidden="true"></span>
+    <p class="cc-kind">The tiers a certificate can state</p>
+    <table class="cc-ladder"><thead><tr><th scope="col">Tier</th><th scope="col">SOL</th><th scope="col">USDC</th></tr></thead><tbody><tr><th scope="row">1</th><td>≥ 1</td><td>≥ 100</td></tr><tr><th scope="row">2</th><td>≥ 10</td><td>≥ 1,000</td></tr><tr><th scope="row">3</th><td>≥ 100</td><td>≥ 10,000</td></tr><tr><th scope="row">4</th><td>≥ 1,000</td><td>≥ 100,000</td></tr><tr><th scope="row">5</th><td>≥ 10,000</td><td>≥ 1,000,000</td></tr></tbody></table>
+    <p class="cc-note">No certificates yet. The first one draws itself into the seal the moment it lands on chain.</p>
+  </article>
+
+  <ol class="notes" data-notes>
+    <li data-note="center"><span class="n mono">01</span><h2>Check any wallet or @handle</h2><p>Type it into the seal. The answer is read from the certificates on chain.</p></li>
+    <li data-note="broken"><span class="n mono">02</span><h2>Broken is revoked</h2><p>Spend a disclosed note and the keeper proves it on chain. The ring stops and breaks, for everyone at once.</p></li>
+    <li data-note="weight"><span class="n mono">03</span><h2>Weight is the tier</h2><p>A hairline is at least 1 SOL. The heaviest ring is at least 10,000 SOL or 1,000,000 USDC.</p></li>
+    <li data-note="orange"><span class="n mono">04</span><h2>Orange is new</h2><p>The newest certificates sit by the centre and burn orange. Older ones settle outward in ink.</p></li>
+  </ol>
+
+  <svg class="leaders" data-leaders aria-hidden="true"><g data-note-leaders></g><path class="card-leader" data-card-leader d=""/><circle class="card-dot" data-card-dot r="3.5" cx="-20" cy="-20"/></svg>
+</section>
+
+<section class="says" aria-labelledby="says-h">
+  <div class="says-head">
+    <p class="label signal">What a certificate says</p>
+    <h2 id="says-h" class="h1">A minimum. Never an amount.</h2>
+  </div>
+  <div class="says-col">
+    <h3>It proves</h3>
+    <ol>
+      <li>The disclosed notes exist in the Rings tree and were unspent at the slot it names.</li>
+      <li>Together they reach the tier: at least 1,000 SOL means at least 1,000 SOL.</li>
+      <li>The subject signed for this vault, so the tier is bound to it.</li>
+      <li>It is still true now: a spend revokes it on chain.</li>
+    </ol>
+  </div>
+  <div class="says-col">
+    <h3>It does not prove</h3>
+    <ol>
+      <li>How much you hold in total, or anything about the rest of your Ring.</li>
+      <li>That the money was never borrowed. Revocation catches the return, not the loan.</li>
+      <li>Anything about the past. It starts at the slot it was certified.</li>
+      <li>Anonymity. A wallet subject names the wallet; choose a badge to name nobody.</li>
+    </ol>
+  </div>
+  <p class="says-more"><a href="/docs/trust">Read the trust points first</a><a href="/docs">The paper</a><a href="/developers">Gate anything with a certificate</a></p>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="foot-lead">
+    <p class="foot-claim">Post proof,<br>not wallet.</p>
+    <div class="ca" data-ca></div>
+    <div class="foot-links" data-token-links></div>
+  </div>
+  <nav class="foot-nav" aria-label="Footer">
+    <div><h2>Protocol</h2><a href="/docs">The paper</a><a href="/docs/trust">Trust points</a><a href="/docs/threat-model">Threat model</a><a href="/docs/revocation">Revocation</a><a href="/docs/fees">Fees</a></div>
+    <div><h2>Check</h2><a href="/verify">Verify a subject</a><a href="/log">Transparency log</a><a href="/rooms">Rooms</a><a href="/status">Status</a></div>
+    <div><h2>Build</h2><a href="/developers">Developers</a><a href="/developers#http-api">HTTP API</a><a href="/developers#the-sdk">SDK</a><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></div>
+  </nav>
+  <dl class="foot-facts mono">
+    <div><dt>Program</dt><dd>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</dd></div>
+    <div><dt>Gate program</dt><dd>gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</dd></div>
+  </dl>
+</footer>
+</body>
+</html>
