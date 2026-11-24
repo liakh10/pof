@@ -15,6 +15,7 @@ import { HeliusRings, jsonRpc, type RingsSource } from './rings.js';
 import { Verifier } from './verify.js';
 import { Keeper } from './keeper.js';
 import { Relayer } from './relayer.js';
+import { Credits, creditKeyFromJson, sdkHouseRing } from './credits.js';
 import { Linker } from './linker.js';
 import { NoteLocks } from './locks.js';
 import { Escrow } from './escrow.js';
@@ -89,6 +90,13 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
     dailyCapLamports: BigInt(env.POF_RELAY_DAILY_LAMPORTS ?? 2_000_000_000), balanceFloorLamports: BigInt(env.POF_RELAY_FLOOR_LAMPORTS ?? 50_000_000),
     quoteTtlSec: 1800, free: env.POF_RELAY_FREE === '1', hmacKey: sha256(text('pof:quote:'), sealKey),
   }, store, chain, log) : null;
+  const ck = env.POF_CREDIT_KEY || (() => { try { return fs.readFileSync(path.join(os.homedir(), '.config', 'pof', 'credits-rsa.json'), 'utf8'); } catch { return ''; } })();
+  if (relayer && ck && relayerSigner) {
+    const seed = relayerSigner.secretForWeb3().slice(0, 32);
+    const house = sdkHouseRing({ store, seed, solanaRpcUrl: rpcUrls[0], indexerUrl: env.HELIUS_SPR_URL || 'https://mainnet.helius-rpc.com/v1/spr', apiKey: env.HELIUS_API_KEY, rpc });
+    const unit = BigInt(env.POF_CREDIT_UNIT_LAMPORTS ?? 10_000_000);
+    relayer.credits = new Credits(store, creditKeyFromJson(ck), house, relayerSigner.address, unit);
+  }
   const linker = new Linker(store, (h, exp, ctl) => verifier.linkToken(h, exp, ctl));
   ctx = { env, programId, signer, relayerSigner, store, rings, chain, log, keeper, locks, escrow, verifier, relayer, linker, sealKey };
   return ctx;
@@ -169,6 +177,26 @@ export const routes = {
     bucket(`relay:${clientOf(req)}`, 6, 4);
     if (!c.relayer) throw new PofError('RELAY_OFF', 'the relayer is not configured here; submit certify from your own wallet', 503);
     return json(await c.relayer.certify(await body(req)));
+  }),
+
+  /** GET /api/relay/credits: the offer; POST: claim credits for a private transfer to the house ring */
+  relayCredits: wrap(async (req) => {
+    const c = await context();
+    bucket(`credits:${clientOf(req)}`, 10, 5);
+    const cr = c.relayer?.credits;
+    if (!cr) throw new PofError('CREDITS_OFF', 'relay credits are not configured here', 503);
+    if (req.method === 'GET') return json(cr.offer(), 200, { 'cache-control': 'public, max-age=60' });
+    if (req.method !== 'POST') throw new PofError('METHOD', 'GET or POST', 405);
+    return json(await cr.claim(await body(req, 65_536)));
+  }),
+
+  /** POST /api/relay/revoke { subjectHash, asset, signature }: the controller's signed revoke, sent by the relayer */
+  relayRevoke: wrap(async (req) => {
+    const c = await context();
+    if (req.method !== 'POST') throw new PofError('METHOD', 'POST', 405);
+    bucket(`revoke:${clientOf(req)}`, 6, 4);
+    if (!c.relayer) throw new PofError('RELAY_OFF', 'the relayer is not configured here', 503);
+    return json(await c.relayer.revoke(await body(req, 2048)));
   }),
 
   linkStart: wrap(async (req) => {
@@ -267,7 +295,7 @@ export const byFn = (table: Record<string, (req: Request) => Promise<Response>>)
 export const areas = {
   attest: () => routes.attest,
   log: () => routes.log,
-  relay: () => byFn({ quote: routes.relayQuote, certify: routes.relayCertify }),
+  relay: () => byFn({ quote: routes.relayQuote, certify: routes.relayCertify, credits: routes.relayCredits, revoke: routes.relayRevoke }),
   link: () => byFn({ start: routes.linkStart, check: routes.linkCheck, verify: routes.linkVerify, link: routes.linkVerify }),
   keeper: () => byFn({ scan: routes.keeperScan, anchor: routes.keeperAnchor, escrow: routes.keeperEscrow }),
 };

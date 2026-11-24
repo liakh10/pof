@@ -13,6 +13,7 @@ export * from './relayer.js';
 export * from './linker.js';
 export * from './locks.js';
 export * from './escrow.js';
+export * from './credits.js';
 export * from './limits.js';
 export * from './chain.js';
 export * from './program.js';

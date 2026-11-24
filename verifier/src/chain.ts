@@ -12,6 +12,8 @@ export interface PofChain {
   /** the ed25519 instruction over the §7 signed head and anchor_log (the program keeps the latest head in the treasury) */
   anchorLog(size: number, root: Uint8Array): Promise<{ signature: string; lamports: bigint }>;
   relayerBalance(): Promise<bigint>;
+  /** [ed25519(controller, revokeBytes), revoke_signed()] paid by the relayer; absent until the program has it */
+  revokeSigned?(input: { subjectHash: Uint8Array; asset: number; signature: Uint8Array }): Promise<{ signature: string; lamports: bigint }>;
   /** incoming SOL transfers to the relayer since a slot: [{ signature, slot, lamports }] */
   incoming(sinceSlot: bigint): Promise<{ signature: string; slot: bigint; lamports: bigint }[]>;
   quoteLamports(): Promise<{ fee: bigint; rent: bigint; network: bigint }>;

@@ -11,6 +11,7 @@ import { verifySig } from './keys.js';
 import { getJson, putJson, type Store } from './store.js';
 import type { PofChain } from './chain.js';
 import type { TransparencyLog } from './log.js';
+import type { Credits } from './credits.js';
 
 export interface RelayConfig {
   address: string; verifierKey: Uint8Array; programId: Uint8Array;
@@ -18,7 +19,7 @@ export interface RelayConfig {
 }
 
 export class Relayer {
-  constructor(private cfg: RelayConfig, private store: Store, private chain: PofChain, private log: TransparencyLog) {}
+  constructor(private cfg: RelayConfig, private store: Store, private chain: PofChain, private log: TransparencyLog, public credits: Credits | null = null) {}
 
   private mac(body: string) { return crypto.createHmac('sha256', this.cfg.hmacKey).update(body).digest('hex').slice(0, 32); }
 
@@ -45,7 +46,7 @@ export class Relayer {
   /** the rolling 24-hour spend, from relay/spend.json: [[unixSec, lamports], ...] */
   private async spend(): Promise<[number, string][]> { const now = Date.now() / 1000; return ((await getJson<[number, string][]>(this.store, 'relay/spend.json')) || []).filter(([t]) => t > now - 86_400); }
 
-  async certify(input: { attestation: unknown; signature: unknown; logIndex: unknown; quote: unknown; hashes: unknown }) {
+  async certify(input: { attestation: unknown; signature: unknown; logIndex: unknown; quote?: unknown; hashes: unknown; credit?: unknown }) {
     const att = unhex(input.attestation, ATTESTATION_LEN, 'attestation');
     const sig = unhex(input.signature, 64, 'signature');
     const a = decodeAttestation(att);
@@ -69,8 +70,11 @@ export class Relayer {
     if (used + cost > this.cfg.dailyCapLamports) throw new PofError('RELAY_CAP', 'the relayer reached its spend cap for the last 24 hours; your payment stays valid, try later or certify from your own wallet', 429);
     if ((await this.chain.relayerBalance()) < cost + this.cfg.balanceFloorLamports) throw new PofError('RELAY_LOW', 'the relayer is low on SOL; your payment stays valid, try later', 503);
 
-    let paid: string | null = null;
-    if (!this.cfg.free) {
+    let paid: string | null = null, creditMark: string | null = null;
+    if (!this.cfg.free && input.credit !== undefined) {
+      if (!this.credits) throw new PofError('CREDITS_OFF', 'relay credits are not configured here; use a quote', 503);
+      creditMark = await this.credits.spend(input.credit, hex(att).slice(0, 64));
+    } else if (!this.cfg.free) {
       const quote = this.parseQuote(input.quote);
       const inc = await this.chain.incoming(quote.slot - 150n);
       const mark = new Uint8Array(Buffer.from(hex(att).slice(0, 64)));
@@ -93,13 +97,30 @@ export class Relayer {
       if (await landed()) r = { signature: e?.details?.signature || 'landed', lamports: 0n };
       else {
         if (paid && e?.code === 'CHAIN_REJECTED') await this.store.del(`relay/paid/${paid}`).catch(() => {});
+        if (creditMark && e?.code === 'CHAIN_REJECTED') await this.store.del(creditMark).catch(() => {}); // the credit comes back
         throw e;
       }
     }
     if (paid) await this.store.put(`relay/paid/${paid}`, new Uint8Array(Buffer.from('done:' + r.signature))); // used: never again
+    if (creditMark) await this.store.put(creditMark, new Uint8Array(Buffer.from('done:' + r.signature)));
     spend.push([Math.floor(Date.now() / 1000), String(r.lamports)]);
     await putJson(this.store, 'relay/spend.json', spend);
-    return { signature: r.signature, payment: paid, certificate: (await this.chain.certificate(a.subjectHash, a.asset))?.address ?? null };
+    return { signature: r.signature, payment: paid, credit: creditMark ? 'spent' : null, certificate: (await this.chain.certificate(a.subjectHash, a.asset))?.address ?? null };
   }
 
+
+  /** a relayed revoke_by_holder for X and badge certificates: the controller signs the CONTRACT revoke bytes, the relayer
+   *  pays the network fee, so no wallet of the holder appears */
+  async revoke(input: { subjectHash: unknown; asset: unknown; signature: unknown }) {
+    const sh = unhex(input.subjectHash, 32, 'subjectHash');
+    const asset = Number(input.asset);
+    const sig = typeof input.signature === 'string' && /^[0-9a-f]{128}$/.test(input.signature) ? unhex(input.signature, 64) : fromB58(input.signature, 64, 'signature');
+    if (!this.chain.revokeSigned) throw new PofError('PROGRAM_NOT_READY', 'the program does not take a signed revoke yet; revoke from the controller key directly', 503);
+    const spend = await this.spend();
+    if (spend.reduce((s, [, l]) => s + BigInt(l), 0n) + 10_000n > this.cfg.dailyCapLamports) throw new PofError('RELAY_CAP', 'the relayer reached its spend cap for the last 24 hours; try later', 429);
+    const r = await this.chain.revokeSigned({ subjectHash: sh, asset, signature: sig });
+    spend.push([Math.floor(Date.now() / 1000), String(r.lamports)]);
+    await putJson(this.store, 'relay/spend.json', spend);
+    return { signature: r.signature };
+  }
 }

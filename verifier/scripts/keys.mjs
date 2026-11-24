@@ -42,12 +42,25 @@ function x25519Key(name) {
   const sk = Buffer.from(fs.readFileSync(f, 'utf8').trim(), 'hex');
   return { file: f, pub: Buffer.from(x25519.getPublicKey(sk)).toString('hex'), value: sk.toString('hex') };
 }
-const v = keypair('verifier'), r = keypair('relayer'), s = sealKey(), k = x25519Key('keeper');
-console.log(JSON.stringify({ dir, verifier: v.pub, relayer: r.pub, seal: 'present (not shown)', keeperX25519: k.pub }, null, 2));
+function rsaKey(name) {
+  const f = path.join(dir, name + '.json');
+  if (!fs.existsSync(f)) {
+    const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 3072 });
+    const j = privateKey.export({ format: 'jwk' });
+    const h = (x) => Buffer.from(x, 'base64url').toString('hex');
+    const n = h(j.n);
+    fs.writeFileSync(f, JSON.stringify({ kid: crypto.createHash('sha256').update(n).digest('hex').slice(0, 8), n, e: h(j.e), d: h(j.d) }), { mode: 0o600, flag: 'wx' });
+  }
+  fs.chmodSync(f, 0o600);
+  const k = JSON.parse(fs.readFileSync(f, 'utf8'));
+  return { file: f, kid: k.kid, json: JSON.stringify(k) };
+}
+const v = keypair('verifier'), r = keypair('relayer'), s = sealKey(), k = x25519Key('keeper'), c = rsaKey('credits-rsa');
+console.log(JSON.stringify({ dir, verifier: v.pub, relayer: r.pub, seal: 'present (not shown)', keeperX25519: k.pub, creditKey: c.kid }, null, 2));
 
 if (process.argv.includes('--vercel')) {
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
-  for (const [name, value] of [['POF_VERIFIER_KEY', v.json], ['POF_RELAYER_KEY', r.json], ['POF_SEAL_KEY', s.value]]) {
+  for (const [name, value] of [['POF_VERIFIER_KEY', v.json], ['POF_RELAYER_KEY', r.json], ['POF_SEAL_KEY', s.value], ['POF_CREDIT_KEY', c.json]]) {
     for (const target of ['production', 'preview']) {
       const p = spawnSync('vercel', ['env', 'add', name, target, '--force'], { cwd: root, input: value, stdio: ['pipe', 'ignore', 'pipe'] });
       console.log(`${name} → ${target}: ${p.status === 0 ? 'set' : 'failed: ' + String(p.stderr).replace(/[A-Za-z0-9+/=]{40,}/g, '***').slice(0, 160)}`);

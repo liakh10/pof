@@ -5,7 +5,7 @@
      revoke_spent(index, salt, nullifier, membership?)  (PDA path; the nullifier-tree path when the PDA is gone) */
 import IDL from '../../program/idl/pof.json';
 import { PofError, fromB58, toB58 } from './codec.js';
-import { decodeAttestation, sthBytes } from './contract.js';
+import { decodeAttestation, revokeBytes, sthBytes } from './contract.js';
 import type { CertificateView, PofChain } from './chain.js';
 import type { Signer } from './keys.js';
 import type { RingsSource } from './rings.js';
@@ -164,6 +164,19 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
       const space = 8 + CERTIFICATE_SPACE;
       return { fee: BigInt(cfg.params.fee_lamports), rent: BigInt(await conn.getMinimumBalanceForRentExemption(space)), network: 10_000n };
     },
+  };
+  const rs = idl.instructions.find((x: any) => x.name === 'revoke_signed');
+  if (rs) chain.revokeSigned = async ({ subjectHash, asset, signature }) => {
+    const cert = certPda(subjectHash, asset);
+    const a = await conn.getAccountInfo(cert);
+    if (!a || !a.owner.equals(PID)) throw new PofError('NOT_FOUND', 'no certificate for that subject and asset', 404);
+    const c = decodeAccount('Certificate', a.data);
+    const msg = revokeBytes(fromB58(o.programId), cert.toBytes(), subjectHash, asset, c.nullset_hash, c.issued_slot);
+    const named: Record<string, any> = { caller: meta(payer.publicKey, true, false), payer: meta(payer.publicKey, true, true), config: meta(CONFIG), treasury: meta(TREASURY, false, true), certificate: meta(cert, false, true), instructions: meta(SYSVAR_INSTRUCTIONS_PUBKEY), system_program: meta(SystemProgram.programId) };
+    const keys = rs.accounts.map((x: any) => { const k = named[x.name]; if (!k) throw new PofError('PROGRAM_NOT_READY', `revoke_signed wants an account ${x.name} the relayer does not know`, 503); return { ...k, isWritable: !!x.writable, isSigner: !!x.signer }; });
+    const ix = new TransactionInstruction({ programId: PID, data: ixData('revoke_signed', {}), keys });
+    const ed = Ed25519Program.createInstructionWithPublicKey({ publicKey: new PublicKey(c.controller).toBuffer(), message: Buffer.from(msg), signature: Buffer.from(signature) });
+    return send([ed, ix], 'revoke_signed');
   };
   (chain as any).treasury = async () => { const a = await conn.getAccountInfo(TREASURY); return a ? decodeAccount('Treasury', a.data) : null; };
   return chain;

@@ -230,3 +230,57 @@ test('relayer: an uncertain certify keeps the payment for the same attestation; 
   assert.equal(res.signature, 'sigY');
   assert.ok(await c.store.get('relay/paid/payL'));
 });
+
+test('relay credits (POF-12): a private transfer buys blind-signed credits; a credit pays one certify; nothing ties it to the purchase', async () => {
+  const B = await import('../lib/blind.mjs');
+  const c = makeCtx();
+  const { privateKey } = (await import('node:crypto')).generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const j = privateKey.export({ format: 'jwk' }); const h = (x) => Buffer.from(x, 'base64url').toString('hex');
+  const key = V.creditKeyFromJson(JSON.stringify({ n: h(j.n), e: h(j.e), d: h(j.d) }));
+  const holder = ring();
+  const transfers = new Map([['5'.repeat(88), { lamports: 50_000_000n, signers: [holder.owner] }]]);
+  const credits = new V.Credits(c.store, key, { received: async (s) => transfers.get(s) || null }, c.relayerSigner.address, 10_000_000n, [5, 20]);
+  c.relayer.credits = credits;
+  const offer = credits.offer();
+  assert.equal(offer.key.kid, key.kid); assert.ok(!('d' in offer.key));
+  const tokens = Array.from({ length: 5 }, () => (globalThis.crypto.getRandomValues(new Uint8Array(32))).reduce((s, x) => s + x.toString(16).padStart(2, '0'), ''));
+  const bl = await Promise.all(tokens.map(t => B.blind(offer.key, t)));
+  const blinded = bl.map(x => x.blinded);
+  const sigOf = (signature, owner, signer, bls = blinded) => hex(signer.sign(V.claimMessage({ signature, owner, kid: key.kid, blinded: bls })));
+  const tx = '5'.repeat(88);
+  await rej(credits.claim({ signature: tx, owner: holder.owner, blinded: blinded.slice(0, 4), proof: sigOf(tx, holder.owner, holder.wallet, blinded.slice(0, 4)) }), 'BAD_BUNDLE');
+  const thief = ring();
+  await rej(credits.claim({ signature: tx, owner: thief.owner, blinded, proof: sigOf(tx, thief.owner, thief.wallet) }), 'NOT_SENDER');
+  await rej(credits.claim({ signature: tx, owner: holder.owner, blinded, proof: sigOf(tx, holder.owner, thief.wallet) }), 'BAD_CLAIM_PROOF');
+  await rej(credits.claim({ signature: '4'.repeat(88), owner: holder.owner, blinded, proof: sigOf('4'.repeat(88), holder.owner, holder.wallet) }), 'NOT_RECEIVED');
+  const got = await credits.claim({ signature: tx, owner: holder.owner, blinded, proof: sigOf(tx, holder.owner, holder.wallet) });
+  await rej(credits.claim({ signature: tx, owner: holder.owner, blinded, proof: sigOf(tx, holder.owner, holder.wallet) }), 'ALREADY_CLAIMED');
+  const creds = got.signatures.map((s, i) => ({ kid: key.kid, token: tokens[i], signature: B.unblind(offer.key, s, bl[i].r) }));
+  // the relayer never saw a token or an unblinded signature at claim time
+  for (const cr of creds) { assert.ok(!blinded.includes(cr.signature)); assert.ok(!got.signatures.includes(cr.signature)); }
+  // spend one on a relayed certify
+  const r = ring(); c.rings.register(r); const ctl = ring();
+  const out = await c.verifier.attest(pkg(c, r, [c.rings.note(r, 3n * SOL)], { kind: 1, value: 'creditor', proof: c.verifier.linkToken('creditor', Math.floor(Date.now() / 1000) + 600, ctl.owner), relay: true, controller: ctl.owner }));
+  const body = { attestation: out.attestation, signature: out.signature, logIndex: out.logIndex, hashes: out.hashes, credit: creds[0] };
+  const real = c.chain.certify.bind(c.chain);
+  c.chain.certify = async () => { throw new V.PofError('CHAIN_REJECTED', 'boom', 502); };
+  await rej(c.relayer.certify(body), 'CHAIN_REJECTED');                 // the credit comes back
+  c.chain.certify = real;
+  const res = await c.relayer.certify(body);
+  assert.equal(res.credit, 'spent');
+  await rej(c.relayer.certify(body), 'CREDIT_USED');
+  await rej(c.relayer.certify({ ...body, credit: { ...creds[1], token: tokens[2] } }), 'BAD_CREDIT');
+  assert.equal(await B.verifyCredit(offer.key, tokens[1], creds[1].signature), true);
+});
+
+test('relayed holder revoke: the controller signs the revoke bytes, the relayer sends them', async () => {
+  const c = makeCtx();
+  let got = null;
+  c.chain.revokeSigned = async (x) => { got = x; return { signature: 'sigRevokeSigned', lamports: 5000n }; };
+  const sh = '11'.repeat(32);
+  const r = await c.relayer.revoke({ subjectHash: sh, asset: 0, signature: 'ab'.repeat(64) });
+  assert.equal(r.signature, 'sigRevokeSigned'); assert.equal(hex(got.subjectHash), sh);
+  delete c.chain.revokeSigned;
+  await rej(c.relayer.revoke({ subjectHash: sh, asset: 0, signature: 'ab'.repeat(64) }), 'PROGRAM_NOT_READY');
+  assert.equal(V.revokeBytes(new Uint8Array(32), new Uint8Array(32), new Uint8Array(32), 1, new Uint8Array(32), 5n).length, 148);
+});

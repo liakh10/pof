@@ -107,5 +107,10 @@ export const subjectMessage = (m: { programId: string; kind: number; value: stri
 export const linkTokenBytes = (programId: Uint8Array, handle: string, controller: Uint8Array, expiresAt: bigint | number): Uint8Array =>
   concat(text('POF-LINK2'), programId, text(normalHandle(handle)), Uint8Array.of(0), controller, u64le(expiresAt));
 
+/* the relayed holder revoke (proposed on BOARD 2026-11-25): signed by the certificate's controller, bound to that very
+   certificate (its address, nullset and issued slot), so it never revokes a later remake */
+export const revokeBytes = (programId: Uint8Array, certificate: Uint8Array, subjectHash: Uint8Array, asset: number, nullsetHash: Uint8Array, issuedSlot: bigint | number): Uint8Array =>
+  concat(text('POF-REVOKE1'), programId, certificate, subjectHash, Uint8Array.of(asset), nullsetHash, u64le(issuedSlot));
+
 export const certificateSeeds = (subjectHash: Uint8Array, asset: number): Uint8Array[] => [text('cert'), subjectHash, Uint8Array.of(asset)];
 export { toB58 };
