@@ -220,3 +220,18 @@ test('a Rings write between the slot read and the tree read does not refuse (iss
   const a = V.decodeAttestation(Buffer.from(out.attestation, 'hex'));
   assert.ok(a.rootSlot <= a.issuedSlot); assert.equal(a.issuedSlot, c.rings.slotNow + 4n);
 });
+
+test('ZK-06: a note behind a live zk certificate is refused; the tag is zk.js\'s Poseidon("pof:zk:tag:v1", nf)', async () => {
+  const c = makeCtx(); const r = ring(); c.rings.register(r);
+  const n = c.rings.note(r, 2n * SOL);
+  const internal = await import('@heliuslabs/spr/internal');
+  const domain = Buffer.alloc(32); Buffer.from('pof:zk:tag:v1').copy(domain, 32 - 13);
+  const tag = internal.poseidon([domain, n.nullifier]);
+  assert.equal(hex(V.zkTag(internal.poseidon, n.nullifier)), hex(tag));
+  // zk/js/zk.js TAG_DOMAIN is the same big-endian field element
+  assert.equal(BigInt('0x' + hex(V.ZK_TAG_DOMAIN)), BigInt('0x' + Buffer.from('pof:zk:tag:v1').toString('hex')));
+  c.chain.zk.add(hex(tag));
+  await code(c.verifier.attest(pkg(c, r, [n])), 'NOTE_IN_USE');
+  c.chain.zk.clear();
+  assert.ok((await c.verifier.attest(pkg(c, r, [n]))).attestation);
+});

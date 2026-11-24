@@ -21,6 +21,8 @@ export interface PofChain {
    *  a refund, a close or any other credit that is not a transfer instruction never counts */
   incoming(sinceSlot: bigint, reference: string): Promise<{ signature: string; slot: bigint; lamports: bigint; reference: string }[]>;
   quoteLamports(): Promise<{ fee: bigint; rent: bigint; network: bigint }>;
+  /** ZK-06: for each zk tag, whether its note lock ["znote", tag] holds it for a live zk certificate that still lists it */
+  zkLocked?(tags: Uint8Array[]): Promise<boolean[]>;
   /** the Config's max_attest_age: how long after its issue slot the program still accepts an attestation */
   maxAttestAge?(): Promise<bigint>;
 }

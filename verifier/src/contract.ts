@@ -117,5 +117,9 @@ export const revokeBytes = (programId: Uint8Array, certificate: Uint8Array, subj
 export const revokeBytesV2 = (programId: Uint8Array, certificate: Uint8Array, subjectHash: Uint8Array, asset: number, nullsetHash: Uint8Array, issuedSlot: bigint | number, validUntil: bigint | number): Uint8Array =>
   concat(text('POF-REVOKE1'), programId, certificate, subjectHash, Uint8Array.of(asset), nullsetHash, u64le(issuedSlot), u64le(validUntil));
 
+/** the zk path's note tag (ZK-06, zk/js/zk.js noteHashes): Poseidon("pof:zk:tag:v1" as a big-endian field, nullifier) */
+export const ZK_TAG_DOMAIN = (() => { const d = text('pof:zk:tag:v1'); const b = new Uint8Array(32); b.set(d, 32 - d.length); return b; })();
+export const zkTag = (poseidon: (x: Uint8Array[]) => Uint8Array, nullifier: Uint8Array): Uint8Array => poseidon([ZK_TAG_DOMAIN, nullifier]);
+
 export const certificateSeeds = (subjectHash: Uint8Array, asset: number): Uint8Array[] => [text('cert'), subjectHash, Uint8Array.of(asset)];
 export { toB58 };

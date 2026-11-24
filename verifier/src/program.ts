@@ -170,6 +170,23 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
       }
       return out;
     },
+    async zkLocked(tags) {
+      const locks = tags.map(t => pda([Buffer.from('znote'), Buffer.from(t)]));
+      const accs = await conn.getMultipleAccountsInfo(locks, 'confirmed');
+      const certKeys = accs.map((a: any) => (a && a.owner.equals(PID) && a.data.length >= 40 ? new PublicKey(a.data.subarray(8, 40)) : null));
+      const want = certKeys.filter(Boolean);
+      const certs = want.length ? await conn.getMultipleAccountsInfo(want, 'confirmed') : [];
+      const slot = BigInt(await conn.getSlot('confirmed'));
+      let k = 0;
+      return certKeys.map((ck: any, i: number) => {
+        if (!ck) return false;
+        const a = certs[k++];
+        if (!a || !a.owner.equals(PID)) return false;
+        let c: any; try { c = decodeAccount('Certificate', a.data); } catch { return false; }
+        const tag = Buffer.from(tags[i]).toString('hex');
+        return c.status === 0 && slot <= BigInt(c.expiry_slot) && c.null_hashes.slice(0, c.note_count).some((h: Uint8Array) => Buffer.from(h).toString('hex') === tag);
+      });
+    },
     async maxAttestAge() {
       if (cfgCache && Date.now() - cfgCache.at < 60_000) return cfgCache.age;
       const cfg = await config();

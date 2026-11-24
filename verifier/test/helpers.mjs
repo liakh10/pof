@@ -85,6 +85,9 @@ export class FakeChain {
   async incoming(since, reference) { return this.inbox.filter(t => !t.reference || t.reference === reference).map(t => ({ ...t, reference: t.reference || reference })); }
   async quoteLamports() { return { fee: 10_000_000n, rent: 3_000_000n, network: 10_000n }; }
   async maxAttestAge() { return 300n; }
+  /** zk locks the tests put in place: hex tag → live */
+  zk = new Set();
+  async zkLocked(tags) { return tags.map(t => this.zk.has(hex(t))); }
 }
 
 export function makeCtx({ relayFree = false, env = {} } = {}) {

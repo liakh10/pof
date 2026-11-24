@@ -29,6 +29,14 @@ export class NoteLocks {
   }
   get hasChain() { return !!this.chain; }
 
+  /** ZK-06: a note that backs a live zk certificate (its tag's ["znote", tag] lock) cannot back a signed one */
+  async refuseZkLocked(tags: Uint8Array[]) {
+    if (!this.chain?.zkLocked) return;
+    const held = await this.chain.zkLocked(tags);
+    const i = held.findIndex(Boolean);
+    if (i >= 0) throw new PofError('NOTE_IN_USE', `notes[${i}] already backs a live zk certificate; one note backs one certificate`);
+  }
+
   /** the newest generation: [gen, lock] or [-1, null]. Generations are never deleted (a release is a tombstone generation on
    *  top), so the chain has no gaps and the first missing generation ends it; a head hint skips the old ones. */
   private async newest(base: string): Promise<[number, Lock | null]> {

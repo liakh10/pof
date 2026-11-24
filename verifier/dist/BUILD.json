@@ -1,7 +1,7 @@
 {
   "bundle": "dist/pof-verifier.mjs",
-  "sha256": "4403608fb6fccb21e3b3aeed7fc115bb49f8ccee2e21003d720bca9a5ce8d5ee",
-  "bytes": 9790081,
+  "sha256": "d5a4673c586fb0371013173971b727de4000774c4d957f8262b7ab83cb573efe",
+  "bytes": 9791901,
   "esbuild": "0.28.2",
   "node": "v20",
   "lockfileSha256": "9430500324f9bc92396bc6a464bf88d994b8840508a04eacd12ce1ee61ed4c3a",
@@ -11,9 +11,9 @@
     "lib/blind.mjs": "ad215c29e351d5cf336eb83ecce39603497cd7348aab0b012487d48d2246659c",
     "lib/credit-pins.json": "2a59c8f3a8d3250eb273c4f0b3717a3dc98750b1253e5a76890aaefc8eb41b74",
     "src/app.ts": "96316b21be04dbd0b5f59cc18665a0b4b9b505fef5e8a1526b94676f1ef4a8b8",
-    "src/chain.ts": "bf397acef15aa3252548e8a5d6f7f7c3abeb9590b0ed4140311ae97aea8a819a",
+    "src/chain.ts": "590cd953f4fe567436bf86b0c2ab1b228ee214d29eb5b4fa89a08ff04466e28a",
     "src/codec.ts": "3d380b86222ce55d20c0335da50a9b67afa6b85428070a38174fa3e8e94200c4",
-    "src/contract.ts": "0ada15b413fb843eccf47aa13f7dd8d0d69a699deaab446dea00ce2f8ba06d44",
+    "src/contract.ts": "bb559b726866188971e71a5ed3a0c828866f6ad02dece69334e95639c80d323b",
     "src/credits.ts": "38ddad1a237f02758e1259369aa821b6e270aa99d51fbba47800096ad081d972",
     "src/escrow.ts": "5b66fd094a7f552864fb2592c672ffcbfa3fd6fec0b514d47bf407f8a15fd425",
     "src/index.ts": "be6b941fa259df5635b2b961de9ce1c9c6b28930faf04a1cf7ca1f50e0c24012",
@@ -21,13 +21,13 @@
     "src/keys.ts": "be8cefee811df1b821f0bf423bf63b549cf9c2c04737fe15a9b5e6327780e29d",
     "src/limits.ts": "a582fbf86d1961a42ed9946f1005e384e7cc43af15ae56ac6a6da269f0d81062",
     "src/linker.ts": "38aa4625256231e65b7c501f20ff52356f9909ad9f45c0b0f04dac4f2761c2fd",
-    "src/locks.ts": "c141c77ab3dc666429faec5fef8cb6ea4f65f666e7fc07fb9407c079af462679",
+    "src/locks.ts": "88bad6bda3b7eab1b28e077b1bba116ae6741bd81b628901aef09dcb820098b2",
     "src/log.ts": "ffed85606c20c464a841128cc851b4fbd7ca056faadcb3b0e247314a104b76ea",
     "src/merkle.ts": "d98bfbf65d7590cdf8297760ea0014b5c2c7108fa6ac7fa20969788ca77621e0",
-    "src/program.ts": "bd1634208f108975bbee91e8a6c18ab3eaaea43a29987751070e58d080e4c02c",
+    "src/program.ts": "d05c39186e4378c02b6a043539f24271af483accce8a0cf8a2ee427300dee559",
     "src/relayer.ts": "20884e919a8a251446adec71ab34afaae35608c78a6a7b7068fa584ede7b864f",
     "src/rings.ts": "949167070d03d1d234736514766f61389f90834dec11677eceebd9a3f5a0040a",
     "src/store.ts": "b95cbbadfe71f5e75ac65d657f401f6628d8a297e9e0ec0e4ad6622dfa4bab6e",
-    "src/verify.ts": "73b45f96312678e7e97f24ea023e4e70abfea9cab69a7eedc7036b50a7bed89d"
+    "src/verify.ts": "9a9608fe6bc32505978289c51c6f09a91611e20f923dada7657358d591d45d8a"
   }
 }

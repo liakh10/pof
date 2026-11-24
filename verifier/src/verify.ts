@@ -6,7 +6,7 @@
 import { PofError, compareBytes, equal, fromB58, hex, unhex, toB58 } from './codec.js';
 import {
   ASSETS, SUBJECT, encodeAttestation, linkTokenBytes, normalHandle, nullsetHash, saltedNullifier, sortHashes, subjectHash,
-  disclosureMessage, tierMinimum, logLeaf,
+  disclosureMessage, tierMinimum, logLeaf, zkTag,
 } from './contract.js';
 import { verifySig, type Signer } from './keys.js';
 import type { RingsSource } from './rings.js';
@@ -213,6 +213,9 @@ export class Verifier {
       /* the sum: compared, never returned */
       const sum = notes.reduce((a, n) => a + n.amount, 0n);
       if (sum < minimum) throw new PofError('BELOW_TIER', `the disclosed notes do not reach tier ${tier} (${ASSETS[asset].name}); add notes or pick a lower tier`);
+
+      /* a note behind a live zk certificate cannot back a signed one (ZK-06) */
+      if (this.locks) await this.locks.refuseZkLocked(nullifiers.map(nf => zkTag(S.internal.poseidon, nf)));
 
       /* one note backs one live certificate: a keyed index of its nullifier (no amount), checked and then taken */
       if (this.locks) await this.locks.take(nullifiers, { subjectHash: hex(sHash), asset, issuedSlot: Number(slot), expirySlot: Number(slot + this.cfg.validitySlots) }, slot);
