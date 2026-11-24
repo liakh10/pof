@@ -12,6 +12,7 @@ import * as C from './core.js';
 import { setRpc, rpc, account, slot as chainSlot } from './chain.js';
 import * as walletJs from './wallet.js';
 import { LocalRings, jsonRpc } from './localtree.js';
+import { CREDIT_PINS } from './dist/pins.js';
 export { explain } from './errors.js';
 
 const S = C.spr;
@@ -537,15 +538,33 @@ export async function createPofClient(opts = {}) {
      the transaction can claim it. Tokens, blinding factors and signatures live only in the sealed store of this vault. */
   const CREDITS = () => 'pof:credits:v2:' + who('vault').owner;
   const blindLib = () => import('./dist/blind.mjs');
+  /* audit CR-01: the credit key and the house ring are pinned in this build (dist/pins.js, from the Verifier's
+     verifier/lib/credit-pins.json), never taken from the live offer, so a relayer cannot hand one buyer a key of their own
+     and recognise them at spend. Only the local lab may pass its own pins (opts.creditPins). */
+  const pinned = () => {
+    const p = net === 'local' && opts.creditPins ? opts.creditPins : CREDIT_PINS[net];
+    if (!p) throw Object.assign(Error(`this build has no pinned relay credit key for ${net}`), { code: 'NO_CREDIT_PIN' });
+    if (String(p.e).replace(/^0+/, '') !== '10001') throw Object.assign(Error('a pinned credit key must use e = 65537'), { code: 'BAD_CREDIT_PIN' });
+    return p;
+  };
+  async function fingerprintOf(p) { const d = C.hex(await C.sha256(C.utf8(`pof:credit-key:v1\n${p.kid}\n${String(p.n).toLowerCase()}\n${p.e}\n${p.houseRing}`))); return d.slice(0, 32).match(/.{4}/g).join(' '); }
+  async function checkedOffer() {
+    const o = await jsonCall(relayUrl('credits'));
+    const p = pinned();
+    const same = o.key && o.key.kid === p.kid && String(o.key.n).toLowerCase().replace(/^0+/, '') === String(p.n).toLowerCase().replace(/^0+/, '') && String(o.key.e).replace(/^0+/, '') === '10001' && o.houseRing === p.houseRing;
+    if (!same) throw Object.assign(Error('The relayer offered a credit key or house ring that this build does not trust. Nothing was paid.'), { code: 'CREDIT_KEY_MISMATCH' });
+    return { ...o, key: { kid: p.kid, n: p.n, e: p.e }, houseRing: p.houseRing, fingerprint: await fingerprintOf(p) };
+  }
   const claimMessage = async ({ signature, owner, kid, blinded }) => C.utf8(['Proof of Funds: relay credits v2', `transfer: ${signature}`, `owner: ${owner}`, `kid: ${kid}`, `blinded: ${C.hex(await C.sha256(C.utf8(blinded.join(''))))}`].join('\n'));
   async function readCredits() { const raw = get(CREDITS()); if (!raw) return { tokens: [], pending: [] }; try { return await unseal(JSON.parse(raw), who('vault').kitKey); } catch { return { tokens: [], pending: [] }; } }
   async function writeCredits(v) { put(CREDITS(), JSON.stringify(await seal(v, who('vault').kitKey))); }
   const credits = {
-    offer: () => jsonCall(relayUrl('credits')),
+    offer: () => checkedOffer(),
+    fingerprint: async () => fingerprintOf(pinned()),
     async count() { return (await readCredits()).tokens.filter(t => !t.used).length; },
     /* step 1: blind fresh tokens for a bundle, kept sealed before any money moves */
     async prepare({ count, offer }) {
-      const o = offer || await credits.offer();
+      const o = await credits.offer(); void offer;
       const n = Number(count);
       if (!o.bundles?.includes(n)) throw Object.assign(Error(`credits come in bundles of ${(o.bundles || []).join(' or ')}`), { code: 'BAD_BUNDLE' });
       const B = await blindLib();
@@ -570,7 +589,8 @@ export async function createPofClient(opts = {}) {
       for (const [i, x] of pend.items.entries()) {
         const sig = B.unblind(pend.key, r.signatures[i], x.r);
         if (!(await B.verifyCredit(pend.key, x.token, sig))) throw Object.assign(Error('the relayer returned a signature that does not verify'), { code: 'BAD_CREDIT' });
-        tokens.push({ kid: r.kid || pend.key.kid, token: x.token, signature: sig });
+        if (r.kid && r.kid !== pend.key.kid) throw Object.assign(Error('the relayer signed with another key than the pinned one'), { code: 'CREDIT_KEY_MISMATCH' });
+        tokens.push({ kid: pend.key.kid, token: x.token, signature: sig });
       }
       const now = await readCredits();
       now.pending = now.pending.filter(p => p.id !== id); now.tokens.push(...tokens); await writeCredits(now);
@@ -615,7 +635,9 @@ export async function createPofClient(opts = {}) {
     if (kit.subject.kind === 0) throw Object.assign(Error('a wallet certificate is revoked by the wallet itself (revoke_by_holder)'), { code: 'RELAY_NOT_FOR_WALLETS' });
     const ctl = await controllerOf(kit, from);
     const r = await revokeBytesOf(kit);
-    const signature = C.hex(await ctl.sign(r.bytes));
+    const sigBytes = await ctl.sign(r.bytes);
+    if (ctl.verify && !ctl.verify(r.bytes, sigBytes)) throw Object.assign(Error('the controller signature did not verify'), { code: 'BAD_SIGNATURE' });
+    const signature = C.hex(sigBytes);
     status('revoke', { phase: 'send', certificate: r.certificate });
     const ans = await jsonCall(relayUrl('revoke'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subjectHash: r.subjectHash, asset: r.asset, signature }) });
     status('revoke', { phase: 'done', signature: ans.signature });
@@ -627,9 +649,9 @@ export async function createPofClient(opts = {}) {
   async function controllerOf(kit, from = 'vault') {
     const id = who(from);
     if (kit.subject.kind === 0) return { publicKey: kit.subject.value, wallet: true };
-    if (kit.subject.kind === 2) { const o = await kits.open(kit, from); const k = S.SigningKey.fromEd25519Bytes(C.unhex(o.badgeSecret, 32)); return { publicKey: kit.subject.value, sign: m => k.sign(new Uint8Array(m)) }; }
+    if (kit.subject.kind === 2) { const o = await kits.open(kit, from); const k = S.SigningKey.fromEd25519Bytes(C.unhex(o.badgeSecret, 32)); return { publicKey: kit.subject.value, sign: m => k.sign(new Uint8Array(m)), verify: (m, sg) => k.verify(new Uint8Array(m), sg) }; }
     const k = await xController(id, kit.subject.value);
-    return { publicKey: C.b58encode(k.publicKey().ed25519()), sign: m => k.sign(new Uint8Array(m)) };
+    return { publicKey: C.b58encode(k.publicKey().ed25519()), sign: m => k.sign(new Uint8Array(m)), verify: (m, sg) => k.verify(new Uint8Array(m), sg) };
   }
 
   /* ---------------------------------------------------------------- the whole flow in one call (the /get page drives it step by step) */

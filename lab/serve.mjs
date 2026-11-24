@@ -28,7 +28,7 @@ const clonedFile = path.join(here, 'rings-local/.run/cloned-tree.b64');
 
 /* the Verifier, built once, for the local network */
 globalThis.isSecureContext ??= true;
-let verifier = null, linker = null, credits = null, relayerKey = null;
+let verifier = null, linker = null, credits = null, relayerKey = null, labPins = null;
 const houseReceived = new Map();
 const xPost = { handle: '', text: '' };
 async function localVerifier() {
@@ -49,7 +49,9 @@ async function localVerifier() {
   // POST /lab/house-received (on devnet and mainnet it is a real private transfer the relayer's Ring decrypts)
   const jwk = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ format: 'jwk' });
   const h = x => Buffer.from(x, 'base64url').toString('hex');
-  credits = new V.Credits(new V.FsStore(dir), V.creditKeyFromJson(JSON.stringify({ n: h(jwk.n), e: h(jwk.e), d: h(jwk.d) })), { received: async sig => houseReceived.get(sig) || null }, 'LabHouseRing11111111111111111111111111111111', 10_000_000n, [5, 20]);
+  const ck = V.creditKeyFromJson(JSON.stringify({ n: h(jwk.n), e: h(jwk.e), d: h(jwk.d) }));
+  labPins = { kid: ck.kid, n: ck.n, e: ck.e, houseRing: 'LabHouseRing11111111111111111111111111111111' };
+  credits = new V.Credits(new V.FsStore(dir), ck, { received: async sig => houseReceived.get(sig) || null }, 'LabHouseRing11111111111111111111111111111111', 10_000_000n, [5, 20]);
   // the real Linker; X itself is simulated: POST /lab/x-post stands in for posting the code from the handle
   linker = new V.Linker(new V.FsStore(dir), (h, exp, ctl) => verifier.linkToken(h, exp, ctl), async () => new Response(JSON.stringify({ tweet: { author: { screen_name: xPost.handle }, text: xPost.text, created_timestamp: Math.floor(Date.now() / 1000) } }), { status: 200 }));
   console.log('lab verifier key', signer.address, '· min note age', String(minAge), 'slots');
@@ -104,7 +106,7 @@ http.createServer(async (req, res) => {
       catch (e) { return send(e.status || 400, JSON.stringify({ error: { code: e.code || 'ERROR', message: String(e.message || e), details: e.details } })); }
     }
     if (url.pathname === '/lab/cloned-tree') return fs.existsSync(clonedFile) ? send(200, fs.readFileSync(clonedFile, 'utf8'), 'text/plain') : send(404, 'run lab/rings-local/prep.mjs', 'text/plain');
-    if (url.pathname === '/lab/config') return send(200, JSON.stringify({ program: PROGRAM, local: LOCAL, helius: keys.length > 0 }));
+    if (url.pathname === '/lab/config') { await localVerifier(); return send(200, JSON.stringify({ program: PROGRAM, local: LOCAL, helius: keys.length > 0, creditPins: labPins })); }
     let file = path.normalize(path.join(root, decodeURIComponent(url.pathname)));
     if (!file.startsWith(root) || /\/(\.run|node_modules|\.git)(\/|$)/.test(file)) return send(404, 'not found', 'text/plain');
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');

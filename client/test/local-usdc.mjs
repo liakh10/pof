@@ -128,7 +128,19 @@ test('local: USDC shield, sync, tiers with 6 decimals, attestation; mixed assets
   }); });
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   try {
-    const R = await createPofClient({ network: 'local', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, minAgeSlots: 0, clonedTree: cloned, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest` });
+    const pins = { kid: creditKey.kid, n: creditKey.n, e: creditKey.e, houseRing };
+    // CR-01: an offer whose key or house ring differs from the pinned one is refused before anything is paid
+    const other = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ format: 'jwk' });
+    for (const bad of [{ ...pins, n: h(other.n) }, { ...pins, houseRing: 'Other1111111111111111111111111111111111111' }, { ...pins, kid: 'deadbeef' }]) {
+      const X = await createPofClient({ network: 'local', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, minAgeSlots: 0, clonedTree: cloned, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest`, creditPins: bad });
+      await X.deriveVault();
+      await assert.rejects(X.credits.prepare({ count: 5 }), e => e.code === 'CREDIT_KEY_MISMATCH');
+    }
+    const N = await createPofClient({ network: 'devnet', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest` });
+    await N.deriveVault();
+    await assert.rejects(N.credits.prepare({ count: 5 }), e => e.code === 'NO_CREDIT_PIN');   // no pin for devnet in this build
+    const R = await createPofClient({ network: 'local', rpc: [RPC], wallet: W, storage: new Map(), programId: PROGRAM, minAgeSlots: 0, clonedTree: cloned, attestUrl: `http://127.0.0.1:${srv.address().port}/api/attest`, creditPins: pins });
+    assert.match(await R.credits.fingerprint(), /^([0-9a-f]{4} ){7}[0-9a-f]{4}$/);
     const rvault = await R.deriveVault();
     await assert.rejects(R.certify({ asset: 1, tier: 1, subjectKind: 2 }), e => e.code === 'CREDITS_NEEDED');
     await assert.rejects(R.credits.prepare({ count: 3 }), e => e.code === 'BAD_BUNDLE');

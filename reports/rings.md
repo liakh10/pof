@@ -211,6 +211,12 @@ Network: 150 ms latency, 6.4 Mbit/s (`lab/test/mobile-perf.mjs`, raw results in 
   sealed under the vault-seed key.
 - **Spending.** Each relayed certificate spends one credit in `/api/relay/certify`. **Even the relayer cannot tie a spent
   credit to the purchase that paid for it.** The v1 hash list this replaces would have let it do so.
+- **Pinned key** (audit CR-01). The client never takes the credit key or the house ring from the live offer. Both are
+  pinned in the build: `dist/pins.js` is generated from the Verifier's `verifier/lib/credit-pins.json`, `e` must be
+  65537, and an offer whose kid, modulus or house ring differs is refused before anything is paid
+  (`CREDIT_KEY_MISMATCH`). A network with no pin cannot buy credits (`NO_CREDIT_PIN`). The page shows the pinned key's
+  fingerprint (`credits.fingerprint()`, 32 hex digits in groups of four) next to the purchase. Tested with a wrong modulus,
+  a wrong house ring, a wrong kid and an unpinned network; the lab shows the fingerprint.
 - **Recovery.** A bundle that was paid but not claimed (a closed tab, an indexer delay) is kept and claimed again by
   `credits.resume()`.
 - **Fallbacks.** Paying at certify time needs `payNow: true` (warned as `NO_CREDIT`). Paying from the wallet needs
@@ -234,7 +240,8 @@ Network: 150 ms latency, 6.4 Mbit/s (`lab/test/mobile-perf.mjs`, raw results in 
 - **The submit.** The client posts them to `/api/relay/revoke`. The relayer submits `[ed25519(controller, bytes),
   revoke_signed()]`, so no wallet pays and none appears. It answers `PROGRAM_NOT_READY` until the deployed program has
   `revoke_signed` (it is in the IDL now).
-- **Proven so far.** The client's bytes equal the Verifier's `revokeBytes`, the badge key's signature over them verifies,
+- **Proven so far.** The client's bytes equal the Verifier's `revokeBytes`. The client checks the controller's signature
+  before sending (audit RV-01), and the badge key's signature over the bytes verifies,
   and a wallet certificate is refused (it revokes from the wallet). The on-chain `revoke_signed` run belongs to the
   program and verifier suites.
 

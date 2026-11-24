@@ -46,7 +46,7 @@ try {
   await page.waitForFunction(() => /CREDITS_NEEDED/.test(document.getElementById('log').textContent), null, { timeout: 30_000 });
   ok(true, 'a badge certificate goes through the relayer and asks for a prepaid credit, never the wallet (audit POF-12)');
   await page.click('#buy'); await waitLog(/credits: 5 blind tokens signed and unblinded/);
-  ok(/5 credits/.test(await page.$eval('#credits', e => e.textContent)), 'five blind credits bought (the Verifier\'s Credits, receipt simulated) and kept in the sealed vault store');
+  ok(/5 credits · relayer key ([0-9a-f]{4} ){7}[0-9a-f]{4}/.test(await page.$eval('#credits', e => e.textContent)), 'five blind credits bought (the Verifier\'s Credits, receipt simulated) and kept in the sealed vault store');
   await page.click('#certify');
   await page.waitForFunction(() => (document.getElementById('log').textContent.match(/attested ·/g) || []).length >= 2, null, { timeout: 60_000 }).catch(() => {});
   const secondLog = await logText();
