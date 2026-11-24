@@ -134,3 +134,17 @@ test("keygen writes a 600 key, prints only the public key, never overwrites; run
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("monitor: a certificate whose log entry does not hold its attestation raises unlogged_certificate", async () => {
+  const w = await makeWorld();
+  const log = await makeLog(6);
+  await w.rpc.putConfig({ verifier: log.verifierKey });
+  const witness = new Witness({ reader: new sdk.LogReader(log.base, log.fetch), client: w.client, signer: signerFromSecret(newSecret()), state: new MemoryState(), monitorCertificates: true });
+  const r = await witness.step();
+  assert.equal(r.ok, true, "the head itself is still cosigned");
+  const bad = r.doc.alarms.filter((a) => a.kind === "unlogged_certificate");
+  assert.ok(bad.length >= 1);
+  assert.ok(bad[0].detail.mismatched.includes("nonce"));
+  const again = await witness.step();
+  assert.equal(again.doc.alarms.filter((a) => a.kind === "unlogged_certificate").length, bad.length, "each certificate is checked once");
+});

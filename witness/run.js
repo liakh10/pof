@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Run a witness anywhere:
 //   node witness/run.js --origin https://<site> --rpc https://<your rpc> [--key ~/.config/pof/witness.json]
-//                       [--out witness.json] [--name my-witness] [--loop 60]
+//                       [--out witness.json] [--name my-witness] [--loop 60] [--monitor]
+// --monitor also checks that every certificate on chain is backed by the log entry it names (needs getProgramAccounts).
 // --log <url> overrides the log endpoint (default <origin>/api/attest/log). Exit code 1 on an alarm (single run).
 import fs from "node:fs";
 import os from "node:os";
@@ -34,6 +35,7 @@ const w = new Witness({
   signer,
   state: new FileState(opt("out", "witness.json")),
   name: opt("name", "pof-witness"),
+  monitorCertificates: args.includes("--monitor"),
 });
 const loop = Number(opt("loop", 0));
 const once = async () => {

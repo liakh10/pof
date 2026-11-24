@@ -33,6 +33,8 @@ export class Witness {
     this.trustedKeys = o.trustedKeys ?? null;
     this.now = o.now ?? (() => Math.floor(Date.now() / 1000));
     this.programId = o.client.programId;
+    this.monitorCertificates = o.monitorCertificates ?? false;
+    this.monitorBatch = o.monitorBatch ?? 50;
   }
 
   async load() {
@@ -47,8 +49,8 @@ export class Witness {
   /** The verifier keys a head may be signed with: the program's Config (verifier and the scheduled next one). */
   async allowedKeys(doc) {
     if (this.trustedKeys) return this.trustedKeys;
-    const c = await this.client.getConfig().catch(() => null);
-    if (c) return [c.verifier, c.nextVerifier].filter(Boolean);
+    const k = await this.client.verifierKeys({ history: true, maxTransactions: 500 }).catch(() => this.client.verifierKeys().catch(() => null));
+    if (k && k.all.length) return k.all;
     // before the program is configured: trust on first use, and alarm if the key ever changes
     return doc.firstKey ? [doc.firstKey] : null;
   }
@@ -127,7 +129,33 @@ export class Witness {
     doc.last = { treeSize: head.treeSize, rootHash: head.rootHash.toLowerCase(), verifierKey: head.verifierKey, signature: head.signature };
     doc.latest = rec;
     doc.stats.cosigned++;
+    if (this.monitorCertificates) await this.monitor(doc, head, alarm);
     return finish({ ok: true, cosignature: rec });
+  }
+
+  /**
+   * The monitor's other duty (audit POF-18): every certificate on chain must be backed by a log entry holding exactly its
+   * signed attestation. Checks up to `monitorBatch` certificates it has not checked yet per step.
+   */
+  async monitor(doc, head, alarm) {
+    doc.monitored = doc.monitored ?? {};
+    const { certificates } = await this.client.listCertificates().catch(() => ({ certificates: [] }));
+    let n = 0;
+    for (const c of certificates) {
+      const id = `${c.address}:${c.nonce}`;
+      if (doc.monitored[id] || n >= this.monitorBatch) continue;
+      if (c.logIndex === null || c.logIndex >= head.treeSize) continue; // not in the log yet: next step
+      n++;
+      let res;
+      try {
+        res = sdk.matchCertificateLeaf(c, sdk.parseLeaf((await this.reader.entry(c.logIndex)).leaf));
+      } catch (e) {
+        res = { matches: false, mismatched: [String(e.message ?? e)] };
+      }
+      doc.monitored[id] = res.matches ? "ok" : "mismatch";
+      if (!res.matches) alarm("unlogged_certificate", { certificate: c.address, logIndex: c.logIndex, mismatched: res.mismatched });
+    }
+    doc.stats.monitored = Object.keys(doc.monitored).length;
   }
 
   async consistent(m, rootM, n, rootN) {

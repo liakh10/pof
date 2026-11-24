@@ -1,7 +1,23 @@
 {
   "note": "Parked until launch: the lead copies these into vercel.json \"crons\" at launch. Each part appends its own entries.",
   "crons": [
-    { "path": "/api/bots/sweep", "schedule": "*/10 * * * *", "owner": "devx", "what": "re-check bot-granted roles and gated members; remove on revoke" },
-    { "path": "/api/status/sample", "schedule": "*/5 * * * *", "owner": "docs", "what": "run the status checks and store one sample in Blob (uptime history, log consistency between samples)" }
+    {
+      "path": "/api/bots/sweep",
+      "schedule": "*/10 * * * *",
+      "owner": "devx",
+      "what": "re-check bot-granted roles and gated members; remove on revoke"
+    },
+    {
+      "path": "/api/status/sample",
+      "schedule": "*/5 * * * *",
+      "owner": "docs",
+      "what": "run the status checks and store one sample in Blob (uptime history, log consistency between samples)"
+    },
+    {
+      "path": "/api/witness",
+      "schedule": "*/5 * * * *",
+      "owner": "devx",
+      "what": "the project's own log witness step (cosign the head, check the anchor, monitor certificates)"
+    }
   ]
 }
