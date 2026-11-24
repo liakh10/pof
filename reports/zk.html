@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Test report: phase 2, the zero-knowledge proof of funds (zk/) · Proof of Funds</title>
-<meta name="description" content="Development setup only. Every number and every proof below comes from a trusted setup made on one machine
-(zk/setup/TRANSCRIPT.md). Whoever ran it could forge proofs for that key. It is fit for local tests and devnet, never for
-mainnet certificates; the public">
+<meta name="description" content="Development setup only. Every proof and every number below comes from a trusted setup made on one machine
+(zk/setup/TRANSCRIPT.md). Whoever ran it could forge proofs for that key. It is fit for local tests and devnet, and never
+for mainnet certificates. The pu">
 <link rel="canonical" href="https://proofoffunds.vercel.app/reports/zk">
 <meta name="theme-color" content="#f3efe6">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -16,9 +16,9 @@ mainnet certificates; the public">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Proof of Funds">
 <meta property="og:title" content="Test report: phase 2, the zero-knowledge proof of funds (zk/) · Proof of Funds">
-<meta property="og:description" content="Development setup only. Every number and every proof below comes from a trusted setup made on one machine
-(zk/setup/TRANSCRIPT.md). Whoever ran it could forge proofs for that key. It is fit for local tests and devnet, never for
-mainnet certificates; the public">
+<meta property="og:description" content="Development setup only. Every proof and every number below comes from a trusted setup made on one machine
+(zk/setup/TRANSCRIPT.md). Whoever ran it could forge proofs for that key. It is fit for local tests and devnet, and never
+for mainnet certificates. The pu">
 <meta property="og:url" content="https://proofoffunds.vercel.app/reports/zk">
 <meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -31,30 +31,93 @@ mainnet certificates; the public">
 <body class="page-docs" data-page="docs">
 <a class="skip" href="#main">Skip to content</a>
 <header class="top">
-  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="2.5"/><circle r="37" fill="none" stroke="var(--signal)" stroke-width="8"/><circle r="26" fill="var(--ink)"/><path d="M -11 0 L -3 8 L 12 -7" stroke="var(--paper)" stroke-width="7" fill="none" stroke-linecap="square" stroke-linejoin="miter"/></svg><span class="brand-name">Proof of Funds</span></a>
   <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
   <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
 </header>
 <main id="main">
 <div class="docs">
   <aside class="docs-side" aria-label="Sections">
-    <details class="docs-pick" open><summary>Test reports</summary><ol class="docs-list"><li><a href="/reports/verifier"><span class="n">01</span>Test report: the Verifier, the transparency log, the relayer, the keeper and the X-handle linker</a></li><li><a href="/reports/rings"><span class="n">02</span>Test report: the Privacy Rings client (browser client, lab, proxies)</a></li><li><a href="/reports/devx"><span class="n">03</span>Test report: developer surfaces (API, SDK, MCP, bots)</a></li><li><a href="/reports/audit"><span class="n">04</span>Proof of Funds: internal security review</a></li><li><a href="/reports/zk" aria-current="page"><span class="n">05</span>Test report: phase 2, the zero-knowledge proof of funds (zk/)</a></li></ol></details>
+    <details class="docs-pick" open><summary>Test reports</summary><ol class="docs-list"><li><a href="/reports/program"><span class="n">01</span>Program test report: pof and pofgate</a></li><li><a href="/reports/verifier"><span class="n">02</span>Test report: the Verifier, the transparency log, the relayer, the keeper and the X-handle linker</a></li><li><a href="/reports/rings"><span class="n">03</span>Test report: the Privacy Rings client (browser client, lab, proxies)</a></li><li><a href="/reports/devx"><span class="n">04</span>Test report: developer surfaces (API, SDK, MCP, bots)</a></li><li><a href="/reports/audit"><span class="n">05</span>Proof of Funds: internal security review</a></li><li><a href="/reports/zk" aria-current="page"><span class="n">06</span>Test report: phase 2, the zero-knowledge proof of funds (zk/)</a></li><li><a href="/reports/audit2"><span class="n">07</span>Proof of Funds: second internal security review (audit2)</a></li></ol></details>
   </aside>
   <article class="prose" data-docs>
     
     <h1 id="test-report-phase-2-the-zero-knowledge-proof-of-funds-zk">Test report: phase 2, the zero-knowledge proof of funds (<code>zk/</code>)</h1>
-<p><strong>Development setup only.</strong> Every number and every proof below comes from a trusted setup made on one machine
-(<code>zk/setup/TRANSCRIPT.md</code>). Whoever ran it could forge proofs for that key. It is fit for local tests and devnet, never for
-mainnet certificates; the public ceremony that replaces it is in <code>docs-src/zk.md</code>. <code>certify_zk</code> is not deployed anywhere.</p>
-<p>Scope: <code>zk/circuits/pof.circom</code> (the circuit), <code>zk/js/zk.js</code> (inputs, context, escrow, proof encoding, the prover call),
-<code>zk/scripts/</code> (build, ceremony, verifying key to Rust), <code>zk/bench/</code> (proving in the browser), <code>zk/onchain/</code> (the Groth16
-verifier over the alt_bn128 syscalls and the <code>certify_zk</code> patch for <code>pof</code>, applied by <code>apply.py</code> to a copy of <code>program/</code>).
-Node 20, circom 2.2.2, snarkjs 0.7.5, circomlib 2.0.5, solana-cli 4.1.2 (Agave), Anchor 1.2.0, solana-bn254 3.2.1.
-No mainnet transaction was sent. Mainnet was read for one finalized blockhash per ceremony phase (the beacons).</p>
-<p>PENDING: filled in when the runs finish.</p>
-    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/reports/audit"><span>Previous</span>Proof of Funds: internal security review</a></nav>
+<p><strong>Development setup only.</strong> Every proof and every number below comes from a trusted setup made on one machine
+(<code>zk/setup/TRANSCRIPT.md</code>). Whoever ran it could forge proofs for that key. It is fit for local tests and devnet, and never
+for mainnet certificates. The public ceremony that replaces it is described in <code>docs-src/zk.md</code> (&quot;The public ceremony&quot;).
+<code>certify_zk</code> is not deployed anywhere, and stays off (<code>ZkConfig.enabled = false</code>) until that ceremony has run.</p>
+<p>Scope:</p>
+<ul><li><code>zk/circuits/pof.circom</code>: the circuit.</li><li><code>zk/js/zk.js</code>: the circuit inputs, the context hash, the escrow, the proof encoding and the prover call. The rings client
+imports it.</li><li><code>zk/scripts/</code>: build, ceremony, transcript, and the verifying key turned into Rust.</li><li><code>zk/bench/</code>: proving in the browser.</li><li><code>zk/onchain/</code>: the Groth16 verifier over the alt_bn128 syscalls, and the <code>certify_zk</code> patch for <code>pof</code>. <code>apply.py</code> applies
+it to a copy of <code>program/</code>; <code>patch/pof-program.diff</code> is the same change as a reviewable diff.</li></ul>
+<p>Toolchain: Node 20, circom 2.2.2, snarkjs 0.7.5, circomlib 2.0.5, solana-cli 4.1.2 (Agave), Anchor 1.2.0, solana-bn254
+3.2.1, Chrome 158 headless.</p>
+<p>No mainnet transaction was sent. Mainnet was read for one finalized blockhash per ceremony phase (the beacons). The client's
+test vectors were read earlier.</p>
+<h2 id="summary">Summary<a class="anchor" href="#summary" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>suite</th><th>command (from <code>zk/</code>)</th><th>checks</th><th>result</th></tr></thead><tbody><tr><td>Hashes = Rings (SDK and real mainnet leaves)</td><td><code>node --test test/parity.test.mjs</code></td><td>4</td><td>pass</td></tr><tr><td>The circuit with snarkjs</td><td><code>node --test test/circuit.test.mjs</code></td><td>12</td><td>pass</td></tr><tr><td>The on-chain verifier, native, against snarkjs proofs</td><td><code>npm run test:native</code></td><td>5</td><td>pass</td></tr><tr><td><code>certify_zk</code> on a local validator (patched <code>pof</code>, quick build)</td><td><code>zsh onchain/test/run.sh</code></td><td>12</td><td>pass</td></tr><tr><td>Patched <code>pof</code> unit tests (zk module included)</td><td><code>cargo test -p pof --lib</code> in the patched copy</td><td>11</td><td>pass</td></tr><tr><td>The audit's round 3 zk proofs</td><td><code>node --test audit/zk/</code> and <code>cargo test</code> in <code>audit/zk-native</code></td><td>3 + 1</td><td>pass (they failed before the fixes)</td></tr><tr><td>Proving in the browser</td><td><code>node bench/run.mjs</code></td><td>5 proofs</td><td>all verify</td></tr></tbody></table></div>
+<h2 id="the-circuit">The circuit<a class="anchor" href="#the-circuit" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>constraints</td><td><strong>93,803</strong> non-linear (circom <code>--O2</code>), 94,082 wires</td></tr><tr><td>public inputs</td><td>18 (two roots, asset, minimum, context, escrow key, ephemeral point, 4 tags, 4 ciphertexts, registry root)</td></tr><tr><td>private inputs</td><td>349</td></tr><tr><td>notes</td><td>1 to 4 (unused slots are zero)</td></tr><tr><td>Powers of Tau</td><td>2^17 (131,072)</td></tr><tr><td>witness wasm</td><td>4.6 MB</td></tr><tr><td>proving key</td><td>57.7 MB; 38.5 MB gzipped. <code>setup/pof_final.zkey.gz</code> went into git with d7f850b (history is never rewritten), so later keys must not: <code>scripts/publish-zkey-release.sh</code> puts a key on a GitHub Release (a pre-release named as a development ceremony; it publishes a public file, so the owner runs it), and <code>scripts/fetch-zkey.sh</code> downloads it (<code>POF_ZKEY_URL</code>) or uses the copy in git, checking it against <code>setup/ZKEY.sha256</code></td></tr><tr><td>verifying key</td><td>18 IC points, <code>VK_HASH f360e497…a406</code> (in <code>onchain/src/vk.rs</code> and <code>ZkConfig.vk_hash</code>)</td></tr></tbody></table></div>
+<p>The statement, the public inputs and who sets each one are in <code>docs-src/zk.md</code>.</p>
+<p><strong>Proven against Rings</strong> (<code>test/parity.test.mjs</code>):</p>
+<ul><li>circomlib Poseidon equals the Helius SDK hasher for 1, 2, 3, 4 and 7 inputs;</li><li><code>hashBytes</code>, the owner identity and the asset hash equal the SDK;</li><li>the circuit's commitment formula, fed with four real mainnet deposits' public data, gives exactly their leaf hashes.</li></ul>
+<p><strong>The circuit tests</strong> (<code>test/circuit.test.mjs</code>). Each &quot;no witness&quot; case means the witness generator hits a failing
+constraint, so no proof can exist for it:</p>
+<ul><li><strong>Valid:</strong> one note above the tier, and four notes summing exactly to the minimum (tags come out ascending). Both prove and
+verify, and the public signals come out in the documented order.</li><li><strong>Amount below the tier:</strong> no witness.</li><li><strong>Wrong root:</strong> a state root the notes are not under gives no witness. A valid proof does not verify under another state
+root or another nullifier root.</li><li><strong>Wrong nk, wrong owner:</strong> no witness.</li><li><strong>A spent note</strong> (its nullifier in the nullifier tree): no witness.</li><li><strong>Replay:</strong> a proof does not verify with the context of another subject, payer, tier, asset, controller or nonce, nor with a
+higher minimum.</li><li><p><strong>Malformed:</strong> no witness for any of these:</p>
+<ul><li>a non-bit <code>enabled</code>, the first slot unused, or a gap among the used slots;</li><li>a tag on an unused slot, a wrong tag, or a wrong ciphertext;</li><li>an ephemeral point that is not <code>r·B8</code>;</li><li>a minimum over u64, a leaf index over 32 bits, or an amount of 2^64;</li><li>a broken state path or nullifier path;</li><li>a missing signal.
+The same note twice is refused before proving.</li></ul></li><li><strong>Spend authority (ZK-04):</strong> <code>nk</code> and the openings without the owner's registered secret give no witness. Neither does
+another registry root, nor another owner's registry entry.</li><li><strong>The end of the nullifier list (ZK-10):</strong> a nullifier above the last element (<code>next = 0</code>) proves absent. That element
+itself is refused.</li><li><strong>A changed proof</strong> does not verify.</li><li><strong>The escrow:</strong> the revocation key opens every nullifier from <code>R</code> and <code>ct</code> and checks it against the tag. Another key is
+refused.</li></ul>
+<h2 id="proving-time">Proving time<a class="anchor" href="#proving-time" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>where</th><th>4 notes (the worst case)</th></tr></thead><tbody><tr><td>Chrome 158 headless, this laptop (10 cores, Apple silicon)</td><td>witness ~0.2 s, proof ~4.1 s, <strong>total 4.3 to 4.5 s</strong> (3 runs)</td></tr><tr><td>the same with the CPU throttled 4x (DevTools emulation)</td><td>witness ~0.8 s, proof ~6.5 to 7.0 s, <strong>total 7.3 to 7.8 s</strong> (2 runs)</td></tr><tr><td>Node 20 (<code>snarkjs.groth16.fullProve</code>, while other agents shared the machine)</td><td>median 5.5 s, 5.0 to 7.4 s</td></tr><tr><td>download, once per device</td><td>4.6 MB wasm + 38.5 MB gzipped key (unpacked in the browser with <code>DecompressionStream</code>)</td></tr></tbody></table></div>
+<p>The 4x throttle slows the main thread; snarkjs proves in Web Workers, which DevTools throttles less. So a real mid-range phone
+will be slower than the second row. A phone measurement is still to do.</p>
+<p><strong>The module the rings client calls</strong> is <code>zk/js/zk.js</code>, ESM with no dependencies:</p>
+<ul><li><code>buildInputs(P, { ring, notes, pub, r, registry })</code> takes <code>P = fromBytesPoseidon(core.poseidon)</code> (the SDK hasher the client
+already loads), the note openings and paths, the on-chain roots, and <code>context(...)</code>.</li><li><code>prove(snarkjs, { input, wasm, zkey, onStage })</code> returns the proof, the public signals, the timings, and <code>args</code>: the
+<code>certify_zk</code> arguments as bytes.</li><li>Also <code>ownerSecretFrom(seed)</code>, <code>ownerCommitment</code> (for <code>register_zk_owner</code>), <code>escrowKeypair</code> and <code>openEscrow</code> (the keeper).</li></ul>
+<p><code>bench/index.html</code> is the reference page with a loading state.</p>
+<h2 id="on-chain-certifyzk">On chain: <code>certify_zk</code><a class="anchor" href="#on-chain-certifyzk" aria-label="Link to this section">#</a></h2>
+<p>The patch adds these to <code>pof</code>:</p>
+<ul><li><strong>accounts:</strong> <code>ZkConfig</code> <code>[&quot;zk&quot;]</code>, the owner registry <code>[&quot;zkreg&quot;]</code>, and <code>NoteLock</code> <code>[&quot;znote&quot;, tag]</code>;</li><li><strong>instructions:</strong> <code>set_zk</code>, <code>register_zk_owner</code>, <code>certify_zk</code> and <code>release_note_lock</code>;</li><li><strong>changes to existing code:</strong>
+<ul><li><code>revoke_spent</code> gets a zk branch (it checks <code>Poseidon(TAG, nf) == tag</code>);</li><li><code>gate</code> refuses a settling zk certificate (ZK-02);</li><li><code>renew</code> refuses zk certificates.</li></ul></li></ul>
+<p>The Groth16 check is <code>zk/onchain/src/groth16.rs</code> over <code>solana-bn254</code> (alt_bn128 add, mul and pairing syscalls), with A
+negated client side.</p>
+<p><strong>Measured on the local validator</strong> against <code>program/</code> at <code>ad07261</code> with the patch applied (<code>onchain/test/last-run.json</code>):</p>
+<div class="table"><table><thead><tr><th>instruction</th><th>compute units</th><th>transaction</th></tr></thead><tbody><tr><td><code>certify_zk</code>, 1 note, wallet subject (1 signer)</td><td><strong>239,125 to 248,023</strong> (three runs)</td><td>843 bytes (v0, lookup table for config, treasury, zk config, registry, tree, system)</td></tr><tr><td><code>certify_zk</code>, 4 notes, badge subject relayed (2 signers)</td><td><strong>296,464 to 305,456</strong></td><td><strong>1,230 bytes</strong> (2 under the 1,232 limit)</td></tr><tr><td><code>register_zk_owner</code> (20 Poseidon syscalls)</td><td>31,448</td><td></td></tr><tr><td><code>set_zk</code> (the on-curve check of the key, 256-bit arithmetic)</td><td>390,862</td><td>admin only</td></tr></tbody></table></div>
+<p>The suite (12 checks, <code>onchain/test/zk-chain.mjs</code>):</p>
+<ul><li><strong>set_zk:</strong>
+<ul><li>an outsider is refused, and so is a key off Baby Jubjub;</li><li>turning it on waits the rotation delay, and a ready <code>certify_zk</code> is refused until then;</li><li>turning it off is immediate;</li><li>the vk hash is recorded.</li></ul></li><li><strong>Valid certificates:</strong>
+<ul><li>one note for a wallet subject: live, the <code>ZkConfig</code> address as the verifier, the tag stored, and the lock holds the
+escrow, which the keeper opens from chain data to the right nullifier;</li><li>four notes at tier 2 (10 SOL exactly), a badge subject, relayed by another payer;</li><li>USDC tier 1, with its lock address pre-funded by a stranger (ZK-07).</li></ul></li><li><strong>Wrong root:</strong>
+<ul><li>a state root not in the history: <code>ZkStateRootUnknown</code>;</li><li>a valid proof against an <em>older</em> nullifier root (ZK-01), or a made-up one: <code>ZkNullRootNotNewest</code>;</li><li>an unknown registry root: <code>ZkRegistryRootUnknown</code>.</li></ul></li><li><strong>Below tier:</strong> a proof against the tier 1 minimum submitted as tier 3 gives <code>ZkProofInvalid</code>.</li><li><strong>Replay:</strong> a proof bound to wallet 3 submitted for wallet 4, or with another payer, or with another nonce, gives
+<code>ZkProofInvalid</code>. An X subject is refused.</li><li><strong>Malformed:</strong>
+<ul><li>a flipped proof byte: <code>ZkProofInvalid</code>;</li><li>the same proof with a tag + r: <code>ZkInputNotInField</code>;</li><li>reversed or duplicate tags: <code>NullHashesUnsorted</code>;</li><li>missing or misordered locks: <code>ZkLockMissing</code>;</li><li>fewer ciphertexts than tags: <code>BadNoteCount</code>.</li></ul></li><li><strong>One note, one live certificate:</strong>
+<ul><li>the same note for another wallet: <code>ZkNoteLocked</code>;</li><li>releasing the lock while the first certificate is live: <code>ZkNoteStillLive</code>;</li><li>after <code>revoke_by_holder</code> and a release, the rent goes back to its payer and the other wallet certifies.</li></ul></li><li><strong>revoke_spent on a zk certificate:</strong>
+<ul><li>the note's nullifier PDA exists (a queued spend, exactly the case the settle window is for);</li><li>the keeper opens the escrow from the lock, and a wrong nullifier is refused;</li><li>the real one revokes it during the settle window;</li><li>then the lock is released.</li></ul></li><li><strong>Settle window (ZK-02):</strong>
+<ul><li><code>certify_zk</code> + <code>require_certificate</code> in one transaction is refused (<code>ZkSettling</code>);</li><li>the certificate's issued slot is the certify slot + 20 (quick build; 150 in the launch build);</li><li>the gate passes from that slot.</li></ul></li><li><strong>The CPI gate</strong> reads a settled zk certificate like a signed one, and refuses a higher tier.</li></ul>
+<h2 id="audit-round-3-what-changed">Audit round 3: what changed<a class="anchor" href="#audit-round-3-what-changed" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>finding</th><th>fix</th><th>test</th></tr></thead><tbody><tr><td>ZK-01 Critical: any of 100 nullifier roots</td><td>only the newest (before the cursor at 17,224)</td><td>audit ZK-01, chain &quot;older nullifier root&quot;</td></tr><tr><td>ZK-02 High: live in the same instruction</td><td><code>issued_slot = certified + ZK_SETTLE_SLOTS</code> (150), <code>gate</code> refuses before it</td><td>audit ZK-02, chain &quot;settle window&quot;</td></tr><tr><td>ZK-03 High: stub verifying key</td><td><code>vk.rs</code> is generated from the ceremony key; a stub or a point at infinity fails compilation; <code>set_zk</code> refuses a zero vk hash; proofs with A, B or C at infinity are refused</td><td>audit zk-native, native &quot;zero proof&quot;</td></tr><tr><td>ZK-04 High: no spend authority</td><td>the owner registry: the ring owner signs <code>register_zk_owner</code>, and the circuit proves knowledge of the registered secret</td><td>audit ZK-04, circuit &quot;spend authority&quot;</td></tr><tr><td>ZK-05 Medium: old remake rent code</td><td>the remake code of <code>certify</code> (POF-07), surplus moved after the CPIs</td><td>review</td></tr><tr><td>ZK-06 Medium: signed + zk on one note</td><td><strong>open, cross-part:</strong> the Verifier must check the <code>znote</code> lock; signed certificates creating <code>znote</code> locks needs CONTRACT §3 v2</td><td>none yet</td></tr><tr><td>ZK-07 Low: pre-funded lock</td><td>top up, allocate and assign when the address holds lamports</td><td>chain &quot;USDC … pre-funded&quot;</td></tr><tr><td>ZK-08 Medium: unsalted tags</td><td>kept on purpose and documented (keeper-free revocation); the salted variant is described as the upgrade path</td><td>docs</td></tr><tr><td>ZK-09 Low: <code>set_zk</code> without delay</td><td>on/key change waits the rotation delay (with POF-17's held delay), off is immediate; on-curve check; key epoch in each lock</td><td>chain &quot;set_zk&quot;</td></tr><tr><td>ZK-10 Info: <code>next = 0</code></td><td>the circuit treats <code>next = 0</code> as the end of the list</td><td>circuit &quot;end of the list&quot;</td></tr></tbody></table></div>
+<h2 id="the-ceremony">The ceremony<a class="anchor" href="#the-ceremony" aria-label="Link to this section">#</a></h2>
+<p><code>scripts/ceremony.sh</code>, with the transcript in <code>setup/TRANSCRIPT.md</code>:</p>
+<ul><li><strong>Phase 1:</strong> <code>powersoftau new bn128 17</code>, two random contributions, a beacon (mainnet slot 473,512,657),
+<code>prepare phase2</code> and <code>verify</code>. It took 28 minutes; the 151 MB output stays out of git, sha256 <code>cbd476d2…ac52</code>.</li><li><strong>Phase 2:</strong> <code>groth16 setup</code> over the r1cs, two random contributions, a beacon (mainnet slot 473,521,279), <code>zkey verify</code>
+and the exported verifying key. It took 4 minutes.</li></ul>
+<p>The entropy came from <code>/dev/urandom</code> and was never written. <strong>Labelled a development setup everywhere it appears.</strong></p>
+<h2 id="what-remains">What remains<a class="anchor" href="#what-remains" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>The release asset</strong>: the owner runs <code>zk/scripts/publish-zkey-release.sh</code> (tag <code>zk-dev-ceremony-1</code>). Later keys go only there.</li><li><strong>The public ceremony</strong> before mainnet (<code>docs-src/zk.md</code>), then rebuild <code>vk.rs</code>, publish the build hash, and <code>set_zk</code>.</li><li><strong>The merge into <code>pof</code>:</strong> the program agent reviews <code>onchain/patch/pof-program.diff</code> and merges it with <code>apply.py</code>. The
+zk part stays off on chain until the audit re-reviews it.</li><li><strong>ZK-06:</strong> the Verifier checks the <code>znote</code> lock of each note it attests (it knows the nullifier, so <code>tag = Poseidon(TAG, nf)</code>).
+A CONTRACT §3 v2 would let signed certificates create the locks too.</li><li><strong>The rings client:</strong> <code>register_zk_owner</code> (one vault-key signature) and the zk certify flow with <code>zk.js</code>.</li><li><strong>The keeper:</strong> open the escrow from <code>NoteLock</code> accounts, and watch new nullifiers against live zk tags.</li><li><strong>The API and SDK:</strong> show a settling zk certificate as &quot;settling&quot; (its <code>issued_slot</code> is in the future).</li><li><strong>A real phone measurement.</strong></li><li><strong>A devnet run against the real tree</strong>, with a real deposit, a real non-inclusion proof from the indexer, and a real
+spend. The local suite uses a tree account that holds synthetic roots.</li><li><strong>Not in this version:</strong> X-handle subjects (they need the linker's proof in the circuit), more than 4 notes, unlinkable
+(salted) tags, and the subgroup check of the escrow key on chain.</li></ul>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/reports/audit"><span>Previous</span>Proof of Funds: internal security review</a><a class="next" href="/reports/audit2"><span>Next</span>Proof of Funds: second internal security review (audit2)</a></nav>
   </article>
-  <aside class="docs-toc"></aside>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#summary">Summary</a></li><li class="d2"><a href="#the-circuit">The circuit</a></li><li class="d2"><a href="#proving-time">Proving time</a></li><li class="d2"><a href="#on-chain-certifyzk">On chain: certify_zk</a></li><li class="d2"><a href="#audit-round-3-what-changed">Audit round 3: what changed</a></li><li class="d2"><a href="#the-ceremony">The ceremony</a></li><li class="d2"><a href="#what-remains">What remains</a></li></ol></aside>
 </div>
 </main>
 <footer class="foot">
@@ -69,7 +132,7 @@ No mainnet transaction was sent. Mainnet was read for one finalized blockhash pe
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">515f4232e10ccbe4aca21bb90884d828972443fc6584f434ab0d167a000d6935</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">183a34daf1fa54d20002e7cc143a4023b100f324225d6dc4fcc8f1f3d6ed3dde</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

@@ -27,7 +27,7 @@
 <body class="page-docs" data-page="docs">
 <a class="skip" href="#main">Skip to content</a>
 <header class="top">
-  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="2.5"/><circle r="37" fill="none" stroke="var(--signal)" stroke-width="8"/><circle r="26" fill="var(--ink)"/><path d="M -11 0 L -3 8 L 12 -7" stroke="var(--paper)" stroke-width="7" fill="none" stroke-linecap="square" stroke-linejoin="miter"/></svg><span class="brand-name">Proof of Funds</span></a>
   <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
   <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
 </header>
@@ -83,17 +83,23 @@ signs, and the host sees request IP addresses. The code stores no amount, openin
 the keeper's sealed pairs, and rate-limit counters named by a keyed hash of the client address per window (swept by the
 keeper). Phase 2 removes the operator's view of amounts and <code>nk</code>
 (<a href="/docs/phase-2">Phase 2</a>); it does not remove the host's view of your IP. Use the network path you trust.</p>
+<h2 id="the-log-is-a-permanent-history">The log is a permanent history<a class="anchor" href="#the-log-is-a-permanent-history" aria-label="Link to this section">#</a></h2>
+<p>The transparency log holds no amounts, but it holds one entry for <strong>every attestation the Verifier signs, including the
+ones you never submit</strong>: the subject hash, asset, tier, issue slot, payer and controller. The public escrow listing keeps
+the same certificates' (sealed) revoke pairs. Nothing is removed. A handle's subject hash is not secret (anyone can hash a
+list of handles and compare), so for an X handle the log shows that you asked, when, and every tier you held, for good.
+If a handle must not be seen asking, do not attest for it: there is no &quot;try and cancel&quot; that leaves no record.</p>
 <h2 id="what-still-links-in-one-list">What still links, in one list<a class="anchor" href="#what-still-links-in-one-list" aria-label="Link to this section">#</a></h2>
 <p>Even when every habit above is followed:</p>
 <ul><li><strong>the vault and the wallet</strong>, in public, through the vault's registration, its shields and its fee funding;</li><li><strong>the vault's activity</strong>: its private transfers are visible as transactions the vault signed (amounts and recipients
 hidden);</li><li><strong>subject, vault and wallet, for the operator</strong>: the Verifier learns them together at attest time, and the relayer
-sees which vaults buy credits (not which certificate each credit later pays for);</li><li><strong>a certificate and its vault, in public, after a revocation by spend</strong>: the revealed nullifier matches a spend the
+sees which vaults buy credits (not which certificate each credit later pays for);</li><li><strong>a handle and its certificate history, in public, forever</strong>: through the transparency log (above);</li><li><strong>a certificate and its vault, in public, after a revocation by spend</strong>: the revealed nullifier matches a spend the
 vault signed. Revoke first, then move, and this one does not happen.</li></ul>
 <h2 id="by-subject-kind">By subject kind<a class="anchor" href="#by-subject-kind" aria-label="Link to this section">#</a></h2>
 <div class="table"><table><thead><tr><th></th><th>wallet</th><th>X handle</th><th>badge</th></tr></thead><tbody><tr><td>Who is named publicly</td><td>the wallet</td><td>the handle (as a hash anyone can recompute)</td><td>a fresh key</td></tr><tr><td>Who submits <code>certify</code></td><td>the wallet</td><td>the relayer</td><td>the relayer</td></tr><tr><td>Links to the funding wallet on chain</td><td>yes, the subject is the wallet</td><td>only by timing, amounts, the relayer payment, or a revocation by spend</td><td>same as a handle</td></tr><tr><td>Who can revoke by hand</td><td>the wallet</td><td>the controller key, rebuilt from the vault</td><td>the badge key, kept in the kit</td></tr><tr><td>Best for</td><td>showing size for a known wallet</td><td>posting under a handle</td><td>one counterparty, one deal</td></tr></tbody></table></div>
     <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/transparency-log"><span>Previous</span>The transparency log</a><a class="next" href="/docs/fees"><span>Next</span>Fees and the $POF holder rule</a></nav>
   </article>
-  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-each-step-reveals">What each step reveals</a></li><li class="d2"><a href="#habits-that-help">Habits that help</a></li><li class="d2"><a href="#what-still-links-in-one-list">What still links, in one list</a></li><li class="d2"><a href="#by-subject-kind">By subject kind</a></li></ol></aside>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#what-each-step-reveals">What each step reveals</a></li><li class="d2"><a href="#habits-that-help">Habits that help</a></li><li class="d2"><a href="#the-log-is-a-permanent-history">The log is a permanent history</a></li><li class="d2"><a href="#what-still-links-in-one-list">What still links, in one list</a></li><li class="d2"><a href="#by-subject-kind">By subject kind</a></li></ol></aside>
 </div>
 </main>
 <footer class="foot">
@@ -108,7 +114,7 @@ vault signed. Revoke first, then move, and this one does not happen.</li></ul>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">515f4232e10ccbe4aca21bb90884d828972443fc6584f434ab0d167a000d6935</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">183a34daf1fa54d20002e7cc143a4023b100f324225d6dc4fcc8f1f3d6ed3dde</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

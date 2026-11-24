@@ -15,9 +15,8 @@ export function certCard(c, { link = true, cls = '', seal = false } = {}) {
   return `<${tag} class="cert is-${state} ${cls}"${link ? ` href="${esc(certPath(c))}"` : ''} data-addr="${esc(c.address)}" data-status="${esc(c.status)}">
   <div class="cert-top"><div><div class="cert-kind">${esc(KIND_TEXT[c.kind] || c.kind)}</div><div class="cert-subject" title="${esc(subj)}">${hashOnly ? `hash ${esc(short(subj, 6))}` : esc(short(subj, 6))}</div></div>${seal ? '' : markSVG({ state })}</div>
   ${seal ? `<div class="cert-seal">${sealSVG({ state, crosshair: false })}</div>` : ''}
-  <div class="cert-tier" aria-label="${esc(c.tierLabel)}"><span class="ge">${t.ge}</span><span class="amt">${esc(t.amt)}</span><span class="sym">${esc(t.sym)}</span></div>
+  <div class="cert-tier" aria-label="at least ${esc(t.amt)} ${esc(t.sym)}"><span class="least">At least</span><span class="amt">${esc(t.amt)}</span><span class="sym">${esc(t.sym)}</span></div>
   <div class="cert-foot"><span class="status ${esc(c.status)}">${esc(STATUS_SHORT[c.status] || c.status)}</span><span>${slotLine}</span></div>
-  ${state === 'revoked' ? `<span class="cert-stamp" aria-hidden="true">REVOKED</span>` : ''}
 </${tag}>`;
 }
 

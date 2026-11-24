@@ -1,7 +1,7 @@
 /* /c/:subject: one subject's certificates, read from the chain in this browser, with each log entry proven here:
    the leaf parses, the attestation is signed by a key the program's Config trusts, the audit path reaches a signed head,
    and the leaf's signed bytes match the certificate on chain. The status re-reads itself; a revoke breaks the seal. */
-import { $, esc, num, short, span, ago, copy, toast, STATUS_TEXT, KIND_TEXT, certPath, subjectLine } from './fmt.js';
+import { $, esc, num, short, span, ago, copy, toast, STATUS_TEXT, KIND_TEXT, certPath, subjectLine, atLeast } from './fmt.js';
 import { source, verifyEntry, fromChain, sdk, PROGRAM } from './data.js';
 import { certCard, stateOf } from './cards.js';
 import { sealSVG } from './seal.js';
@@ -15,7 +15,8 @@ addEventListener('pof:slot', e => { now = e.detail; });
 function title(certs, query) {
   const c = certs[0];
   if (!c) return `No certificate for ${short(query, 8)}`;
-  return `${c.tierLabel}, ${STATUS_TEXT[c.status].toLowerCase()}`;
+  const t = atLeast(c.tierLabel);
+  return `${t.charAt(0).toUpperCase()}${t.slice(1)}, ${STATUS_TEXT[c.status].toLowerCase()}`;
 }
 
 function facts(c) {

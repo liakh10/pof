@@ -40,25 +40,34 @@ async function readWitness() {
   } catch { $('[data-witness]').innerHTML = ''; }
 }
 
-/* the audit path as a drawing: the leaf at the bottom, one sibling per level, up to the root */
-function pathSVG(index, size, depth) {
-  const W = 560, rowH = 44, Hh = (depth + 1) * rowH + 30;
-  let out = `<svg class="tree" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Audit path of ${depth} hashes">`;
-  let x = W / 2;
-  for (let lvl = 0; lvl <= depth; lvl++) {
-    const y = Hh - 20 - lvl * rowH;
-    const right = ((index >> lvl) & 1) === 1;
-    if (lvl < depth) {
-      const sx = right ? x - 90 + lvl * 4 : x + 90 - lvl * 4;
-      out += `<line class="ed path" x1="${x}" y1="${y}" x2="${W / 2}" y2="${y - rowH}"/><line class="ed" x1="${sx}" y1="${y}" x2="${W / 2}" y2="${y - rowH}"/>`;
-      out += `<circle class="nd" cx="${sx}" cy="${y}" r="9"/><text x="${right ? sx - 16 : sx + 16}" y="${y + 4}" text-anchor="${right ? 'end' : 'start'}">sibling ${lvl + 1}</text>`;
-    }
-    out += `<circle class="nd ${lvl === 0 ? 'leaf' : 'path'}" cx="${x}" cy="${y}" r="${lvl === depth ? 14 : 10}"/>`;
-    if (lvl === 0) out += `<text x="${x + 18}" y="${y + 4}">entry ${index}</text>`;
-    if (lvl === depth) out += `<text x="${x + 22}" y="${y + 4}">root, size ${size}</text>`;
-    x = W / 2;
+/* the audit path as a drawing on the grid: the leaf at the bottom, one sibling per level on the side its bit says, orthogonal
+   joins up to the root. Module 18, every coordinate a multiple of it. */
+function pathSVG(index, size, path, root) {
+  const M = 18, X = 16 * M, OFF = 7 * M, ROW = 3 * M, depth = path.length;
+  const Wd = 32 * M, Ht = (depth + 1) * ROW + 4 * M;
+  const y = l => Ht - M - l * ROW;
+  // which side each sibling is on, from the leaf up, by the RFC 9162 split (the tree is not always balanced)
+  const sides = [];
+  for (let m = index, n = size; n > 1;) {
+    let k = 1; while (k * 2 < n) k *= 2;
+    if (m < k) { sides.push('right'); n = k; } else { sides.push('left'); m -= k; n -= k; }
   }
-  return out + '</svg>';
+  sides.reverse();
+  const out = [];
+  for (let l = 0; l < depth; l++) {
+    const right = sides[l] === 'right';
+    const sx = right ? X + OFF : X - OFF;
+    out.push(`<path class="ed" d="M ${sx} ${y(l)} V ${y(l + 1)} H ${X}"/>`);
+    out.push(`<line class="ed path" x1="${X}" y1="${y(l)}" x2="${X}" y2="${y(l + 1)}"/>`);
+    out.push(`<circle class="nd" cx="${sx}" cy="${y(l)}" r="6"/>`);
+    out.push(`<text x="${right ? sx + M : sx - M}" y="${y(l) + 4}" text-anchor="${right ? 'start' : 'end'}">${esc(String(path[l]).slice(0, 8))}</text>`);
+    if (l > 0) out.push(`<circle class="nd path" cx="${X}" cy="${y(l)}" r="6"/>`);
+  }
+  out.push(`<rect class="nd leaf" x="${X - 7}" y="${y(0) - 7}" width="14" height="14"/>`);
+  out.push(`<text x="${X + M}" y="${y(0) + 4}" text-anchor="start" class="strong">entry ${index}</text>`);
+  out.push(`<circle class="nd path" cx="${X}" cy="${y(depth)}" r="10"/><circle class="ring" cx="${X}" cy="${y(depth)}" r="16"/>`);
+  out.push(`<text x="${X}" y="${y(depth) - 2 * M + 4}" text-anchor="middle" class="strong">root ${esc(String(root).slice(0, 8))} · size ${size}</text>`);
+  return `<svg class="tree" viewBox="0 0 ${Wd} ${Ht}" role="img" aria-label="Audit path: ${depth} sibling hashes from entry ${index} to the root">${out.join('')}</svg>`;
 }
 
 async function check(i) {
@@ -69,7 +78,7 @@ async function check(i) {
     const a = v.leaf.attestation;
     const row = (t, ok) => `<li><span class="${ok ? 'ok' : 'no'}"></span><span>${t}</span><small></small></li>`;
     box.innerHTML = `<ul class="checks">${row('The leaf parses (377 bytes, version 1)', v.checks.leafParses)}${row('The Verifier signed the attestation', v.checks.attestationSigned)}${row('The key is the one in the program Config', v.checks.keyTrusted)}${row(`The path of ${v.proof.path.length} hashes reaches the root`, v.checks.included)}${row('The root is a signed head', v.checks.headSigned !== false)}${row('The attestation names this program', v.checks.programMatches !== false)}</ul>
-      ${pathSVG(i, v.proof.treeSize, v.proof.path.length)}
+      ${pathSVG(i, v.proof.treeSize, v.proof.path, v.proof.rootHash)}
       <dl class="facts" style="margin-top:var(--s4)">
         <div><dt>Subject</dt><dd>${esc(KIND[a.subjectKind] || a.subjectKind)} · ${esc(a.subjectHash)}</dd></div>
         <div><dt>Tier</dt><dd>${esc(tierLabel(SYM[a.asset] || '?', a.tier))}</dd></div>

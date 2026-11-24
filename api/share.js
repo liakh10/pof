@@ -40,12 +40,19 @@ async function describe(subject) {
 export default async function handler(req, res) {
   const url = new URL(req.url, "http://x");
   const subject = decodeURIComponent(url.searchParams.get("subject") || "").slice(0, 120);
+  // one cache key per subject: stray query strings go to the bare /c/<subject> (audit A2-04)
+  if ([...url.searchParams.keys()].some(k => k !== "subject")) {
+    res.statusCode = 308;
+    res.setHeader("location", `/c/${encodeURIComponent(subject)}`);
+    res.setHeader("cache-control", "public, max-age=3600, s-maxage=86400");
+    return res.end();
+  }
   const proto = req.headers["x-forwarded-proto"] || "https";
   const origin = `${proto}://${req.headers.host}`;
   let meta = { title: `Certificate for ${subject}`, description: null };
   try { if (subject) meta = await describe(subject); } catch {}
   res.statusCode = 200;
   res.setHeader("content-type", "text/html; charset=utf-8");
-  res.setHeader("cache-control", "public, max-age=0, s-maxage=20, stale-while-revalidate=120");
+  res.setHeader("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
   res.end(withTags(PAGE(), { origin, subject, ...meta }));
 }

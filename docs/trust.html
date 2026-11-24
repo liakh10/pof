@@ -27,7 +27,7 @@
 <body class="page-docs" data-page="docs">
 <a class="skip" href="#main">Skip to content</a>
 <header class="top">
-  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="2.5"/><circle r="37" fill="none" stroke="var(--signal)" stroke-width="8"/><circle r="26" fill="var(--ink)"/><path d="M -11 0 L -3 8 L 12 -7" stroke="var(--paper)" stroke-width="7" fill="none" stroke-linecap="square" stroke-linejoin="miter"/></svg><span class="brand-name">Proof of Funds</span></a>
   <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
   <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
 </header>
@@ -63,10 +63,18 @@ exist. You cannot detect (a) from outside: you trust the published code and the 
 fact: every attestation the Verifier signs is in the public <a href="/docs/transparency-log">transparency log</a>, and the bundle hash of the
 code that signed it is in each entry. The log does not prevent a false attestation; it makes one permanent and
 attributable. Phase 2 removes the Verifier's view entirely (<a href="/docs/phase-2">Phase 2</a>).</p>
+<p><strong>The log and the escrow keep every attempt.</strong> Every attestation the Verifier signs is appended to the public
+transparency log, and its revoke pairs to the public (sealed) escrow listing, <strong>including attestations that were never
+submitted on chain</strong>. Each entry carries the subject hash, the asset, the tier, the issue slot, the payer and the
+controller, and the log is never pruned. An X-handle subject hash is <code>sha256(&quot;pof:x:&quot; ‖ handle)</code>, which anyone can
+reverse by hashing a list of handles. So the log shows, permanently, that a handle asked for a certificate (even one it
+never submitted) and every tier it held through renewals and remakes, long after the certificate ended (internal review
+finding A2-06).</p>
 <h2 id="2-the-verifiers-signing-key-and-the-program-admin">2. The Verifier's signing key and the program admin<a class="anchor" href="#2-the-verifiers-signing-key-and-the-program-admin" aria-label="Link to this section">#</a></h2>
 <p>The program accepts attestations signed by one ed25519 key at a time, stored in its <code>Config</code>. The admin can:</p>
 <ul><li><strong>pause</strong> certify and renew at once (<code>set_paused</code>), for a leaked key; revocation and expiry never pause;</li><li><strong>propose a new key</strong> (<code>set_verifier</code>), which takes over only after a delay counted in slots (216,000 slots at launch,
-never fewer than 9,000), so a key cannot be swapped in quietly; anyone can read the pending key and its slot in <code>Config</code>;</li><li>set the fee, up to a hard cap of 0.25 SOL per certify or renew, and enable or disable an asset. A tier table, once set,
+never fewer than 9,000), so a key cannot be swapped in quietly; anyone can read the pending key and its slot in <code>Config</code>;</li><li>set the fee, up to a hard cap of 0.25 SOL per certify or renew; set the validity between 9,000 and 1,512,000 slots;
+enable or disable an asset. A tier table, once set,
 cannot be changed, so an issued tier never changes meaning.</li></ul>
 <p>The admin cannot sign attestations. The <code>pof</code> program is deployed with the upgradeable loader, and its upgrade
 authority is the admin key: whoever holds it can change the program. Check the current authority on chain
@@ -93,8 +101,9 @@ somebody shows the spend with <code>revoke_spent</code>. Between the spend and t
 interval plus one transaction. If the keeper stopped, a spent certificate would stay live until it expires.
 <strong>Before launch the keeper is off.</strong></p>
 <p>What limits this:</p>
-<ul><li>certificates are short-lived: the Verifier issues them for 216,000 slots by default (the program allows up to
-<code>validity_slots</code>, 6,480,000 in the launch Config), and <code>renew</code> on the same notes re-checks them and extends them;</li><li>the kits are escrowed to every registered keeper, so one stopped operator does not keep spent certificates alive once
+<ul><li>certificates are short-lived: <code>validity_slots</code> is 216,000 in the launch Config (the admin can set it between 9,000 and
+1,512,000, the program's hard cap), the Verifier issues for 216,000 by default, and <code>renew</code> on the same notes re-checks
+them and extends them;</li><li>the kits are escrowed to every registered keeper, so one stopped operator does not keep spent certificates alive once
 a second keeper is registered;</li><li>the <a href="/docs/status">status page</a> publishes our keeper's last run in slots, so a stopped keeper is visible.</li></ul>
 <p>A consumer that needs more than &quot;live, and no spend shown yet&quot; should ask for a recently issued or renewed certificate.</p>
 <h2 id="5-the-x-handle-check-relies-on-x">5. The X handle check relies on X<a class="anchor" href="#5-the-x-handle-check-relies-on-x" aria-label="Link to this section">#</a></h2>
@@ -142,7 +151,7 @@ with failing tests for each finding. A finding stays listed there, with its stat
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">515f4232e10ccbe4aca21bb90884d828972443fc6584f434ab0d167a000d6935</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">183a34daf1fa54d20002e7cc143a4023b100f324225d6dc4fcc8f1f3d6ed3dde</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

@@ -127,7 +127,7 @@ if (film) {
   src = await source();
   const live = LIVE || src.mode === 'fixture';
   if (!live) { preLaunch(); emptyWall({ title: 'No certificates yet.', body: 'The first certificate appears here the moment it lands on chain, and turns over the moment its funds move.' }); return; }
-  wall.innerHTML = Array.from({ length: 8 }, () => '<div class="cert skeleton" aria-hidden="true"></div>').join('');
+  wall.innerHTML = Array.from({ length: 8 }, (_, i) => `<div class="cert loading" aria-hidden="true" style="--d:${i * 90}ms"><svg class="ld" viewBox="-50 -50 100 100"><circle r="42" pathLength="100"/><circle r="32" pathLength="100"/><circle r="22" pathLength="100"/></svg></div>`).join('');
   const tick = async () => {
     try { await Promise.all([readStats(), readWall()]); }
     catch (e) {

@@ -181,7 +181,7 @@ function drawTiers() {
   const current = val('tier') || 1;
   $('[data-tiers]').innerHTML = TIERS[SYM[asset]].map((t, i) => {
     const ok = have === null || have >= mins[i];
-    return `<label class="choice"><input type="radio" name="tier" value="${i + 1}" ${i + 1 === current ? 'checked' : ''} ${ok ? '' : 'disabled'}><b>≥ ${t}</b><span>${SYM[asset]}${ok ? '' : ' · not enough in the vault'}</span></label>`;
+    return `<label class="choice"><input type="radio" name="tier" value="${i + 1}" ${i + 1 === current ? 'checked' : ''} ${ok ? '' : 'disabled'}><span>at least</span><b>${t}</b><span>${SYM[asset]}${ok ? '' : ', not enough in the vault'}</span></label>`;
   }).join('');
   if (!$('input[name="tier"]:checked')) { const first = $('input[name="tier"]:not(:disabled)'); if (first) first.checked = true; }
   summary();

@@ -23,6 +23,8 @@ export const TIERS = {
   USDC: ['100', '1,000', '10,000', '100,000', '1,000,000'],
 };
 export const tierLabel = (asset, tier) => `≥ ${TIERS[asset]?.[tier - 1] ?? '?'} ${asset}`;
+/** a tier label for display type: "≥ 1,000 SOL" → "at least 1,000 SOL" (the display face has no ≥) */
+export const atLeast = label => String(label || '').replace(/^≥\s*/, 'at least ');
 
 /** slots → "about 4 min" / "about 2 h" / "about 3 days" */
 export function span(slots) {

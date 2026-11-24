@@ -8,7 +8,7 @@ const dots = (n, on) => `<span class="rings-count" aria-hidden="true">${Array.fr
 
 function drawTiers() {
   const a = Number($('input[name="rasset"]:checked').value);
-  $('[data-rtiers]').innerHTML = TIERS[SYM[a]].map((t, i) => `<label class="choice"><input type="radio" name="rtier" value="${i + 1}" ${i === 2 ? 'checked' : ''}><b>≥ ${t}</b><span>${SYM[a]}</span></label>`).join('');
+  $('[data-rtiers]').innerHTML = TIERS[SYM[a]].map((t, i) => `<label class="choice"><input type="radio" name="rtier" value="${i + 1}" ${i === 2 ? 'checked' : ''}><span>at least</span><b>${t}</b><span>${SYM[a]}</span></label>`).join('');
 }
 $$('input[name="rasset"]').forEach(r => r.addEventListener('change', drawTiers));
 drawTiers();
@@ -46,7 +46,7 @@ $('[data-act="create"]').addEventListener('click', async e => {
     box.innerHTML = rooms.sort((a, b) => b.memberCount - a.memberCount).map(r => `<a class="room-card" href="/rooms/${esc(r.address)}">
       <div class="row" style="justify-content:space-between"><span class="label quiet">Room</span>${dots(5, r.minTier)}</div>
       <p class="h3">${esc(r.name || 'Unnamed room')}</p>
-      <p class="cert-tier"><span class="ge">≥</span><span class="amt" style="font-size:44px">${esc((r.minTierLabel || '').replace(/^≥\s*/, '').replace(/\s*\w+$/, ''))}</span><span class="sym">${esc(r.asset)}</span></p>
+      <p class="cert-tier"><span class="least">At least</span><span class="amt" style="font-size:44px">${esc((r.minTierLabel || '').replace(/^≥\s*/, '').replace(/\s*\w+$/, ''))}</span><span class="sym">${esc(r.asset)}</span></p>
       <div class="room-meta"><span>${num(r.memberCount)} members</span><span>by ${esc(short(r.creator, 4))}</span></div>
     </a>`).join('');
   } catch (e) {

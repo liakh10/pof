@@ -27,7 +27,7 @@
 <body class="page-docs" data-page="docs">
 <a class="skip" href="#main">Skip to content</a>
 <header class="top">
-  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="3"/><circle r="38" fill="none" stroke="var(--signal)" stroke-width="7"/><circle r="27" fill="var(--ink)"/><path d="M -12 0 L -3 9 L 14 -9" stroke="var(--paper)" stroke-width="7.5" fill="none" stroke-linecap="square"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="2.5"/><circle r="37" fill="none" stroke="var(--signal)" stroke-width="8"/><circle r="26" fill="var(--ink)"/><path d="M -11 0 L -3 8 L 12 -7" stroke="var(--paper)" stroke-width="7" fill="none" stroke-linecap="square" stroke-linejoin="miter"/></svg><span class="brand-name">Proof of Funds</span></a>
   <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
   <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
 </header>
@@ -40,67 +40,103 @@
     <p class="kicker">The phase 2 circuit, its public inputs, the setup, the browser prover and certify_zk, with measured numbers and the known limits.</p>
     <h1 id="the-zero-knowledge-circuit-phase-2">The zero-knowledge circuit (phase 2)</h1>
 <p>Phase 1 trusts the Verifier with the openings of the disclosed notes and with the vault's nullifier key <code>nk</code>
-(<a href="/docs/trust">Trust points</a>, item 1). Phase 2 replaces that request with a Groth16 proof made in the holder's browser and
-checked by the <code>pof</code> program itself. The program learns that the subject holds at least the tier in one asset, and nothing
-else: no amount, no <code>nk</code>, no owner key, no leaf, no nullifier.</p>
-<p><strong>Status: in development, not deployed.</strong> The circuit, a development setup, the browser prover and the on-chain
-instruction <code>certify_zk</code> are built and tested (numbers below). The setup is a <strong>development setup</strong> made on one machine.
-<code>certify_zk</code> stays switched off on mainnet until the public ceremony described at the end has run.</p>
+(<a href="/docs/trust">Trust points</a>, item 1). Phase 2 replaces that request with a Groth16 proof. The holder's browser makes the proof,
+and the <code>pof</code> program checks it itself. The program learns that the subject holds at least the tier in one asset, and
+nothing else: no amount, no <code>nk</code>, no leaf, no nullifier, and not which ring the money sits in.</p>
+<p><strong>Status: in development, not deployed.</strong> The circuit, a development setup, the browser prover and the on-chain instruction
+<code>certify_zk</code> are built and tested; the numbers are below and in the <a href="https://github.com/liakh10/pof/blob/main/reports/zk.md" rel="noopener" target="_blank">zk test report</a>.
+The setup is a <strong>development setup</strong> made on one machine. <code>certify_zk</code> stays switched off until the public ceremony
+described at the end has run.</p>
 <h2 id="the-statement">The statement<a class="anchor" href="#the-statement" aria-label="Link to this section">#</a></h2>
-<p>For public values <code>(state_root, null_root, asset, min_amount, ctx, K, R, tag_1..4, ct_1..4)</code> the prover knows a ring
-(<code>ownerId</code>, <code>nk</code>), an ephemeral scalar <code>r</code>, and 1 to 4 notes <code>(amount, blinding, dataHash, ringTerm, leafIndex, paths)</code> such
-that, for every used note slot:</p>
-<ol><li><code>commitment = Poseidon(3, 0, asset, amount, dataHash, ringTerm, Poseidon(Poseidon(ownerId, Poseidon(nk)), blinding))</code>,
-the Rings note commitment (<a href="https://github.com/liakh10/pof/blob/main/RINGS.md" rel="noopener" target="_blank">RINGS.md</a> §2);</li><li>the commitment is the leaf at <code>leafIndex</code> of the Rings state tree (height 32) under <code>state_root</code>;</li><li><code>nullifier = Poseidon(commitment, blinding, nk)</code> (RINGS §3);</li><li>the nullifier is <strong>absent</strong> from the Rings indexed nullifier tree (height 40) under <code>null_root</code>: a leaf
-<code>Poseidon(low, next)</code> of that tree has <code>low &lt; nullifier &lt; next</code> as integers;</li><li><code>tag = Poseidon(&quot;pof:zk:tag:v1&quot;, nullifier)</code>;</li><li><code>ct = nullifier + Poseidon(&quot;pof:zk:esc:v1&quot;, S.x, S.y, slot)</code> where <code>R = r·B8</code> and <code>S = r·K</code> on Baby Jubjub;</li></ol>
-<p>and, over all notes: <code>amount &lt; 2^64</code> each, <code>Σ amount ≥ min_amount</code>, used slots come first, unused slots have <code>tag = ct = 0</code>.</p>
-<p>Every hash is Poseidon over BN254 with the circom parameters. That is the Rings hasher itself (the SDK uses
-light-poseidon): the tests check circomlib against the Helius SDK value for value, and recompute real mainnet deposit
+<p>The public values are <code>(state_root, null_root, asset, min_amount, ctx, K, R, tag_1..4, ct_1..4, registry_root)</code>. The prover
+knows a ring (<code>ownerId</code>, <code>nk</code>), the ring owner's registered secret <code>s</code>, an ephemeral scalar <code>r</code>, and 1 to 4 notes. For every
+used note slot:</p>
+<ol><li><code>commitment = Poseidon(3, 0, asset, amount, dataHash, ringTerm, Poseidon(Poseidon(ownerId, Poseidon(nk)), blinding))</code>.
+This is the Rings note commitment (<a href="https://github.com/liakh10/pof/blob/main/RINGS.md" rel="noopener" target="_blank">RINGS.md</a> §2).</li><li>The commitment is the leaf at <code>leafIndex</code> of the Rings state tree (height 32) under <code>state_root</code>.</li><li><code>nullifier = Poseidon(commitment, blinding, nk)</code> (RINGS §3).</li><li>The nullifier is <strong>absent</strong> from the Rings indexed nullifier tree (height 40) under <code>null_root</code>. A leaf <code>Poseidon(low, next)</code>
+of that tree has <code>low &lt; nullifier &lt; next</code> as integers. <code>next = 0</code> marks the last element, which has no upper bound.</li><li><code>tag = Poseidon(&quot;pof:zk:tag:v1&quot;, nullifier)</code>.</li><li><code>ct = nullifier + Poseidon(&quot;pof:zk:esc:v1&quot;, S.x, S.y, slot)</code>, where <code>R = r·B8</code> and <code>S = r·K</code> on Baby Jubjub.</li></ol>
+<p>Over the whole proof:</p>
+<ul><li>each <code>amount &lt; 2^64</code>, and <code>Σ amount ≥ min_amount</code>;</li><li>the used slots come first, and unused slots have <code>tag = ct = 0</code>;</li><li><code>Poseidon(ownerId, Poseidon(&quot;pof:zk:own:v1&quot;, s))</code> is a leaf of the POF owner registry under <code>registry_root</code>.</li></ul>
+<p>The last line is what makes the proof need the owner and not only <code>nk</code> (see &quot;Spend authority&quot; below).</p>
+<p>Every hash is Poseidon over BN254 with the circom parameters, which is the Rings hasher itself: the SDK uses
+light-poseidon. The tests check circomlib against the Helius SDK value for value. They also recompute real mainnet deposit
 leaves with the circuit's commitment formula (<code>zk/test/parity.test.mjs</code>).</p>
 <h2 id="public-inputs-and-who-sets-them">Public inputs, and who sets them<a class="anchor" href="#public-inputs-and-who-sets-them" aria-label="Link to this section">#</a></h2>
-<div class="table"><table><thead><tr><th>#</th><th>input</th><th>set by</th></tr></thead><tbody><tr><td>0</td><td><code>state_root</code></td><td>the transaction; the program requires it to be in the Rings tree account's 500-root state history</td></tr><tr><td>1</td><td><code>null_root</code></td><td>the transaction; the program requires it to be in the tree's 100-root nullifier history</td></tr><tr><td>2</td><td><code>asset</code></td><td>the program: <code>Poseidon(mint[0..31], mint[31])</code> of the asset's mint in <code>Config</code> (Rings <code>hashBytes</code>)</td></tr><tr><td>3</td><td><code>min_amount</code></td><td>the program: the tier's minimum from <code>Config</code></td></tr><tr><td>4</td><td><code>ctx</code></td><td>the program: <code>sha256(&quot;pof:zk:ctx:v1&quot; ‖ program ‖ kind ‖ subject_hash ‖ asset ‖ tier ‖ controller ‖ payer ‖ nonce)</code>, top 3 bits cleared</td></tr><tr><td>5, 6</td><td><code>K</code></td><td>the program: the revocation key in <code>ZkConfig</code></td></tr><tr><td>7, 8</td><td><code>R</code></td><td>the transaction (stored in each note lock)</td></tr><tr><td>9 to 12</td><td><code>tag_i</code></td><td>the transaction (stored on the certificate)</td></tr><tr><td>13 to 16</td><td><code>ct_i</code></td><td>the transaction (stored in each note lock)</td></tr></tbody></table></div>
-<p>Because the program computes <code>asset</code>, <code>min_amount</code>, <code>ctx</code> and <code>K</code> itself, a proof cannot be moved to another subject,
-controller, payer, tier, asset or nonce: any change gives other public inputs and the pairing check fails. Inputs must be
-canonical field elements (below r); a non-canonical encoding of the same value is refused, so the byte strings the program
-stores are unique.</p>
-<h2 id="why-the-escrow">Why the escrow<a class="anchor" href="#why-the-escrow" aria-label="Link to this section">#</a></h2>
-<p>A nullifier spent recently sits in the Rings nullifier queue (a PDA) before a forester folds it into the nullifier tree, in
-batches of 4,999. The proof can show absence from the tree, not from the queue, without revealing the nullifier. So the
-proof also encrypts each nullifier to the revocation key <code>K</code>, and the circuit forces the encryption to be correct. The
-keeper holds <code>k</code> (with <code>K = k·B8</code>); it reads <code>R</code> and <code>ct</code> from the note lock, recovers each nullifier, checks it against the
-tag, and calls <code>revoke_spent</code> the moment the nullifier PDA appears, including right after certify for a note that was already
-in the queue. The keeper learns nullifiers, which only matter at the moment of a spend, and never an amount or <code>nk</code>.</p>
-<h2 id="one-note-one-live-certificate">One note, one live certificate<a class="anchor" href="#one-note-one-live-certificate" aria-label="Link to this section">#</a></h2>
-<p>Tags are deterministic per note. <code>certify_zk</code> creates a <code>NoteLock</code> PDA <code>[&quot;znote&quot;, tag]</code> per note, so the same note cannot back
-two live certificates. <code>release_note_lock</code> (anyone) closes a lock once its certificate is revoked, expired, closed or no
-longer carries the tag, and returns the rent to whoever paid it.</p>
-<h2 id="revocation">Revocation<a class="anchor" href="#revocation" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>#</th><th>input</th><th>set by</th></tr></thead><tbody><tr><td>0</td><td><code>state_root</code></td><td>the transaction; it must be in the Rings tree account's 500-root state history</td></tr><tr><td>1</td><td><code>null_root</code></td><td>the transaction; it must be the tree's <strong>newest</strong> nullifier root (the one before the cursor at offset 17,224)</td></tr><tr><td>2</td><td><code>asset</code></td><td>the program: <code>Poseidon(mint[0..31], mint[31])</code> of the asset's mint in <code>Config</code> (Rings <code>hashBytes</code>)</td></tr><tr><td>3</td><td><code>min_amount</code></td><td>the program: the tier's minimum from <code>Config</code></td></tr><tr><td>4</td><td><code>ctx</code></td><td>the program: <code>sha256(&quot;pof:zk:ctx:v1&quot; ‖ program ‖ kind ‖ subject_hash ‖ asset ‖ tier ‖ controller ‖ payer ‖ nonce)</code>, top 3 bits cleared</td></tr><tr><td>5, 6</td><td><code>K</code></td><td>the program: the revocation key in force in <code>ZkConfig</code></td></tr><tr><td>7, 8</td><td><code>R</code></td><td>the transaction (stored in each note lock)</td></tr><tr><td>9 to 12</td><td><code>tag_i</code></td><td>the transaction (stored on the certificate)</td></tr><tr><td>13 to 16</td><td><code>ct_i</code></td><td>the transaction (stored in each note lock)</td></tr><tr><td>17</td><td><code>registry_root</code></td><td>the transaction; it must be one of the owner registry's last 12 roots</td></tr></tbody></table></div>
+<p>The program computes <code>asset</code>, <code>min_amount</code>, <code>ctx</code> and <code>K</code> itself. So a proof cannot be moved to another subject, controller,
+payer, tier, asset or nonce: any change gives other public inputs, and the pairing check fails. Every input must be a
+canonical field element (below r). A non-canonical encoding of the same value is refused, so each stored byte string is unique.</p>
+<p><strong>Why only the newest nullifier root.</strong> The nullifier tree only grows. At an older root, a note spent since then is still
+absent, and the proof would show it as unspent. If a forester batch lands between proving and submitting, the transaction
+fails and the client proves again. Batches are rare (4,999 nullifiers each).</p>
+<h2 id="spend-authority">Spend authority<a class="anchor" href="#spend-authority" aria-label="Link to this section">#</a></h2>
+<p><code>nk</code> and the openings of deposit notes are not secret from everyone: a phase 1 Verifier has seen the <code>nk</code> of every vault it
+checked, and deposit openings are public chain data once <code>nk</code> is known. A proof from those alone would let someone who once
+saw <code>nk</code> certify with money that is not theirs.</p>
+<p>So the circuit also proves knowledge of a secret <code>s</code> that the ring owner registered. The owner signs <code>register_zk_owner</code>
+once with its own key. The program appends <code>Poseidon(ownerId(signer), Poseidon(&quot;pof:zk:own:v1&quot;, s))</code> to the owner registry,
+an append-only Poseidon Merkle tree of height 20 kept on chain. The client derives <code>s</code> from the vault seed
+(<code>sha256(&quot;pof:zk:own:v1&quot; ‖ seed)</code>), keeps it on the device and never sends it to a Verifier.</p>
+<p>What registration shows: that this vault key uses POF phase 2. A certificate does not show which registered owner made it.
+The registry is the anonymity set.</p>
+<p>What it does not stop: an owner who <em>wants</em> to lend its money can hand over <code>s</code> and <code>nk</code> together. Phase 1 has the same
+limit, because the owner can sign for a renter. Revocation still catches the money moving.</p>
+<h2 id="the-settle-window">The settle window<a class="anchor" href="#the-settle-window" aria-label="Link to this section">#</a></h2>
+<p>A nullifier spent recently waits in the Rings nullifier queue (its PDA exists) before a forester folds it into the tree. The
+proof can show absence from the tree, not from the queue, without revealing the nullifier. So a zk certificate <strong>settles</strong>
+for <code>ZK_SETTLE_SLOTS</code> (150 slots, about a minute) after <code>certify_zk</code>:</p>
+<ul><li>it records <code>issued_slot = certified_slot + 150</code>;</li><li><code>gate</code> refuses it before that slot with <code>ZkSettling</code>. <code>gate</code> is behind <code>require_certificate</code> and <code>pof_gate</code>.</li></ul>
+<p>So a program cannot act on it in the same transaction, nor in that minute. During the window, anyone who can show a spend
+revokes it with <code>revoke_spent</code>.</p>
+<h2 id="revocation-and-why-tags-are-not-salted">Revocation, and why tags are not salted<a class="anchor" href="#revocation-and-why-tags-are-not-salted" aria-label="Link to this section">#</a></h2>
 <p>A zk certificate records the <code>ZkConfig</code> address as its <code>verifier</code>. <code>revoke_spent</code> then checks
-<code>Poseidon(&quot;pof:zk:tag:v1&quot;, nullifier) == tag</code> (no salt) and the same chain proofs as phase 1: the nullifier PDA exists, or a
-membership path in the nullifier tree. The nullifier becomes public at that point, as in phase 1.</p>
+<code>Poseidon(&quot;pof:zk:tag:v1&quot;, nullifier) == tag</code> (there is no salt), plus the same chain proofs as phase 1: the nullifier PDA
+exists, or a membership path in the nullifier tree.</p>
+<p>Tags are deterministic per note, which is a trade-off:</p>
+<ul><li><strong>For:</strong> revocation needs no keeper. A Rings spend puts the nullifier on chain. Anyone who watches spends computes its tag,
+finds a certificate that carries it, and revokes. The same tag also gives the one-note-one-certificate lock below.</li><li><strong>Against:</strong> two zk certificates made from the same note carry the same tag, and a later spend of the note is linkable to
+every certificate that carried it, even after the holder revoked. The UI says so. The unlinkable variant (a salted tag
+with an escrowed salt, plus a second note lock value) is the upgrade path. With it, revocation would depend on holders of
+the escrow key.</li></ul>
+<p>The escrow (<code>R</code>, <code>ct</code>) gives the keeper the nullifiers in advance, so it can revoke the moment a nullifier PDA appears. It does
+not need to wait to see the spend.</p>
+<h2 id="one-note-one-live-certificate">One note, one live certificate<a class="anchor" href="#one-note-one-live-certificate" aria-label="Link to this section">#</a></h2>
+<p><code>certify_zk</code> creates a <code>NoteLock</code> PDA <code>[&quot;znote&quot;, tag]</code> per note, so the same note cannot back two live zk certificates. A lock
+address that a stranger pre-funded still works: the program tops it up, then allocates and assigns it.</p>
+<p><code>release_note_lock</code> (anyone) closes a lock once its certificate is revoked, expired, closed, or no longer carries the tag. The
+rent goes back to whoever paid it.</p>
+<p>Across the two paths, the Verifier must refuse a note whose <code>znote</code> lock is live; it knows the nullifier and computes the tag.
+A signed certificate does not yet create <code>znote</code> locks (see Known limits).</p>
+<h2 id="the-switch-and-the-key">The switch and the key<a class="anchor" href="#the-switch-and-the-key" aria-label="Link to this section">#</a></h2>
+<p><code>set_zk</code> (admin) can turn <code>certify_zk</code> off at once. Turning it on, or changing the revocation key <code>K</code>, waits the same delay as
+a Verifier key rotation (<code>Config.params.rotation_delay</code>).</p>
+<p><code>K</code> must be a Baby Jubjub point; its subgroup membership is the key maker's check. Every note lock records the key epoch it
+was encrypted under.</p>
+<p><code>ZkConfig.vk_hash</code> records the sha256 of the verifying key compiled into the build. A build with a stub verifying key does
+not compile, and proofs with points at infinity are refused.</p>
 <h2 id="numbers-development-build">Numbers (development build)<a class="anchor" href="#numbers-development-build" aria-label="Link to this section">#</a></h2>
-<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>constraints</td><td>88,474 (circom 2.2.2 <code>--O2</code>), 17 public inputs, Powers of Tau 2^17</td></tr><tr><td>per note</td><td>~21.5k: state path 32 × Poseidon(2), nullifier path 40 × Poseidon(2), the commitment, three 254-bit range checks</td></tr><tr><td>escrow</td><td>~3.5k (one fixed-base and one variable-base Baby Jubjub multiplication)</td></tr><tr><td>circuit wasm</td><td>see <a href="https://github.com/liakh10/pof/blob/main/reports/zk.md" rel="noopener" target="_blank">the zk report</a></td></tr><tr><td>proving key</td><td>see the report</td></tr><tr><td>proving time</td><td>see the report (browser and Node)</td></tr><tr><td><code>certify_zk</code></td><td>see the report (compute units, transaction size)</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>constraints</td><td>93,803 (circom 2.2.2 <code>--O2</code>), 18 public inputs, Powers of Tau 2^17</td></tr><tr><td>per note</td><td>~21.5k: state path 32 × Poseidon(2), nullifier path 40 × Poseidon(2), the commitment, three 254-bit comparisons</td></tr><tr><td>shared</td><td>~5k registry path (20 × Poseidon(2)), ~3.5k escrow (one fixed-base, one variable-base Baby Jubjub multiplication)</td></tr><tr><td>circuit (witness wasm)</td><td>4.6 MB</td></tr><tr><td>proving key</td><td>57.7 MB (38.5 MB gzipped, as served)</td></tr><tr><td>proving</td><td>see the report: Node about 5 to 7 s for 4 notes on an M-series laptop; the browser figures are in the report</td></tr><tr><td><code>certify_zk</code></td><td>about 240k to 250k compute units with 1 note, 300k with 4; transactions of 843 bytes (1 note, 1 signer) to 1,230 bytes (4 notes, 2 signers, with a lookup table)</td></tr></tbody></table></div>
 <h2 id="the-development-setup">The development setup<a class="anchor" href="#the-development-setup" aria-label="Link to this section">#</a></h2>
-<p><code>zk/scripts/ceremony.sh</code> runs a local Powers of Tau (BN254, 2^17) with two random contributions and a public beacon, then a
-Groth16 phase 2 with two random contributions and a beacon. The beacon is the sha256 of a finalized Solana mainnet blockhash,
-named in the transcript. Every step is verified with snarkjs; <code>zk/setup/TRANSCRIPT.md</code> lists every contribution hash, and
-the hashes of the r1cs, the phase 1 output, the proving key and the verifying key. The program embeds the verifying key
-(<code>zk/onchain/src/vk.rs</code>, generated) and records its sha256 in <code>ZkConfig.vk_hash</code>.</p>
-<p><strong>Why it is not enough for mainnet.</strong> One machine made every contribution. Whoever ran it could have kept the secrets and
-could forge proofs for this key. That is acceptable for local tests and devnet, and not for real certificates.</p>
+<p><code>zk/scripts/ceremony.sh</code> runs the setup in two phases:</p>
+<ol><li>A local Powers of Tau (BN254, 2^17) with two random contributions and a public beacon.</li><li>A Groth16 phase 2 with two random contributions and a beacon.</li></ol>
+<p>Each beacon is the sha256 of a finalized Solana mainnet blockhash, named in the transcript. Every step is verified with
+snarkjs. <code>zk/setup/TRANSCRIPT.md</code> lists every contribution hash, plus the hashes of the r1cs, the phase 1 output, the proving
+key and the verifying key. The program embeds the verifying key (<code>zk/onchain/src/vk.rs</code>, generated) and records its sha256.</p>
+<p><strong>Why it is not enough for mainnet.</strong> One machine made every contribution. Whoever ran it could have kept the secrets, and
+could forge proofs for this key. That is fine for local tests and devnet, and not for real certificates.</p>
 <h2 id="the-public-ceremony-before-mainnet">The public ceremony (before mainnet)<a class="anchor" href="#the-public-ceremony-before-mainnet" aria-label="Link to this section">#</a></h2>
-<ol><li>Phase 1 from the Perpetual Powers of Tau (a public ceremony with many independent contributors), at 2^17 or above.</li><li>Phase 2 opened to outside contributors: each downloads the latest <code>zkey</code>, contributes with their own entropy, and publishes
-their contribution hash; the coordinator only sequences. At least one honest contributor makes the key sound.</li><li>A final beacon from a future Solana blockhash fixed in advance.</li><li>The final key's hash is published, <code>vk.rs</code> is regenerated from it, the program is rebuilt and its build hash published,
-and only then does the admin call <code>set_zk(true, K)</code>.</li></ol>
+<ol><li>Phase 1 from the Perpetual Powers of Tau (a public ceremony with many independent contributors), at 2^17 or above.</li><li>Phase 2 opened to outside contributors. Each downloads the latest <code>zkey</code>, contributes with their own entropy, and
+publishes their contribution hash; the coordinator only sequences. One honest contributor is enough to make the key sound.</li><li>A final beacon from a future Solana blockhash, fixed in advance.</li><li>The final key's hash is published and <code>vk.rs</code> is regenerated from it. Then the program is rebuilt and its build hash
+published. Only after that does the admin call <code>set_zk(true, K)</code>, which itself waits the rotation delay.</li></ol>
 <h2 id="known-limits">Known limits<a class="anchor" href="#known-limits" aria-label="Link to this section">#</a></h2>
 <ul><li><strong>Subjects.</strong> <code>certify_zk</code> takes wallet and badge subjects (their key signs the transaction). X handles still need the
-linker's proof, which this version does not carry into the circuit.</li><li><strong>Up to 4 notes.</strong> A holder with more small notes merges them in Rings first, or certifies a lower tier.</li><li><strong>The keeper sees nullifiers.</strong> It cannot see amounts or <code>nk</code>, but it can link a certificate to a later spend, as the
-holder of the salts can in phase 1. A threshold of keepers is the upgrade path.</li><li><strong>Root age.</strong> The program accepts any state root in the 500-root history (about eight hours at today's traffic), and the
-certificate records the tree's last update slot, not the root's own slot.</li><li><strong>Minimum note age.</strong> Phase 1 checks each note's creating transaction is older than 150 slots. The proof does not; the
-client should prove against an older root, which gives the same guarantee.</li><li><strong>The proving key is large</strong> (tens of MB) and is downloaded once per device; the circuit runs in a Web Worker.</li><li><strong>Groth16 needs a trusted setup per circuit.</strong> Any change to the circuit needs a new phase 2.</li></ul>
+linker's proof, which this version does not carry into the circuit.</li><li><strong>Up to 4 notes.</strong> A holder with more small notes merges them in Rings first, or certifies a lower tier.</li><li><strong>Linkable tags</strong> (above): a deliberate trade-off for keeper-free revocation.</li><li><strong>Signed and zk certificates on one note.</strong> The zk path locks notes on chain, the Verifier in its own index. Until signed
+certificates also create <code>znote</code> locks (a CONTRACT §3 v2 change: the attestation would carry the tags), the Verifier must
+check the <code>znote</code> lock of every note it attests.</li><li><strong>Consensual lending.</strong> The owner can hand over <code>s</code> and <code>nk</code> (see &quot;Spend authority&quot;).</li><li><strong>Root age.</strong> Any state root in the 500-root history is accepted (about eight hours at today's traffic). The certificate
+records the tree's last update slot, not the root's own slot.</li><li><strong>Minimum note age.</strong> Phase 1 checks that each note's creating transaction is older than 150 slots. The proof does not; the
+client proves against an older state root for the same effect.</li><li><strong>The proving key is large</strong> (38.5 MB to download once per device). The proof takes seconds on a laptop and longer on a phone.</li><li><strong>Groth16 needs a trusted setup per circuit.</strong> Any change to the circuit needs a new phase 2.</li></ul>
     <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/phase-2"><span>Previous</span>Phase 2</a><a class="next" href="/docs/status"><span>Next</span>Status</a></nav>
   </article>
-  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-statement">The statement</a></li><li class="d2"><a href="#public-inputs-and-who-sets-them">Public inputs, and who sets them</a></li><li class="d2"><a href="#why-the-escrow">Why the escrow</a></li><li class="d2"><a href="#one-note-one-live-certificate">One note, one live certificate</a></li><li class="d2"><a href="#revocation">Revocation</a></li><li class="d2"><a href="#numbers-development-build">Numbers (development build)</a></li><li class="d2"><a href="#the-development-setup">The development setup</a></li><li class="d2"><a href="#the-public-ceremony-before-mainnet">The public ceremony (before mainnet)</a></li><li class="d2"><a href="#known-limits">Known limits</a></li></ol></aside>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-statement">The statement</a></li><li class="d2"><a href="#public-inputs-and-who-sets-them">Public inputs, and who sets them</a></li><li class="d2"><a href="#spend-authority">Spend authority</a></li><li class="d2"><a href="#the-settle-window">The settle window</a></li><li class="d2"><a href="#revocation-and-why-tags-are-not-salted">Revocation, and why tags are not salted</a></li><li class="d2"><a href="#one-note-one-live-certificate">One note, one live certificate</a></li><li class="d2"><a href="#the-switch-and-the-key">The switch and the key</a></li><li class="d2"><a href="#numbers-development-build">Numbers (development build)</a></li><li class="d2"><a href="#the-development-setup">The development setup</a></li><li class="d2"><a href="#the-public-ceremony-before-mainnet">The public ceremony (before mainnet)</a></li><li class="d2"><a href="#known-limits">Known limits</a></li></ol></aside>
 </div>
 </main>
 <footer class="foot">
@@ -115,7 +151,7 @@ client should prove against an older root, which gives the same guarantee.</li><
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">515f4232e10ccbe4aca21bb90884d828972443fc6584f434ab0d167a000d6935</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">183a34daf1fa54d20002e7cc143a4023b100f324225d6dc4fcc8f1f3d6ed3dde</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

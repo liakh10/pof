@@ -144,25 +144,30 @@ input::placeholder { color: var(--ink-3); }
 .empty .h3 { margin-bottom: var(--s2); }
 .spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid var(--ink); border-right-color: transparent; border-radius: 50%; animation: spin .9s linear infinite; vertical-align: -3px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.skeleton { background: repeating-linear-gradient(90deg, var(--paper-2) 0 8px, transparent 8px 12px); color: transparent !important; }
+/* loading: thin rings drawing in, never stripes */
+.cert.loading { border-color: var(--rule-quiet); display: grid; place-items: center; }
+.ld { width: 72px; height: 72px; }
+.ld circle { fill: none; stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 100; stroke-dashoffset: 100; animation: ld-draw 1.8s var(--ease) infinite alternate; animation-delay: var(--d, 0ms); }
+.ld circle:nth-child(2) { animation-delay: calc(var(--d, 0ms) + 120ms); }
+.ld circle:nth-child(3) { stroke: var(--signal); animation-delay: calc(var(--d, 0ms) + 240ms); }
+@keyframes ld-draw { to { stroke-dashoffset: 0; } }
 
-/* ------------------------------------------------------------------ the seal */
+/* ------------------------------------------------------------------ the seal (geometry in ui/seal.js: module 18, three weights) */
 .seal { width: 100%; height: auto; overflow: visible; }
-.seal .rg { stroke-dasharray: 1000; stroke-dashoffset: 0; }
-.seal.draw .rg { animation: ring-draw var(--t-draw) var(--ease) both; animation-delay: calc(var(--i) * 55ms); }
-.seal.draw .rg.broken { animation: none; }
+.seal .rg:not(.broken) { stroke-dasharray: 1000; stroke-dashoffset: 0; }
+.seal.draw .rg:not(.broken) { animation: ring-draw var(--t-draw) var(--ease) both; animation-delay: calc(var(--i) * 45ms); }
 @keyframes ring-draw { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
 .seal.draw .check { stroke-dasharray: 1000; animation: ring-draw 900ms var(--ease) 700ms both; }
 .seal.draw .disc { transform-box: fill-box; transform-origin: center; animation: disc-in 700ms var(--ease) 250ms both; }
 @keyframes disc-in { from { transform: scale(.2); } to { transform: scale(1); } }
 .seal .spin { transform-box: view-box; transform-origin: 0 0; animation: rotate var(--spin) linear infinite; }
 @keyframes rotate { to { transform: rotate(360deg); } }
-.seal .sig { transition: stroke var(--t-mid); }
-.seal.pulse .sig { animation: sig-pulse 1.2s var(--ease); }
-@keyframes sig-pulse { 0% { stroke-width: 30; } 100% { } }
-.seal .shard { transform-box: view-box; transform-origin: 0 0; }
-.seal.breaking .shard { animation: shard 900ms var(--ease) both; }
-@keyframes shard { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+.seal .sig { transition: stroke var(--t-slow) var(--ease); }
+.seal.pulse .brk { animation: sig-pulse 1.2s var(--ease); }
+@keyframes sig-pulse { 0% { stroke-width: 22; } 100% { stroke-width: 14; } }
+/* the break opens: one clean 30° gap at the upper right */
+.seal.breaking .brk.broken { animation: break-open 1100ms var(--ease) both; }
+@keyframes break-open { from { stroke-dasharray: 1130.97 0; stroke-dashoffset: -989.60; } to { stroke-dasharray: 1036.73 94.25; stroke-dashoffset: -1036.73; } }
 .mark { flex: none; }
 
 /* ------------------------------------------------------------------ home: the poster */
@@ -239,15 +244,15 @@ input::placeholder { color: var(--ink-3); }
 .cert {
   position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: var(--s3); min-height: 248px; padding: var(--s4);
   background: var(--card); border: var(--rule-2) solid var(--ink); text-decoration: none; color: var(--ink);
-  transition: transform var(--t-mid) var(--ease), background var(--t-mid);
+  transition: border-color var(--t-fast), background var(--t-mid);
 }
-a.cert:hover { color: var(--ink); transform: rotate(-1.2deg) translateY(-3px); }
+a.cert:hover { color: var(--ink); border-color: var(--signal); }
 .cert-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s3); }
 .cert-kind { font: 650 var(--fs-label)/1.2 var(--face-text); letter-spacing: var(--label-tracking); text-transform: uppercase; font-stretch: 112%; }
 .cert-subject { font: 500 15px/1.25 var(--face-mono); overflow-wrap: anywhere; margin-top: var(--s1); }
 .cert .mark { width: 44px; height: 44px; }
 .cert-tier { align-self: end; }
-.cert-tier .ge { font: var(--display-weight) 30px/1 var(--face-display); font-stretch: 80%; vertical-align: top; margin-right: 2px; }
+.cert-tier .least { display: block; font: 650 var(--fs-label)/1.2 var(--face-text); letter-spacing: var(--label-tracking); text-transform: uppercase; font-stretch: 112%; color: var(--ink-2); margin-bottom: var(--s1); }
 .cert-tier .amt { font: var(--display-weight) clamp(44px, 4.4vw, 60px)/0.9 var(--face-display); font-stretch: 76%; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
 .cert-tier .sym { font: 720 20px/1 var(--face-display); font-stretch: 90%; margin-left: var(--s1); }
 .cert-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); border-top: var(--rule) solid var(--ink); padding-top: var(--s2); font: 500 12.5px/1.3 var(--face-mono); color: var(--ink-2); }
@@ -256,22 +261,22 @@ a.cert:hover { color: var(--ink); transform: rotate(-1.2deg) translateY(-3px); }
 .status.revoked_spent, .status.revoked_by_holder, .status.revoked { background: var(--ink); color: var(--on-ink); }
 .status.expired { background: transparent; color: var(--ink-2); border-color: var(--ink-3); }
 .cert.is-revoked { background: var(--paper); }
-.cert.is-revoked .cert-tier .amt { text-decoration: line-through; text-decoration-thickness: 5px; text-decoration-color: var(--ink); }
+.cert.is-revoked .cert-tier .amt, .cert.is-revoked .cert-tier .sym { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: var(--ink); }
 .cert.is-expired { opacity: .62; }
 .cert.flip { animation: cert-flip 1100ms var(--ease); }
-@keyframes cert-flip { 0% { transform: none; } 30% { transform: rotate(2.5deg) scale(1.02); background: var(--signal); } 100% { transform: none; } }
+@keyframes cert-flip { 0% { background: var(--card); } 25% { background: var(--signal); } 100% { background: var(--paper); } }
 .cert.new { animation: cert-new 900ms var(--ease) both; }
-@keyframes cert-new { from { opacity: 0; transform: translateY(16px) rotate(-3deg); } to { opacity: 1; transform: none; } }
-.cert-stamp { position: absolute; right: var(--s3); top: 46%; transform: rotate(-9deg); font: var(--display-weight) 28px/1 var(--face-display); font-stretch: 78%; letter-spacing: -0.01em; padding: 4px 10px; border: 4px solid var(--ink); background: var(--paper); }
+@keyframes cert-new { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
 
 /* the big certificate on /c */
 .cert-xl { grid-template-columns: minmax(0, 1fr) minmax(160px, 240px); grid-template-rows: auto 1fr auto; min-height: 0; padding: var(--s6); gap: var(--s4) var(--s5); }
 .cert-xl .cert-top, .cert-xl .cert-tier { grid-column: 1; }
 .cert-xl .cert-foot { grid-column: 1 / -1; }
 .cert-xl .cert-seal { grid-column: 2; grid-row: 1 / 3; align-self: center; }
-.cert-xl .cert-stamp { top: auto; bottom: 64px; right: var(--s5); }
+
 .cert-xl .cert-tier .amt { font-size: clamp(64px, 9vw, 132px); }
-.cert-xl .cert-tier .ge { font-size: clamp(36px, 4vw, 56px); }
+
 @media (max-width: 720px) { .cert-xl { grid-template-columns: minmax(0, 1fr) 96px; padding: var(--s4); } .cert-xl .cert-seal { grid-row: 1; } .cert-xl .cert-tier { grid-column: 1 / -1; } }
 
 /* key/value facts */
@@ -422,12 +427,15 @@ tr.hit td { background: var(--paper-2); }
 .log-head .mono { font-size: 12.5px; overflow-wrap: anywhere; display: block; margin-top: var(--s2); }
 @media (max-width: 860px) { .log-head { grid-template-columns: 1fr 1fr; } .log-head > div:nth-child(2) { border-right: 0; } .log-head > div:nth-child(n+3) { border-top: var(--rule) solid var(--ink); } }
 .tree { width: 100%; height: auto; }
+.tree { margin: var(--s4) 0; }
 .tree .nd { fill: var(--card); stroke: var(--ink); stroke-width: 2; }
-.tree .nd.path { fill: var(--signal); }
+.tree .nd.path { fill: var(--signal); stroke: var(--ink); }
 .tree .nd.leaf { fill: var(--ink); }
-.tree .ed { stroke: var(--ink); stroke-width: 1.5; }
+.tree .ring { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.tree .ed { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 .tree .ed.path { stroke: var(--signal); stroke-width: 4; }
-.tree text { font: 600 11px var(--face-mono); fill: var(--ink-2); }
+.tree text { font: 500 12px var(--face-mono); fill: var(--ink-2); }
+.tree text.strong { fill: var(--ink); font-weight: 600; }
 
 /* status */
 .status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: var(--gutter); }
