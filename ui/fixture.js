@@ -76,8 +76,8 @@ export async function fixtureSource() {
   plan.sort((a, b) => a.at - b.at);
   for (const p of plan) {
     const r = rnd();
-    if (r < 0.16) await addCertificate({ ...p, status: 1, revokedAt: p.at + Math.floor(rnd() * 20_000) });
-    else if (r < 0.22) await addCertificate({ ...p, status: 2, revokedAt: p.at + Math.floor(rnd() * 20_000) });
+    if (r < 0.16) await addCertificate({ ...p, status: 1, revokedAt: Math.min(SLOT0 - 20, p.at + Math.floor(rnd() * 20_000)) });
+    else if (r < 0.22) await addCertificate({ ...p, status: 2, revokedAt: Math.min(SLOT0 - 20, p.at + Math.floor(rnd() * 20_000)) });
     else await addCertificate(p);
   }
 
