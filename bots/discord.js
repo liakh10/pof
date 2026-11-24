@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 import { K } from "./store.js";
 import { linkUrl, subjectLabel, unlink } from "./link.js";
-import { evaluate, loadRoom } from "./gate.js";
+import { evaluate, loadRoom, safeName } from "./gate.js";
 
 const EPHEMERAL = 64;
 const MANAGE_ROLES = 1n << 28n;
@@ -44,7 +44,8 @@ export function discordApi(env, f = fetch) {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok && res.status !== 404) console.warn(`discord ${method} ${path}: ${res.status}`);
-    return { ok: res.ok, status: res.status };
+    const json = res.status === 204 ? null : await res.json().catch(() => null);
+    return { ok: res.ok, status: res.status, json };
   };
 }
 
@@ -75,6 +76,23 @@ export async function syncMember(deps, guildId, userId) {
   return v;
 }
 
+/** null when the member may bind this role; otherwise the reason. */
+export async function roleProblem(dapi, guildId, member, roleId) {
+  if (!dapi) return "The bot is not configured with a token yet.";
+  if (roleId === guildId) return "Pick a real role, not @everyone.";
+  const [roles, guild] = await Promise.all([dapi("GET", `/guilds/${guildId}/roles`), dapi("GET", `/guilds/${guildId}`)]);
+  if (!roles.ok || !Array.isArray(roles.json)) return "I could not read this server's roles. Check that I am in the server.";
+  const target = roles.json.find((r) => r.id === roleId);
+  if (!target) return "That role does not exist here.";
+  if (target.managed) return "That role belongs to an integration; pick a normal role.";
+  const isOwner = guild.ok && guild.json?.owner_id && guild.json.owner_id === member?.user?.id;
+  if (isOwner) return null;
+  const mine = new Set(member?.roles ?? []);
+  const top = Math.max(0, ...roles.json.filter((r) => mine.has(r.id)).map((r) => r.position));
+  if (target.position >= top) return "That role sits at or above your own highest role. Pick a lower one, or ask someone above it.";
+  return null;
+}
+
 export async function handleDiscordInteraction(body, deps) {
   const { store, client, env } = deps;
   if (body.type === 1) return { type: 1 };
@@ -91,8 +109,11 @@ export async function handleDiscordInteraction(body, deps) {
     const room = await loadRoom(client, opt("room"));
     if (!room) return say("That is not a pof_gate Room address. Copy it from the Rooms page.");
     const role = String(opt("role"));
+    // POF-21: never let /pof-setup hand out a role the member could not grant themselves
+    const why = await roleProblem(deps.dapi, guildId, body.member, role);
+    if (why) return say(why);
     await store.put(K.dcGuild(guildId), { room: room.address, role, by: user.id });
-    return say(`Bound to Room ${room.name || room.address} (${room.minTierLabel}). Members run /pof-verify to get <@&${role}>. My own role must sit above it.`);
+    return say(`Bound to Room ${safeName(room)} (${room.minTierLabel}). Members run /pof-verify to get <@&${role}>. My own role must sit above it.`);
   }
   if (name === "pof-verify") {
     const link = await store.get(K.link("dc", user.id));

@@ -60,7 +60,7 @@ export async function linkSubmit({ method, rawBody }, deps) {
   const subject = { kind: Number(b.subject.kind), value: b.subject.value.trim() };
   let why;
   try {
-    why = await verifySubjectProof(tok, subject, String(b.proof ?? ""), { checkXLink: deps.checkXLink });
+    why = await verifySubjectProof(tok, subject, String(b.proof ?? ""), { client: deps.client });
   } catch (e) {
     why = e.message;
   }

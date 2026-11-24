@@ -35,7 +35,9 @@ beforeEach(async () => {
   };
   const dapi = async (method, path) => {
     dcCalls.push({ method, path });
-    return { ok: true, status: 204 };
+    if (method === "GET" && path.endsWith("/roles")) return { ok: true, status: 200, json: [{ id: "444", position: 1, managed: false }] };
+    if (method === "GET") return { ok: true, status: 200, json: { owner_id: "333" } };
+    return { ok: true, status: 204, json: null };
   };
   const kp = crypto.generateKeyPairSync("ed25519");
   discordKey = kp;
@@ -78,7 +80,7 @@ test("telegram: only admins bind; a linked whale is approved, an unlinked user i
   assert.match(tgCalls.at(-1).body.text, /Only a group admin/);
   admins.add(7);
   await tg(groupMsg(`/pof_bind@PofBot ${w.room}`, 7));
-  assert.match(tgCalls.at(-1).body.text, /Bound to Room whales: ≥ 100 SOL/);
+  assert.match(tgCalls.at(-1).body.text, /Bound to Room "whales": ≥ 100 SOL/);
   assert.equal((await store.get(K.tgChat(-100))).room, w.room);
 
   // unlinked requester: kept pending, DM'd a personal link
@@ -158,15 +160,17 @@ test("link: bad signatures, wrong key, expired token, and one subject per accoun
   r = await link("tg", 10, eve);
   assert.equal(JSON.parse(r.body).movedFromAnotherAccount, true);
   assert.equal(await store.get(K.link("tg", 9)), null);
-  // X handles go through the verifier's link id
-  deps.checkXLink = async (id) => (id === "good-id-1" ? "Anon" : null);
+  // X handles: signed by the controller of the handle's certificate, read from chain (POF-03: no bearer link id)
+  const ctl = wallet();
+  await w.rpc.putCertificate({ subject: sdk.xSubject("handlecase"), asset: 0, tier: 3, expirySlot: 9000, controller: ctl.address });
   const tx = makeLinkToken(env, { p: "tg", u: 11 });
-  r = await linkSubmit({ method: "POST", rawBody: JSON.stringify({ ...tx, subject: { kind: 1, value: "@anon" }, proof: "bad-id-00" }) }, deps);
-  assert.equal(r.status, 400);
-  r = await linkSubmit({ method: "POST", rawBody: JSON.stringify({ ...tx, subject: { kind: 1, value: "@anon" }, proof: "good-id-1" }) }, deps);
-  assert.equal(JSON.parse(r.body).linked, "@anon");
-  r = await linkSubmit({ method: "POST", rawBody: JSON.stringify({ ...tx, subject: { kind: 1, value: "@someoneelse" }, proof: "good-id-1" }) }, deps);
-  assert.match(JSON.parse(r.body).error, /another handle/);
+  const xlink = (value, proof) => linkSubmit({ method: "POST", rawBody: JSON.stringify({ ...tx, subject: { kind: 1, value }, proof }) }, deps);
+  r = await xlink("@handlecase", wallet().sign(linkMessage(tx)));
+  assert.match(JSON.parse(r.body).error, /not by the key that controls/);
+  r = await xlink("@nocert", ctl.sign(linkMessage(tx)));
+  assert.match(JSON.parse(r.body).error, /no certificate yet/);
+  r = await xlink("@HandleCase", ctl.sign(linkMessage(tx)));
+  assert.equal(JSON.parse(r.body).linked, "@handlecase");
   // the page and the message endpoint
   assert.match(linkPage({ query: {} }, deps).body, /Link your certificate/);
   const m = JSON.parse(linkPage({ query: { ...tx, message: "1" } }, deps).body);
@@ -196,7 +200,7 @@ test("discord: setup needs Manage Roles; verify grants and removes the role", as
   r = JSON.parse((await signedDiscord(cmd("pof-setup", "333", [{ name: "room", value: "nope" }, { name: "role", value: "444" }], String(1n << 28n)))).body);
   assert.match(r.data.content, /not a pof_gate Room/);
   r = JSON.parse((await signedDiscord(cmd("pof-setup", "333", [{ name: "room", value: w.room }, { name: "role", value: "444" }], String(1n << 28n)))).body);
-  assert.match(r.data.content, /Bound to Room whales/);
+  assert.match(r.data.content, /Bound to Room "whales"/);
   assert.equal(r.data.flags, 64);
 
   // not linked yet: a personal link button
@@ -266,4 +270,66 @@ test("paused and unconfigured bots answer clearly", async () => {
   assert.equal(t.status, 503);
   const d = await discordWebhook({ method: "POST", headers: {}, rawBody: "{}" }, { ...deps, env: {} });
   assert.equal(d.status, 503);
+});
+
+test("POF-21: /pof-setup refuses a role at or above the member's own, @everyone and managed roles; the owner may bind any", async () => {
+  const roles = [
+    { id: "111", position: 0, managed: false }, // @everyone (id = guild id)
+    { id: "500", position: 5, managed: false }, // the member's top role
+    { id: "400", position: 4, managed: false },
+    { id: "600", position: 6, managed: false },
+    { id: "700", position: 3, managed: true },
+  ];
+  deps.dapi = async (method, path) => {
+    dcCalls.push({ method, path });
+    if (path === "/guilds/111/roles") return { ok: true, status: 200, json: roles };
+    if (path === "/guilds/111") return { ok: true, status: 200, json: { owner_id: "999" } };
+    return { ok: true, status: 204, json: null };
+  };
+  const setup = (role, user = "333", memberRoles = ["500"]) => {
+    const b = cmd("pof-setup", user, [{ name: "room", value: w.room }, { name: "role", value: role }], String(1n << 28n));
+    b.member.roles = memberRoles;
+    return signedDiscord(b).then((r) => JSON.parse(r.body).data.content);
+  };
+  assert.match(await setup("600"), /at or above your own highest role/);
+  assert.match(await setup("500"), /at or above your own highest role/);
+  assert.match(await setup("111"), /not @everyone/);
+  assert.match(await setup("700"), /integration/);
+  assert.match(await setup("888"), /does not exist/);
+  assert.match(await setup("400"), /Bound to Room "whales"/);
+  assert.match(await setup("600", "999", []), /Bound to Room/, "the server owner may bind any role");
+});
+
+test("POF-15: the sweep re-checks everyone in turns, past any fixed cap, and saves where it stopped", async () => {
+  // 30 granted members whose certificates are all revoked
+  await store.put(K.dcGuild("111"), { room: w.room, role: "444" });
+  for (let i = 0; i < 30; i++) {
+    const wal = wallet();
+    await w.rpc.putCertificate({ subject: sdk.walletSubject(wal.address), asset: 0, tier: 4, status: 1, revokedSlot: 4999, expirySlot: 9000 });
+    const { saveLink } = await import("../link.js");
+    const { rec } = await saveLink(store, { p: "dc", u: String(1000 + i) }, { kind: 0, value: wal.address });
+    await store.put(K.dcGrant("111", String(1000 + i)), { role: "444", room: w.room, subjectHash: rec.subjectHash, at: 1 });
+  }
+  const { sweep } = await import("../sweep.js");
+  let t = 0;
+  const now = () => (t += 10); // each check "takes" 10 ms
+  let total = 0;
+  let r = await sweep({ ...deps, api: null }, { budgetMs: 100, now });
+  total += r.discordRemoved;
+  assert.equal(r.complete.discord, false);
+  assert.ok(r.discordRemoved > 0 && r.discordRemoved < 30);
+  assert.ok((await store.get("sweep/cursor")).dc);
+  for (let i = 0; i < 10 && total < 30; i++) {
+    r = await sweep({ ...deps, api: null }, { budgetMs: 100, now });
+    total += r.discordRemoved;
+  }
+  assert.equal(total, 30);
+  assert.equal((await store.list("dc/grant/")).length, 0);
+});
+
+test("POF-24: creator-chosen room names reach chats without links or markup", async () => {
+  const { safeName } = await import("../gate.js");
+  assert.equal(safeName({ name: "[claim](https://evil.example) @everyone", address: "x" }), '"claim everyone"');
+  assert.equal(safeName({ name: "", address: "Addr" }), "Addr");
+  assert.equal(safeName({ name: "whales‮ evil.xyz/path", address: "x" }), '"whales"');
 });

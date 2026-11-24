@@ -41,6 +41,21 @@ export async function inclusionPath(index: number, leafHashes: Uint8Array[]): Pr
   return [...(await inclusionPath(index - k, leafHashes.slice(k))), await merkleRoot(leafHashes.slice(0, k))];
 }
 
+/** RFC 9162 §2.1.4.1 PROOF(m, D[n]) over already-hashed leaves: the consistency proof from size m to size n. */
+export async function consistencyProof(m: number, leafHashes: Uint8Array[]): Promise<Uint8Array[]> {
+  const n = leafHashes.length;
+  if (m < 0 || m > n) throw new Error("size out of range");
+  if (m === 0 || m === n) return [];
+  return subproof(m, leafHashes, true);
+}
+async function subproof(m: number, d: Uint8Array[], b: boolean): Promise<Uint8Array[]> {
+  const n = d.length;
+  if (m === n) return b ? [] : [await merkleRoot(d)];
+  const k = largestPow2Below(n);
+  if (m <= k) return [...(await subproof(m, d.slice(0, k), b)), await merkleRoot(d.slice(k))];
+  return [...(await subproof(m - k, d.slice(k), false)), await merkleRoot(d.slice(0, k))];
+}
+
 /** RFC 9162 §2.1.3.2: verify an audit path. */
 export async function verifyInclusion(args: {
   leafHash: Uint8Array | Hex; index: number; treeSize: number; path: (Uint8Array | Hex)[]; rootHash: Uint8Array | Hex;
@@ -173,13 +188,22 @@ export function parseLeaf(leaf: Uint8Array | Hex): LogLeaf {
 export interface ProofCheck {
   ok: boolean;
   /** each check, so a UI can show which one failed */
-  checks: { leafParses: boolean; attestationSigned: boolean; included: boolean; headSigned: boolean | null; programMatches: boolean | null };
+  checks: {
+    leafParses: boolean;
+    attestationSigned: boolean;
+    /** the leaf's (and the head's) verifier key is one of `trustedKeys`: false when no trusted keys were given */
+    keyTrusted: boolean;
+    included: boolean;
+    headSigned: boolean | null;
+    programMatches: boolean | null;
+  };
   leaf: LogLeaf | null;
 }
 
 /**
- * Verify a log entry end to end: the leaf parses, the attestation inside carries a valid Verifier signature,
- * the audit path leads to the root, and (if a signed head is given) the head is signed by the same key set.
+ * Verify a log entry end to end: the leaf parses, the attestation inside carries a valid signature by a TRUSTED verifier
+ * key, the audit path leads to the root, and (if a signed head is given) the head is signed by a trusted key.
+ * `trustedKeys` must come from the chain (PofClient.verifierKeys()), never from the log: without them `ok` is false.
  */
 export async function verifyLogEntry(args: {
   leaf: Uint8Array | Hex;
@@ -187,10 +211,9 @@ export async function verifyLogEntry(args: {
   proof: { treeSize: number; rootHash: Hex; path: Hex[] };
   head?: SignedTreeHead;
   programId?: AddressLike;
-  /** keys you trust for tree heads; default: the leaf's own verifier key */
-  trustedKeys?: string[];
+  trustedKeys: string[];
 }): Promise<ProofCheck> {
-  const checks: ProofCheck["checks"] = { leafParses: false, attestationSigned: false, included: false, headSigned: null, programMatches: null };
+  const checks: ProofCheck["checks"] = { leafParses: false, attestationSigned: false, keyTrusted: false, included: false, headSigned: null, programMatches: null };
   let leaf: LogLeaf | null = null;
   try {
     leaf = parseLeaf(args.leaf);
@@ -198,19 +221,171 @@ export async function verifyLogEntry(args: {
   } catch {
     return { ok: false, checks, leaf };
   }
+  const trusted = args.trustedKeys ?? [];
+  checks.keyTrusted = trusted.some((k) => sameKey(k, leaf!.verifierKey));
   checks.attestationSigned = await verifyAttestationSignature(fromHex(leaf.attestationBytes), fromHex(leaf.signature), leaf.verifierKey);
   checks.included = await verifyInclusion({
     leafHash: await leafHash(h(args.leaf)), index: args.index, treeSize: args.proof.treeSize, path: args.proof.path, rootHash: args.proof.rootHash,
   });
   if (args.programId) checks.programMatches = leaf.attestation.programId === encodeBase58(toAddressBytes(args.programId));
   if (args.head) {
-    const trusted = args.trustedKeys ?? [leaf.verifierKey];
     checks.headSigned =
       trusted.some((k) => sameKey(k, args.head!.verifierKey)) &&
       args.head.treeSize === args.proof.treeSize &&
       args.head.rootHash.toLowerCase() === args.proof.rootHash.toLowerCase() &&
       (await verifyTreeHead(args.head, leaf.attestation.programId));
   }
-  const ok = checks.leafParses && checks.attestationSigned && checks.included && checks.headSigned !== false && checks.programMatches !== false;
+  const ok = checks.leafParses && checks.attestationSigned && checks.keyTrusted && checks.included && checks.headSigned !== false && checks.programMatches !== false;
   return { ok, checks, leaf };
+}
+
+/**
+ * Does this log leaf hold the attestation behind this certificate? The certificate's `log_index` is not signed
+ * (the submitter chose it), so match on the signed bytes: subject, asset, tier, nullset hash, nonce, payer, controller,
+ * issue and expiry slots, and the verifier key.
+ */
+export function matchCertificateLeaf(
+  cert: { subjectHash: string; asset: number; tier: number; nullsetHash: string | null; nonce: string | null; payer: string; controller: string | null; issuedSlot: number | null; expirySlot: number; verifier: string },
+  leaf: LogLeaf,
+): { matches: boolean; mismatched: string[] } {
+  const a = leaf.attestation;
+  const pairs: [string, unknown, unknown][] = [
+    ["subjectHash", cert.subjectHash, a.subjectHash],
+    ["asset", cert.asset, a.asset],
+    ["tier", cert.tier, a.tier],
+    ["nullsetHash", cert.nullsetHash, a.nullsetHash],
+    ["nonce", cert.nonce, a.nonce],
+    ["payer", cert.payer, a.payer],
+    ["controller", cert.controller, a.controller],
+    ["issuedSlot", cert.issuedSlot, a.issuedSlot],
+    ["expirySlot", cert.expirySlot, a.expirySlot],
+    ["verifier", cert.verifier, leaf.verifierKey],
+  ];
+  const mismatched = pairs.filter(([, x, y]) => x !== null && x !== undefined && String(x).toLowerCase() !== String(y).toLowerCase()).map(([k]) => k);
+  return { matches: mismatched.length === 0, mismatched };
+}
+
+/* ---------- witness cosignatures (CONTRACT §8) ---------- */
+
+/** The 88 bytes a witness signs: "POF-WIT1" ‖ program_id ‖ tree_size u64 LE ‖ root_hash ‖ timestamp u64 LE (unix seconds). */
+export function cosignMessage(programId: AddressLike, treeSize: number, rootHash: Uint8Array | Hex, timestamp: number): Uint8Array {
+  return concat(utf8("POF-WIT1"), toAddressBytes(programId), u64le(treeSize), h(rootHash), u64le(timestamp));
+}
+
+export interface Cosignature {
+  witnessKey: string;
+  treeSize: number;
+  rootHash: Hex;
+  timestamp: number;
+  signature: Hex;
+}
+
+export function verifyCosignature(c: Cosignature, programId: AddressLike): Promise<boolean> {
+  return ed25519Verify(keyBytes(c.witnessKey), cosignMessage(programId, c.treeSize, c.rootHash, c.timestamp), fromHex(c.signature));
+}
+
+/* ---------- reading the Verifier's log over HTTP (CONTRACT §7) ---------- */
+
+export interface LogEntryJson { index: number; leaf: Hex; leafHash?: Hex }
+
+/** A small reader for GET /api/attest/log (?head, ?entry, ?proof, ?consistency, ?from&to). */
+export class LogReader {
+  constructor(public base: string, private f: typeof fetch = fetch) {
+    this.base = base.replace(/\/$/, "");
+  }
+  private async get<T>(qs: string): Promise<T> {
+    const r = await this.f(`${this.base}?${qs}`, { headers: { accept: "application/json" } });
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok || !j) throw new Error(`log ${qs}: ${j?.error?.message ?? j?.message ?? r.status}`);
+    return j as T;
+  }
+  head(): Promise<SignedTreeHead> {
+    return this.get("head");
+  }
+  entry(i: number): Promise<LogEntryJson> {
+    return this.get(`entry=${i}`);
+  }
+  proof(i: number, size: number): Promise<{ index: number; treeSize: number; rootHash: Hex; path: Hex[] }> {
+    return this.get(`proof=${i}&size=${size}`);
+  }
+  consistency(first: number, second: number): Promise<{ first: number; second: number; firstRoot?: Hex; secondRoot?: Hex; path: Hex[] }> {
+    return this.get(`consistency=${first}&size=${second}`);
+  }
+  /** entries [from, to), fetched in pages of up to 256 */
+  async entries(from: number, to: number): Promise<LogEntryJson[]> {
+    const out: LogEntryJson[] = [];
+    for (let a = from; a < to; ) {
+      const b = Math.min(to, a + 256);
+      const r = await this.get<{ entries: LogEntryJson[] }>(`from=${a}&to=${b}`);
+      if (!r.entries?.length) throw new Error(`log returned no entries for ${a}..${b}`);
+      out.push(...r.entries);
+      a += r.entries.length;
+    }
+    return out;
+  }
+}
+
+export interface AuditResult {
+  ok: boolean;
+  treeSize: number;
+  rootHash: Hex;
+  checks: {
+    headSigned: boolean;
+    rootRecomputed: boolean;
+    entriesSigned: number;
+    entriesBad: number[];
+    /** the on-chain anchor (Treasury) is a prefix of this log with the same root, or null when there is none */
+    anchorMatches: boolean | null;
+    programMatches: boolean;
+  };
+  anchor: { treeSize: number; rootHash: Hex; slot: number } | null;
+}
+
+/**
+ * Download the whole log, recompute every leaf hash and the root, check the signed head, every attestation signature,
+ * and that the root anchored on chain equals the root of the same-size prefix.
+ */
+export async function auditLog(args: {
+  reader: LogReader;
+  programId: AddressLike;
+  anchor?: { treeSize: number; rootHash: Hex; slot: number } | null;
+  /** verifier keys from the chain (PofClient.verifierKeys); a head or entry signed by any other key fails */
+  trustedKeys: string[];
+  onProgress?: (done: number, total: number) => void;
+}): Promise<AuditResult> {
+  const head = await args.reader.head();
+  const trusted = args.trustedKeys ?? [];
+  const headSigned = trusted.some((k) => sameKey(k, head.verifierKey)) && (await verifyTreeHead(head, args.programId));
+  const entries = head.treeSize ? await args.reader.entries(0, head.treeSize) : [];
+  const hashes: Uint8Array[] = [];
+  const bad: number[] = [];
+  let signed = 0;
+  const pid = encodeBase58(toAddressBytes(args.programId));
+  let programMatches = true;
+  for (const [i, e] of entries.entries()) {
+    const leaf = fromHex(e.leaf);
+    hashes.push(await leafHash(leaf));
+    try {
+      const l = parseLeaf(leaf);
+      if (l.attestation.programId !== pid) programMatches = false;
+      if (trusted.some((k) => sameKey(k, l.verifierKey)) && (await verifyAttestationSignature(fromHex(l.attestationBytes), fromHex(l.signature), l.verifierKey))) signed++;
+      else bad.push(i);
+    } catch {
+      bad.push(i);
+    }
+    if (args.onProgress && (i % 64 === 63 || i === entries.length - 1)) args.onProgress(i + 1, entries.length);
+  }
+  const root = toHex(await merkleRoot(hashes));
+  const rootRecomputed = root === String(head.rootHash).toLowerCase() && hashes.length === head.treeSize;
+  let anchorMatches: boolean | null = null;
+  const anchor = args.anchor ?? null;
+  if (anchor) {
+    anchorMatches = anchor.treeSize <= hashes.length && toHex(await merkleRoot(hashes.slice(0, anchor.treeSize))) === anchor.rootHash.toLowerCase();
+  }
+  const ok = headSigned && rootRecomputed && bad.length === 0 && anchorMatches !== false && programMatches;
+  return {
+    ok, treeSize: head.treeSize, rootHash: root,
+    checks: { headSigned, rootRecomputed, entriesSigned: signed, entriesBad: bad, anchorMatches, programMatches },
+    anchor,
+  };
 }

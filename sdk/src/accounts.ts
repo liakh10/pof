@@ -4,7 +4,7 @@
  * tolerating small naming differences so an IDL rename does not break consumers.
  */
 import { POF_IDL, POF_GATE_IDL } from "./idl/index.js";
-import { decodeAccount, fieldOffset, type Idl } from "./borsh.js";
+import { decodeAccount, fieldOffset, Reader, type Idl } from "./borsh.js";
 import { toHex, u64le } from "./bytes.js";
 import { findProgramAddress } from "./pda.js";
 import { toAddressBytes, type AddressLike } from "./base58.js";
@@ -51,6 +51,8 @@ export interface Certificate {
   /** hex, sha256 of the salted nullifier hashes (§5) */
   nullsetHash: string | null;
   renewals: number;
+  /** hex, the attestation's nonce (with nullsetHash it ties the certificate to exactly one log leaf) */
+  nonce: string | null;
   /** after revoke_spent: the disclosed note's index, salt and nullifier, public from then on */
   revealed: { index: number; salt: string; nullifier: string } | null;
 }
@@ -138,6 +140,7 @@ export function decodeCertificate(address: string, data: Uint8Array): Certificat
     rootSlot: num(pick(r, "root_slot", "rootSlot")),
     nullsetHash: optHex(pick(r, "nullset_hash", "nullsetHash")),
     renewals: num(pick(r, "renewals")) ?? 0,
+    nonce: optHex(pick(r, "nonce")),
     revealed:
       revIdx !== null && revIdx !== 255
         ? { index: revIdx, salt: hex(pick(r, "revealed_salt")), nullifier: hex(pick(r, "revealed_nullifier")) }
@@ -299,3 +302,34 @@ export const layout = {
     offset: (field: "room" | "subject_hash") => fieldOffset(gateIdl, "Member", field),
   },
 };
+
+/* ---------- events (Anchor `emit!`, "Program data: <base64>" log lines) ---------- */
+
+export interface PofEvent { name: string; data: Record<string, any> }
+
+/** Decode every pof event in a transaction's log lines. */
+export function decodeEvents(logs: string[], idl: Idl = pofIdl): PofEvent[] {
+  const evs = (idl as any).events ?? [];
+  const out: PofEvent[] = [];
+  for (const l of logs) {
+    const m = /^Program data: (.+)$/.exec(l);
+    if (!m) continue;
+    let b: Uint8Array;
+    try {
+      const bin = atob(m[1]);
+      b = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    } catch {
+      continue;
+    }
+    const e = evs.find((x: any) => x.discriminator.every((v: number, i: number) => b[i] === v));
+    if (!e) continue;
+    const d = idl.types?.find((t) => t.name === e.name);
+    if (!d || d.type.kind !== "struct") continue;
+    try {
+      out.push({ name: e.name, data: new Reader(b, 8).struct(idl, d.type.fields ?? []) });
+    } catch {
+      /* a truncated line */
+    }
+  }
+  return out;
+}

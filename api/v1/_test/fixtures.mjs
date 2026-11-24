@@ -22,47 +22,74 @@ export async function makeWorld() {
   return w;
 }
 
-/** A transparency log with the verifier's HTTP shape (CONTRACT §7), served through an injected fetch. */
+/** A transparency log with the verifier's HTTP shape (CONTRACT §7), served through an injected fetch. It can grow. */
 export async function makeLog(n = 7) {
   const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
   const vk = Buffer.from(publicKey.export({ format: "jwk" }).x, "base64url");
   const verifierKey = sdk.encodeBase58(vk);
   const leaves = [];
-  for (let i = 0; i < n; i++) {
+  const hashes = [];
+  const log = { base: "https://pof.test/api/attest/log", leaves, hashes, verifierKey, privateKey, sth: null, forkRoot: null };
+  log.makeLeaf = (i, opts = {}) => {
     const att = sdk.buildAttestation({
-      programId: sdk.POF_PROGRAM_ID, subjectKind: 0, subjectHash: crypto.randomBytes(32).toString("hex"), asset: 0, tier: 1 + (i % 5),
+      programId: opts.programId ?? sdk.POF_PROGRAM_ID, subjectKind: 0, subjectHash: crypto.randomBytes(32).toString("hex"), asset: 0, tier: 1 + (i % 5),
       treeRoot: "bb".repeat(32), rootSlot: 100 + i, noteCount: 1, nullsetHash: "cc".repeat(32), issuedSlot: 200 + i, expirySlot: 9000,
       payer: verifierKey, controller: verifierKey, nonce: crypto.randomBytes(16).toString("hex"),
     });
-    const sig = crypto.sign(null, att, privateKey);
+    const sig = opts.badSig ? crypto.randomBytes(64) : crypto.sign(null, att, privateKey);
     const slot = Buffer.alloc(8); slot.writeBigUInt64LE(BigInt(300 + i));
-    leaves.push(new Uint8Array(Buffer.concat([Buffer.from([1]), att, sig, vk, Buffer.alloc(32, 9), slot])));
-  }
-  const hashes = await Promise.all(leaves.map((l) => sdk.leafHash(l)));
-  const root = sdk.toHex(await sdk.merkleRoot(hashes));
-  const sth = {
-    treeSize: n, rootHash: root, slot: 5000,
-    signature: crypto.sign(null, sdk.treeHeadMessage(sdk.POF_PROGRAM_ID, n, root), privateKey).toString("hex"), verifierKey,
+    return new Uint8Array(Buffer.concat([Buffer.from([1]), att, sig, vk, Buffer.alloc(32, 9), slot]));
   };
-  const base = "https://pof.test/api/attest/log";
-  const fetchImpl = async (url) => {
+  log.signHead = async (size = leaves.length, root) => {
+    root = root ?? sdk.toHex(await sdk.merkleRoot(hashes.slice(0, size)));
+    log.sth = {
+      treeSize: size, rootHash: root, slot: 5000,
+      signature: crypto.sign(null, sdk.treeHeadMessage(sdk.POF_PROGRAM_ID, size, root), privateKey).toString("hex"), verifierKey,
+    };
+    return log.sth;
+  };
+  log.append = async (k, opts = {}) => {
+    for (let j = 0; j < k; j++) {
+      const l = log.makeLeaf(leaves.length, opts);
+      leaves.push(l);
+      hashes.push(await sdk.leafHash(l));
+    }
+    return log.signHead();
+  };
+  await log.append(n);
+  log.fetch = async (url) => {
     const u = new URL(url);
     const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-    if (u.searchParams.has("head")) return reply(200, sth);
+    const q = (k) => u.searchParams.get(k);
+    const size = log.sth.treeSize;
+    if (u.searchParams.has("head")) return reply(200, log.sth);
     if (u.searchParams.has("entry")) {
-      const i = Number(u.searchParams.get("entry"));
-      if (!leaves[i]) return reply(404, { error: { code: "NOT_FOUND", message: `log entry ${i} does not exist` } });
+      const i = Number(q("entry"));
+      if (!leaves[i] || i >= size) return reply(404, { error: { code: "NOT_FOUND", message: `log entry ${i} does not exist` } });
       return reply(200, { index: i, leaf: sdk.toHex(leaves[i]), leafHash: sdk.toHex(hashes[i]), verifierKey: vk.toString("hex") });
     }
     if (u.searchParams.has("proof")) {
-      const i = Number(u.searchParams.get("proof"));
-      const size = Number(u.searchParams.get("size") ?? n);
-      const path = (await sdk.inclusionPath(i, hashes.slice(0, size))).map(sdk.toHex);
-      return reply(200, { index: i, treeSize: size, rootHash: sdk.toHex(await sdk.merkleRoot(hashes.slice(0, size))), leafHash: sdk.toHex(hashes[i]), path });
+      const i = Number(q("proof"));
+      const s = Number(q("size") ?? size);
+      const path = (await sdk.inclusionPath(i, hashes.slice(0, s))).map(sdk.toHex);
+      return reply(200, { index: i, treeSize: s, rootHash: sdk.toHex(await sdk.merkleRoot(hashes.slice(0, s))), leafHash: sdk.toHex(hashes[i]), path });
+    }
+    if (u.searchParams.has("consistency")) {
+      const m = Number(q("consistency"));
+      const s = Number(q("size") ?? size);
+      if (m > s || s > leaves.length) return reply(404, { error: { code: "BAD_RANGE", message: "no such range" } });
+      const path = (await sdk.consistencyProof(m, hashes.slice(0, s))).map(sdk.toHex);
+      return reply(200, { first: m, second: s, firstRoot: sdk.toHex(await sdk.merkleRoot(hashes.slice(0, m))), secondRoot: sdk.toHex(await sdk.merkleRoot(hashes.slice(0, s))), path });
+    }
+    if (u.searchParams.has("from")) {
+      const a = Number(q("from")), b = Math.min(size, Number(q("to")), a + 256);
+      const entries = [];
+      for (let i = a; i < b; i++) entries.push({ index: i, leaf: sdk.toHex(leaves[i]), leafHash: sdk.toHex(hashes[i]) });
+      return reply(200, { treeSize: size, entries });
     }
     return reply(400, { error: { code: "BAD", message: "?" } });
   };
-  return { base, fetch: fetchImpl, sth, leaves, verifierKey, privateKey };
+  return log;
 }
 
 /** Serve a MemoryRpc as a real JSON-RPC endpoint (and a log under /api/attest/log), for child processes and HTTP tests. */

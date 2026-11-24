@@ -3,7 +3,7 @@
 // the bot approves a join request when the requester's linked subject holds a live certificate that meets the Room.
 import { K } from "./store.js";
 import { linkUrl, subjectLabel, unlink } from "./link.js";
-import { evaluate, loadRoom } from "./gate.js";
+import { evaluate, loadRoom, safeName } from "./gate.js";
 
 export function tgApi(env, f = fetch) {
   return async (method, body) => {
@@ -99,7 +99,7 @@ export async function handleTelegramUpdate(update, deps) {
       if (!room) return reply("Send /pof_bind <room address>. The Room is the pof_gate account shown on the Rooms page.");
       await store.put(K.tgChat(chatId), { room: room.address, title: msg.chat.title ?? null, boundBy: userId, evict: false });
       return reply(
-        `Bound to Room ${room.name || room.address}: ${room.minTierLabel}.\nNext: make me an admin with "Invite users", and turn on "Approve new members" on the invite link. I approve requests whose certificate is live and meets the Room.`,
+        `Bound to Room ${safeName(room)}: ${room.minTierLabel}.\nNext: make me an admin with "Invite users", and turn on "Approve new members" on the invite link. I approve requests whose certificate is live and meets the Room.`,
       );
     }
     if (c.cmd === "pof_unbind") {
@@ -119,7 +119,7 @@ export async function handleTelegramUpdate(update, deps) {
       const b = await store.get(K.tgChat(chatId));
       if (!b) return reply("This group is not bound to a Room.");
       const room = await loadRoom(client, b.room);
-      return reply(`Room ${room?.name || b.room}: ${room?.minTierLabel ?? "missing"}. Removal on revoke: ${b.evict ? "on" : "off"}.`);
+      return reply(`Room ${room ? safeName(room) : b.room}: ${room?.minTierLabel ?? "missing"}. Removal on revoke: ${b.evict ? "on" : "off"}.`);
     }
     return { action: "ignored" };
   }

@@ -552,6 +552,14 @@
               "minimum": 0
             },
             "description": "the leaf index (a certificate's logIndex)"
+          },
+          {
+            "name": "certificate",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "a Certificate address: the leaf must hold exactly that certificate's signed attestation (subject, asset, tier, nullset hash, nonce, payer, controller, slots, verifier key), since log_index on chain is not signed"
           }
         ],
         "responses": {
@@ -625,7 +633,33 @@
                             "boolean",
                             "null"
                           ]
+                        },
+                        "keyTrusted": {
+                          "type": "boolean"
                         }
+                      }
+                    },
+                    "certificateMatch": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "matches": {
+                          "type": "boolean"
+                        },
+                        "mismatched": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "trustedKeys": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
                       }
                     }
                   }
@@ -760,6 +794,257 @@
           },
           "502": {
             "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    },
+    "/log/consistency": {
+      "get": {
+        "operationId": "getLogConsistency",
+        "summary": "An RFC 9162 consistency proof between two tree sizes, verified (the second root comes from the signed head when it is the head)",
+        "parameters": [
+          {
+            "name": "first",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "second",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "default: the current head size"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "proof",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "first": {
+                      "type": "integer"
+                    },
+                    "second": {
+                      "type": "integer"
+                    },
+                    "firstRoot": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "secondRoot": {
+                      "type": "string"
+                    },
+                    "secondRootSigned": {
+                      "type": "boolean"
+                    },
+                    "path": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "502": {
+            "$ref": "#/components/responses/Upstream"
+          }
+        }
+      }
+    },
+    "/witness": {
+      "get": {
+        "operationId": "getWitness",
+        "summary": "The latest document of the log witness: cosigned heads (CONTRACT §8), their anchors on chain, and any alarms",
+        "responses": {
+          "200": {
+            "description": "witness document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "witness": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "programId": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "integer"
+                    },
+                    "latest": {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "heads": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "witnessKey": {
+                            "type": "string"
+                          },
+                          "treeSize": {
+                            "type": "integer"
+                          },
+                          "rootHash": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "integer"
+                          },
+                          "signature": {
+                            "type": "string"
+                          },
+                          "verifierKey": {
+                            "type": "string"
+                          },
+                          "verifierSignature": {
+                            "type": "string"
+                          },
+                          "anchor": {
+                            "type": [
+                              "object",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "alarms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "log_unreachable",
+                              "unknown_key",
+                              "bad_signature",
+                              "log_shrank",
+                              "equivocation",
+                              "inconsistent",
+                              "anchor_mismatch",
+                              "unlogged_certificate"
+                            ]
+                          },
+                          "at": {
+                            "type": "integer"
+                          },
+                          "detail": {}
+                        }
+                      }
+                    },
+                    "stats": {
+                      "type": "object"
+                    },
+                    "cosignaturesValid": {
+                      "type": "boolean"
+                    },
+                    "cosignaturesChecked": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/badge/{subject}.svg": {
+      "get": {
+        "operationId": "getBadge",
+        "summary": "A status badge as SVG (for <img>): live, revoked with its slot, expired, below tier, or none",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SOL",
+                "USDC"
+              ]
+            }
+          },
+          {
+            "name": "minTier",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          {
+            "name": "theme",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "light",
+                "dark"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "badge",
+            "content": {
+              "image/svg+xml": {}
+            }
+          },
+          "400": {
+            "description": "not a subject (still an SVG)",
+            "content": {
+              "image/svg+xml": {}
+            }
           }
         }
       }
@@ -995,6 +1280,16 @@
                   "null"
                 ]
               }
+            }
+          },
+          "keyTrusted": {
+            "type": "boolean",
+            "description": "the head's key is one the program's Config lists now or listed before (VerifierSet history); signatureValid is false without it"
+          },
+          "trustedKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }

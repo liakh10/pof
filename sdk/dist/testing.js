@@ -38,6 +38,21 @@ export class MemoryRpc {
             });
         });
     }
+    /** transaction history for verifierKeys({ history: true }): address → [{ signature, logs }] newest first */
+    history = new Map();
+    async getSignaturesForAddress(address, opts = {}) {
+        let list = this.history.get(address) ?? [];
+        if (opts.before)
+            list = list.slice(list.findIndex((x) => x.signature === opts.before) + 1);
+        return list.slice(0, opts.limit ?? 1000).map((x, i) => ({ signature: x.signature, slot: 1000 - i, err: null }));
+    }
+    async getTransactionLogs(signature) {
+        for (const l of this.history.values())
+            for (const x of l)
+                if (x.signature === signature)
+                    return x.logs;
+        return null;
+    }
     put(address, owner, data) {
         this.accounts.set(address, { address, owner, lamports: 1_000_000, data });
     }

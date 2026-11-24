@@ -69,6 +69,15 @@ export class Rpc {
         }
         return out;
     }
+    async getSignaturesForAddress(address, opts = {}) {
+        return this.call("getSignaturesForAddress", [
+            address, { limit: opts.limit ?? 1000, before: opts.before, commitment: this.commitment === "processed" ? "confirmed" : this.commitment },
+        ]);
+    }
+    async getTransactionLogs(signature) {
+        const r = await this.call("getTransaction", [signature, { encoding: "json", maxSupportedTransactionVersion: 0, commitment: this.commitment === "processed" ? "confirmed" : this.commitment }]);
+        return r?.meta?.logMessages ?? null;
+    }
     async getProgramAccounts(programId, filters) {
         const r = await this.call("getProgramAccounts", [
             programId,

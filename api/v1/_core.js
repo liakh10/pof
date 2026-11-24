@@ -2,8 +2,10 @@
 import fs from "node:fs";
 import {
   sdk, HttpError, getClient, remember, lookupSubject, certJson, roomJson, parseIntParam, parseAssetParam, parseTierParam,
-  logBase, verifiedHead, verifiedProof,
+  logBase, verifiedHead, verifiedProof, logGet, readWitnessDoc, trustedKeys,
 } from "./_lib.js";
+import { renderBadge, badgeState } from "../../embed/svg.js";
+import { checkWitnessDoc } from "../../witness/witness.js";
 
 export const API_VERSION = "1.0.0";
 
@@ -53,6 +55,9 @@ export async function handleV1(req) {
           "GET /v1/config",
           "GET /v1/log/head",
           "GET /v1/log/proof/{id}",
+          "GET /v1/log/consistency?first=&second=",
+          "GET /v1/witness",
+          "GET /v1/badge/{subject}.svg",
           "GET /v1/openapi.json",
         ],
         docs: "/developers",
@@ -115,7 +120,7 @@ export async function handleV1(req) {
       }
       if (rest.length === 1) {
         if (!sdk.isAddress(rest[0])) throw new HttpError(400, "bad_room", "a room is a base58 account address");
-        const r = await client.getRoomWithMembers(rest[0]);
+        const r = await remember(`room:${rest[0]}`, 5_000, () => client.getRoomWithMembers(rest[0]));
         if (!r) throw new HttpError(404, "not_found", `no pof_gate room at ${rest[0]}`);
         return json(200, roomJson(r), cache(5, 30));
       }
@@ -153,7 +158,7 @@ export async function handleV1(req) {
       let log = null;
       try {
         const h = await verifiedHead(logBase(env, req.origin), client, req.fetch);
-        log = { treeSize: h.treeSize, rootHash: h.rootHash, signatureValid: h.signatureValid, anchor: h.anchor };
+        log = { treeSize: h.treeSize, rootHash: h.rootHash, signatureValid: h.signatureValid, keyTrusted: h.keyTrusted, anchor: h.anchor };
       } catch {
         log = null;
       }
@@ -181,11 +186,63 @@ export async function handleV1(req) {
       const client = (() => { try { return getClient(env); } catch { return null; } })();
       const base = logBase(env, req.origin);
       if (rest.length === 1 && rest[0] === "head") return json(200, await verifiedHead(base, client, req.fetch), cache(5, 30));
+      if (rest.length === 1 && rest[0] === "consistency") {
+        const head = await logGet(base, "head", req.fetch);
+        const first = parseIntParam(q.first, "first");
+        const second = parseIntParam(q.second, "second") ?? head.treeSize;
+        if (first === undefined) throw new HttpError(400, "bad_param", "first is required (the older tree size)");
+        if (first > second || second > head.treeSize) throw new HttpError(404, "not_found", `no consistency proof from ${first} to ${second} (the log has ${head.treeSize})`);
+        const p = await logGet(base, `consistency=${first}&size=${second}`, req.fetch);
+        // the second root is taken from the signed head when it is the head, never from the proof answer alone
+        let secondRoot = p.secondRoot;
+        let secondRootSigned = false;
+        if (second === head.treeSize) {
+          secondRoot = head.rootHash;
+          const keys = await trustedKeys(client);
+          secondRootSigned = keys.all.some((k) => k === head.verifierKey) && (await sdk.verifyTreeHead(head, client?.programId ?? sdk.POF_PROGRAM_ID).catch(() => false));
+        }
+        const verified = first === 0 || (p.firstRoot && secondRoot
+          ? await sdk.verifyConsistency({ size1: first, size2: second, root1: p.firstRoot, root2: secondRoot, proof: p.path })
+          : false);
+        return json(200, { first, second, firstRoot: p.firstRoot ?? null, secondRoot, secondRootSigned, path: p.path, verified }, cache(10, 60));
+      }
       if (rest.length === 2 && rest[0] === "proof") {
         const id = parseIntParam(rest[1], "id");
         if (id === undefined) throw new HttpError(400, "bad_param", "id must be a whole number");
-        return json(200, await verifiedProof(base, client, id, req.fetch), cache(5, 30));
+        if (q.certificate !== undefined && !sdk.isAddress(q.certificate)) throw new HttpError(400, "bad_param", "certificate must be an account address");
+        return json(200, await verifiedProof(base, client, id, req.fetch, { certificate: q.certificate }), cache(5, 30));
       }
+    }
+
+    if (head === "witness" && rest.length === 0) {
+      const doc = await readWitnessDoc(env);
+      if (!doc) throw new HttpError(404, "not_found", "no witness has published yet");
+      const check = await checkWitnessDoc(doc);
+      return json(200, { ...doc, cosignaturesValid: check.ok, cosignaturesChecked: check.checked }, cache(15, 60));
+    }
+
+    if (head === "badge" && rest.length === 1 && rest[0].endsWith(".svg")) {
+      const subject = rest[0].slice(0, -4);
+      const asset = parseAssetParam(q.asset);
+      const minTier = parseTierParam(q.minTier, asset, "minTier");
+      const theme = q.theme === "dark" ? "dark" : "light";
+      const svgOut = (status, body) => ({
+        status, headers: { ...CORS, "content-type": "image/svg+xml; charset=utf-8", "cache-control": cache(30, 120), "x-pof-api": API_VERSION }, body,
+      });
+      let a;
+      try {
+        a = await lookupSubject(getClient(env), subject, { asset });
+      } catch (e) {
+        // an <img> cannot show JSON: a bad subject still gets a badge, with a 400
+        if (e instanceof HttpError && e.status === 400) return svgOut(400, renderBadge({ subject: "not a subject", state: "none", theme }));
+        throw e;
+      }
+      const svg = renderBadge({ subject, ...badgeState(a, { asset, minTier }), slot: a.slot, theme });
+      return {
+        status: 200,
+        headers: { ...CORS, "content-type": "image/svg+xml; charset=utf-8", "cache-control": cache(30, 120), "x-pof-api": API_VERSION },
+        body: svg,
+      };
     }
 
     throw new HttpError(404, "no_route", `no endpoint ${req.path}; see GET /v1`);

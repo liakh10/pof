@@ -17,6 +17,10 @@ export interface RpcLike {
   getAccount(address: string): Promise<AccountData | null>;
   getAccounts(addresses: string[]): Promise<(AccountData | null)[]>;
   getProgramAccounts(programId: string, filters: MemcmpFilter[]): Promise<AccountData[]>;
+  /** optional: transaction history of an address, newest first */
+  getSignaturesForAddress?(address: string, opts?: { before?: string; limit?: number }): Promise<{ signature: string; slot: number; err: unknown }[]>;
+  /** optional: the log lines of one transaction */
+  getTransactionLogs?(signature: string): Promise<string[] | null>;
 }
 
 function b64(s: string): Uint8Array {
@@ -85,6 +89,17 @@ export class Rpc implements RpcLike {
       r.value.forEach((v: any, j: number) => out.push(this.toAccount(chunk[j], v)));
     }
     return out;
+  }
+
+  async getSignaturesForAddress(address: string, opts: { before?: string; limit?: number } = {}) {
+    return this.call<{ signature: string; slot: number; err: unknown }[]>("getSignaturesForAddress", [
+      address, { limit: opts.limit ?? 1000, before: opts.before, commitment: this.commitment === "processed" ? "confirmed" : this.commitment },
+    ]);
+  }
+
+  async getTransactionLogs(signature: string): Promise<string[] | null> {
+    const r: any = await this.call("getTransaction", [signature, { encoding: "json", maxSupportedTransactionVersion: 0, commitment: this.commitment === "processed" ? "confirmed" : this.commitment }]);
+    return r?.meta?.logMessages ?? null;
   }
 
   async getProgramAccounts(programId: string, filters: MemcmpFilter[]): Promise<AccountData[]> {

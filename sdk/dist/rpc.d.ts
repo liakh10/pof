@@ -18,6 +18,17 @@ export interface RpcLike {
     getAccount(address: string): Promise<AccountData | null>;
     getAccounts(addresses: string[]): Promise<(AccountData | null)[]>;
     getProgramAccounts(programId: string, filters: MemcmpFilter[]): Promise<AccountData[]>;
+    /** optional: transaction history of an address, newest first */
+    getSignaturesForAddress?(address: string, opts?: {
+        before?: string;
+        limit?: number;
+    }): Promise<{
+        signature: string;
+        slot: number;
+        err: unknown;
+    }[]>;
+    /** optional: the log lines of one transaction */
+    getTransactionLogs?(signature: string): Promise<string[] | null>;
 }
 export declare class RpcError extends Error {
     code?: number | undefined;
@@ -39,6 +50,15 @@ export declare class Rpc implements RpcLike {
     private toAccount;
     getAccount(address: string): Promise<AccountData | null>;
     getAccounts(addresses: string[]): Promise<(AccountData | null)[]>;
+    getSignaturesForAddress(address: string, opts?: {
+        before?: string;
+        limit?: number;
+    }): Promise<{
+        signature: string;
+        slot: number;
+        err: unknown;
+    }[]>;
+    getTransactionLogs(signature: string): Promise<string[] | null>;
     getProgramAccounts(programId: string, filters: MemcmpFilter[]): Promise<AccountData[]>;
 }
 export declare function memcmp(offset: number, bytes: Uint8Array): MemcmpFilter;

@@ -70,6 +70,20 @@ export declare class PofClient {
         activeVerifier: string;
         slot: number;
     }) | null>;
+    /**
+     * The verifier keys a log head or entry may be signed with: the Config's verifier and scheduled next verifier, plus,
+     * with `history`, every key a `VerifierSet` event ever named (read from the Config account's transaction history,
+     * when the RPC serves it). Never trust the key a head or a leaf names about itself.
+     */
+    verifierKeys(opts?: {
+        history?: boolean;
+        maxTransactions?: number;
+    }): Promise<{
+        current: string | null;
+        next: string | null;
+        all: string[];
+        fromHistory: boolean;
+    }>;
     /** The Treasury's public counters, and the transparency log head anchored on chain. */
     getTreasury(): Promise<(Treasury & {
         address: string;

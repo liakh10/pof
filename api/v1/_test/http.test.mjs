@@ -7,7 +7,9 @@ import { makeWorld, makeLog, startChainServer } from "./fixtures.mjs";
 let chain, server, base, w;
 before(async () => {
   w = await makeWorld();
-  chain = await startChainServer(w.rpc, await makeLog(3));
+  const log = await makeLog(3);
+  await w.rpc.putConfig({ verifier: log.verifierKey });
+  chain = await startChainServer(w.rpc, log);
   process.env.SOLANA_RPC = chain.url;
   process.env.POF_LOG_URL = chain.logUrl;
   process.env.BOT_LINK_SECRET = "y".repeat(40);

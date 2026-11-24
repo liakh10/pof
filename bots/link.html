@@ -36,7 +36,7 @@
   <fieldset>
     <legend>Subject</legend>
     <label><input type="radio" name="kind" value="0" checked> A wallet (sign with it)</label>
-    <label><input type="radio" name="kind" value="1"> An X handle (checked on the site)</label>
+    <label><input type="radio" name="kind" value="1"> An X handle (sign with the key that controls its certificate)</label>
     <label><input type="radio" name="kind" value="2"> A badge key (sign with your badge kit)</label>
   </fieldset>
 
@@ -49,7 +49,10 @@
   <fieldset id="k1" class="hide">
     <legend>X handle</legend>
     <label>Handle <input type="text" id="handle" placeholder="@yourhandle" autocomplete="off"></label>
-    <label>Link id from the handle check <input type="text" id="xid" autocomplete="off"></label>
+    <p>Sign with the certificate's controller: your wallet if you used it, or the controller key in your certificate kit.</p>
+    <div class="row" id="xwallets"></div>
+    <div class="msg" id="tosignx">…</div>
+    <label>Or paste the controller's signature (base58 or hex) <textarea id="xsig"></textarea></label>
     <button id="sendx">Link handle</button>
   </fieldset>
 
@@ -79,7 +82,7 @@
   const base = location.pathname.replace(/\/$/, "");
   fetch(`${base}?${new URLSearchParams({ ...q, message: "1" })}`).then(r => r.json()).then(j => {
     if (j.error) return show(j.error, "bad");
-    message = j.message; document.getElementById("tosign").textContent = message;
+    message = j.message; document.getElementById("tosign").textContent = message; document.getElementById("tosignx").textContent = message;
   }).catch(() => show("Could not reach the server.", "bad"));
 
   for (const r of document.querySelectorAll("input[name=kind]")) r.addEventListener("change", () => {
@@ -103,23 +106,28 @@
   const add = (name, p) => { if (p && typeof p.signMessage === "function" && !found.some(f => f.p === p)) found.push({ name, p }); };
   add("Phantom", window.phantom?.solana); add("Solflare", window.solflare); add("Backpack", window.backpack?.solana ?? window.backpack);
   add("Glow", window.glowSolana); add("Wallet", window.solana);
-  const box = document.getElementById("wallets");
+  const sign = async (w) => {
+    const res = await w.p.connect();
+    const pk = (res?.publicKey ?? w.p.publicKey).toString();
+    const signed = await w.p.signMessage(new TextEncoder().encode(message), "utf8");
+    return { pk, sig: b58(new Uint8Array(signed?.signature ?? signed)) };
+  };
   if (!found.length) document.getElementById("nowallet").classList.remove("hide");
-  for (const w of found) {
-    const b = document.createElement("button"); b.textContent = `Sign with ${w.name}`;
-    b.onclick = async () => {
-      if (!message) return show("Still loading, try again in a moment.");
-      try {
-        const res = await w.p.connect();
-        const pk = (res?.publicKey ?? w.p.publicKey).toString();
-        const signed = await w.p.signMessage(new TextEncoder().encode(message), "utf8");
-        const sig = signed?.signature ?? signed;
-        await submit({ kind: 0, value: pk }, b58(new Uint8Array(sig)));
-      } catch (e) { show(e?.message || "The wallet did not sign.", "bad"); }
-    };
-    box.appendChild(b);
+  for (const [boxId, kind] of [["wallets", 0], ["xwallets", 1]]) {
+    const box = document.getElementById(boxId);
+    for (const w of found) {
+      const b = document.createElement("button"); b.textContent = `Sign with ${w.name}`;
+      b.onclick = async () => {
+        if (!message) return show("Still loading, try again in a moment.");
+        try {
+          const { pk, sig } = await sign(w);
+          await submit(kind === 0 ? { kind: 0, value: pk } : { kind: 1, value: document.getElementById("handle").value }, sig);
+        } catch (e) { show(e?.message || "The wallet did not sign.", "bad"); }
+      };
+      box.appendChild(b);
+    }
   }
-  document.getElementById("sendx").onclick = () => submit({ kind: 1, value: document.getElementById("handle").value }, document.getElementById("xid").value.trim());
+  document.getElementById("sendx").onclick = () => submit({ kind: 1, value: document.getElementById("handle").value }, document.getElementById("xsig").value.trim());
   document.getElementById("sendb").onclick = () => submit({ kind: 2, value: document.getElementById("badge").value.trim() }, document.getElementById("bsig").value.trim());
 })();
 </script>

@@ -14,24 +14,11 @@ async function rawBody(req) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-/** kind 1 subjects: ask the verifier's X-handle linker whether a link id is valid and for which handle. */
-function xLinkChecker(env, origin) {
-  const base = (env.POF_X_LINK_URL || `${origin}/api/link`).replace(/\/$/, "");
-  return async (id) => {
-    if (!/^[A-Za-z0-9_.-]{6,200}$/.test(id)) return null;
-    const r = await fetch(`${base}?id=${encodeURIComponent(id)}`).catch(() => null);
-    if (!r?.ok) return null;
-    const j = await r.json().catch(() => null);
-    return j?.verified && j?.handle ? String(j.handle) : null;
-  };
-}
-
 export default async function handler(req, res) {
   const url = new URL(req.url, `https://${req.headers.host || "localhost"}`);
   const query = Object.fromEntries(url.searchParams);
   const fn = query.fn || url.pathname.split("/").filter(Boolean).pop();
   delete query.fn;
-  const origin = `${req.headers["x-forwarded-proto"] || "https"}://${req.headers.host}`;
   let out;
   try {
     const env = process.env;
@@ -39,7 +26,7 @@ export default async function handler(req, res) {
     const r = { method: req.method, headers: req.headers, rawBody: body, query };
     const deps = fn === "link" && req.method === "GET"
       ? { env }
-      : { env, store: getStore(env), client: getClient(env), checkXLink: xLinkChecker(env, origin) };
+      : { env, store: getStore(env), client: getClient(env) };
     if (fn === "telegram") out = await telegramWebhook(r, deps);
     else if (fn === "discord") out = await discordWebhook(r, deps);
     else if (fn === "link") out = req.method === "GET" ? linkPage(r, deps) : await linkSubmit(r, deps);

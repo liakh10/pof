@@ -1,3 +1,4 @@
+import { type Idl } from "./borsh.js";
 import { type AddressLike } from "./base58.js";
 export type StatusName = "live" | "revoked_spent" | "revoked_by_holder" | "expired";
 export interface Certificate {
@@ -33,6 +34,8 @@ export interface Certificate {
     /** hex, sha256 of the salted nullifier hashes (§5) */
     nullsetHash: string | null;
     renewals: number;
+    /** hex, the attestation's nonce (with nullsetHash it ties the certificate to exactly one log leaf) */
+    nonce: string | null;
     /** after revoke_spent: the disclosed note's index, salt and nullifier, public from then on */
     revealed: {
         index: number;
@@ -144,3 +147,9 @@ export declare const layout: {
         offset: (field: "room" | "subject_hash") => number;
     };
 };
+export interface PofEvent {
+    name: string;
+    data: Record<string, any>;
+}
+/** Decode every pof event in a transaction's log lines. */
+export declare function decodeEvents(logs: string[], idl?: Idl): PofEvent[];

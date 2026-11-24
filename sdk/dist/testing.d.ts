@@ -12,6 +12,20 @@ export declare class MemoryRpc implements RpcLike {
     getAccount(address: string): Promise<AccountData | null>;
     getAccounts(addresses: string[]): Promise<(AccountData | null)[]>;
     getProgramAccounts(programId: string, filters: MemcmpFilter[]): Promise<AccountData[]>;
+    /** transaction history for verifierKeys({ history: true }): address → [{ signature, logs }] newest first */
+    history: Map<string, {
+        signature: string;
+        logs: string[];
+    }[]>;
+    getSignaturesForAddress(address: string, opts?: {
+        before?: string;
+        limit?: number;
+    }): Promise<{
+        signature: string;
+        slot: number;
+        err: null;
+    }[]>;
+    getTransactionLogs(signature: string): Promise<string[] | null>;
     put(address: string, owner: string, data: Uint8Array): void;
     /** Write a Certificate account at its PDA. Returns the address. */
     putCertificate(c: {

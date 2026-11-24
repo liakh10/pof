@@ -154,3 +154,29 @@ test("Config and Treasury decode; stats prefer the program's own counters", asyn
   assert.equal(s.expired, 2);
   assert.equal(s.live, 3);
 });
+
+test("verifierKeys: Config keys, plus every key VerifierSet events ever named (history)", async () => {
+  const { client, rpc } = await world();
+  const old = Keypair.generate().publicKey.toBase58();
+  const cur = Keypair.generate().publicKey.toBase58();
+  const nxt = Keypair.generate().publicKey.toBase58();
+  await rpc.putConfig({ verifier: cur, next_verifier: nxt, next_verifier_slot: 99999 });
+  const ev = (verifier, next) => {
+    const disc = sdk.POF_IDL.events.find((e) => e.name === "VerifierSet").discriminator;
+    const body = Buffer.concat([Buffer.from(disc), new PublicKey(verifier).toBuffer(), new PublicKey(next).toBuffer(), Buffer.alloc(8)]);
+    return `Program data: ${body.toString("base64")}`;
+  };
+  const [cfg] = await sdk.configAddress();
+  rpc.history.set(cfg, [
+    { signature: "s3", logs: ["Program log: Instruction: SetVerifier", ev(cur, nxt)] },
+    { signature: "s2", logs: [ev(old, cur)] },
+    { signature: "s1", logs: [ev(old, "11111111111111111111111111111111")] },
+  ]);
+  const now = await client.verifierKeys();
+  assert.deepEqual(new Set(now.all), new Set([cur, nxt]));
+  assert.equal(now.current, cur);
+  const h = await client.verifierKeys({ history: true });
+  assert.deepEqual(new Set(h.all), new Set([cur, nxt, old]));
+  assert.equal(h.fromHistory, true);
+  assert.equal(sdk.decodeEvents([ev(old, cur), "Program data: !!!", "nothing"]).length, 1);
+});

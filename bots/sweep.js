@@ -4,9 +4,17 @@
 import { K } from "./store.js";
 import { evaluate, loadRoom } from "./gate.js";
 
-export async function sweep(deps, { max = 500 } = {}) {
+// POF-15: everything is re-checked, in turns: each run works for at most `budgetMs`, then saves where it stopped and the
+// next run goes on from there (wrapping round at the end).
+export async function sweep(deps, { budgetMs = 40_000, now = () => Date.now() } = {}) {
   const { store, client, api, dapi } = deps;
-  const out = { checked: 0, discordRemoved: 0, telegramRemoved: 0, errors: 0 };
+  const out = { checked: 0, discordRemoved: 0, telegramRemoved: 0, errors: 0, complete: { discord: false, telegram: false } };
+  const t0 = now();
+  const cursor = (await store.get("sweep/cursor")) ?? { dc: null, tg: null };
+  const turn = (keys, after) => {
+    const i = after ? keys.findIndex((k) => k > after) : 0;
+    return i < 0 ? [] : keys.slice(i);
+  };
   const rooms = new Map();
   const room = async (addr) => {
     if (!rooms.has(addr)) rooms.set(addr, await loadRoom(client, addr));
@@ -14,7 +22,14 @@ export async function sweep(deps, { max = 500 } = {}) {
   };
 
   if (dapi) {
-    for (const key of (await store.list("dc/grant/")).slice(0, max)) {
+    const keys = turn(await store.list("dc/grant/"), cursor.dc);
+    out.complete.discord = true;
+    for (const key of keys) {
+      if (now() - t0 > budgetMs) {
+        out.complete.discord = false;
+        break;
+      }
+      cursor.dc = key;
       const [, , guildId, userId] = key.split("/");
       try {
         const grant = await store.get(key);
@@ -31,10 +46,18 @@ export async function sweep(deps, { max = 500 } = {}) {
         out.errors++;
       }
     }
+    if (out.complete.discord) cursor.dc = null;
   }
 
   if (api) {
-    for (const key of (await store.list("tg/member/")).slice(0, max)) {
+    const keys = turn(await store.list("tg/member/"), cursor.tg);
+    out.complete.telegram = true;
+    for (const key of keys) {
+      if (now() - t0 > budgetMs) {
+        out.complete.telegram = false;
+        break;
+      }
+      cursor.tg = key;
       const [, , chatId, userId] = key.split("/");
       try {
         const binding = await store.get(K.tgChat(chatId));
@@ -57,6 +80,8 @@ export async function sweep(deps, { max = 500 } = {}) {
         out.errors++;
       }
     }
+    if (out.complete.telegram) cursor.tg = null;
   }
+  await store.put("sweep/cursor", cursor);
   return out;
 }

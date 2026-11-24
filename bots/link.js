@@ -53,28 +53,34 @@ export function linkMessage({ p, u, e }) {
 }
 
 /**
- * Verify the subject proof. kind 0/2: an ed25519 signature (base58 or hex) by the key over linkMessage.
- * kind 1: a link id from the verifier's X-handle linker, checked by `checkXLink(linkId) → handle | null`.
+ * Verify the subject proof: an ed25519 signature (base58 or hex) over linkMessage.
+ * kind 0 / 2: by the wallet or badge key itself.
+ * kind 1 (X handle): by the CONTROLLER of a certificate for that handle, read from chain. The controller is the key the
+ * holder's client keeps; it is what can revoke the certificate and join rooms with it, so it is what a gate must check.
+ * (No bearer link id is accepted here: POF-03.)
  */
-export async function verifySubjectProof(tok, subject, proof, { checkXLink } = {}) {
+export async function verifySubjectProof(tok, subject, proof, { client } = {}) {
   const kind = Number(subject?.kind);
+  let sig;
+  try {
+    sig = /^[0-9a-f]{128}$/i.test(proof) ? sdk.fromHex(proof) : sdk.decodeBase58(String(proof));
+  } catch {
+    return "the signature cannot be read";
+  }
+  if (sig.length !== 64) return "the signature cannot be read";
+  const msg = new TextEncoder().encode(linkMessage(tok));
   if (kind === 0 || kind === 2) {
-    const key = sdk.toAddressBytes(String(subject.value));
-    let sig;
-    try {
-      sig = /^[0-9a-f]{128}$/i.test(proof) ? sdk.fromHex(proof) : sdk.decodeBase58(String(proof));
-    } catch {
-      return "the signature cannot be read";
-    }
-    const ok = await sdk.ed25519Verify(key, new TextEncoder().encode(linkMessage(tok)), sig);
+    const ok = await sdk.ed25519Verify(sdk.toAddressBytes(String(subject.value)), msg, sig);
     return ok ? null : "the signature does not match this key";
   }
   if (kind === 1) {
-    if (!checkXLink) return "X handles link through the handle check on the site; it is not configured here";
-    const handle = await checkXLink(String(proof));
-    if (!handle) return "that X link id is unknown or expired";
-    if (sdk.normalizeHandle(handle) !== sdk.normalizeHandle(String(subject.value))) return "that X link id belongs to another handle";
-    return null;
+    if (!client) return "X handles cannot be checked here";
+    const handle = sdk.normalizeHandle(String(subject.value));
+    const r = await client.lookup(`x:${handle}`);
+    const controllers = [...new Set(r.certificates.map((c) => c.controller).filter(Boolean))];
+    if (!controllers.length) return `@${handle} has no certificate yet: certify first, then link`;
+    for (const c of controllers) if (await sdk.ed25519Verify(sdk.toAddressBytes(c), msg, sig)) return null;
+    return `the signature is not by the key that controls @${handle}'s certificate`;
   }
   return "unknown subject kind";
 }

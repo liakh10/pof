@@ -56,9 +56,13 @@ export async function handleMessage(msg, backend) {
   }
 }
 
-/** Handle a single message or a batch (2025-03-26 and older allow batches). */
+export const MAX_BATCH = 10;
+
+/** Handle a single message or a batch (2025-03-26 and older allow batches; POF-14: at most MAX_BATCH). */
 export async function handlePayload(payload, backend) {
   if (Array.isArray(payload)) {
+    if (payload.length === 0) return err(null, -32600, "empty batch");
+    if (payload.length > MAX_BATCH) return err(null, -32600, `a batch holds at most ${MAX_BATCH} messages`);
     const out = (await Promise.all(payload.map((m) => handleMessage(m, backend)))).filter(Boolean);
     return out.length ? out : null;
   }

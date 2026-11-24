@@ -4,7 +4,7 @@
  * tolerating small naming differences so an IDL rename does not break consumers.
  */
 import { POF_IDL, POF_GATE_IDL } from "./idl/index.js";
-import { decodeAccount, fieldOffset } from "./borsh.js";
+import { decodeAccount, fieldOffset, Reader } from "./borsh.js";
 import { toHex, u64le } from "./bytes.js";
 import { findProgramAddress } from "./pda.js";
 import { toAddressBytes } from "./base58.js";
@@ -69,6 +69,7 @@ export function decodeCertificate(address, data) {
         rootSlot: num(pick(r, "root_slot", "rootSlot")),
         nullsetHash: optHex(pick(r, "nullset_hash", "nullsetHash")),
         renewals: num(pick(r, "renewals")) ?? 0,
+        nonce: optHex(pick(r, "nonce")),
         revealed: revIdx !== null && revIdx !== 255
             ? { index: revIdx, salt: hex(pick(r, "revealed_salt")), nullifier: hex(pick(r, "revealed_nullifier")) }
             : null,
@@ -186,3 +187,34 @@ export const layout = {
         offset: (field) => fieldOffset(gateIdl, "Member", field),
     },
 };
+/** Decode every pof event in a transaction's log lines. */
+export function decodeEvents(logs, idl = pofIdl) {
+    const evs = idl.events ?? [];
+    const out = [];
+    for (const l of logs) {
+        const m = /^Program data: (.+)$/.exec(l);
+        if (!m)
+            continue;
+        let b;
+        try {
+            const bin = atob(m[1]);
+            b = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+        }
+        catch {
+            continue;
+        }
+        const e = evs.find((x) => x.discriminator.every((v, i) => b[i] === v));
+        if (!e)
+            continue;
+        const d = idl.types?.find((t) => t.name === e.name);
+        if (!d || d.type.kind !== "struct")
+            continue;
+        try {
+            out.push({ name: e.name, data: new Reader(b, 8).struct(idl, d.type.fields ?? []) });
+        }
+        catch {
+            /* a truncated line */
+        }
+    }
+    return out;
+}

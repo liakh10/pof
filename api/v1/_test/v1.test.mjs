@@ -14,6 +14,7 @@ const get = async (path, query = {}) => {
 beforeEach(async () => {
   w = await makeWorld();
   log = await makeLog(7);
+  await w.rpc.putConfig({ verifier: log.verifierKey });
   setClient(w.client);
   clearMemo();
 });
@@ -143,6 +144,19 @@ test("GET /v1/log/head and /v1/log/proof/:id verify the verifier's log", async (
   const t = await handleV1({ method: "GET", path: "log/proof/2", query: {}, env, fetch: evil });
   assert.equal(JSON.parse(t.body).verified, false);
   assert.equal(JSON.parse(t.body).checks.included, false);
+  // POF-13: a log signed by a key the program's Config does not list is never "verified"
+  const { clearMemo } = await import("../_lib.js");
+  await w.rpc.putConfig({ verifier: rand() });
+  clearMemo();
+  r = await get("log/head");
+  assert.equal(r.json.keyTrusted, false);
+  assert.equal(r.json.signatureValid, false);
+  r = await get("log/proof/1");
+  assert.equal(r.json.verified, false);
+  assert.equal(r.json.checks.keyTrusted, false);
+  // POF-20: no Host-derived log URL in production
+  const p = await handleV1({ method: "GET", path: "log/head", query: {}, env: { VERCEL_ENV: "production" }, origin: "https://evil.test" });
+  assert.equal(p.status, 503);
 });
 
 test("no RPC configured reads 503, RPC failure reads 502", async () => {
@@ -161,4 +175,75 @@ test("the OpenAPI file is served and lists every route", async () => {
   const spec = JSON.parse(r.body);
   assert.equal(spec.openapi, "3.1.0");
   for (const p of ["/certificates/{subject}", "/certificates", "/rooms/{room}", "/stats", "/log/head", "/log/proof/{id}"]) assert.ok(spec.paths[p], p);
+});
+
+test("GET /v1/log/consistency verifies against the signed head", async () => {
+  const before = log.sth.treeSize;
+  await log.append(5);
+  let r = await get("log/consistency", { first: String(before) });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.second, before + 5);
+  assert.equal(r.json.secondRootSigned, true);
+  assert.equal(r.json.verified, true);
+  r = await get("log/consistency", { first: "2", second: "6" });
+  assert.equal(r.json.verified, true);
+  assert.equal((await get("log/consistency", {})).status, 400);
+  assert.equal((await get("log/consistency", { first: "99" })).status, 404);
+  const evil = async (url) => {
+    const res = await log.fetch(url);
+    if (!url.includes("consistency=")) return res;
+    const j = await res.json();
+    j.path[0] = "00".repeat(32);
+    return new Response(JSON.stringify(j), { status: 200 });
+  };
+  const t = await handleV1({ method: "GET", path: "log/consistency", query: { first: "3" }, env, fetch: evil });
+  assert.equal(JSON.parse(t.body).verified, false);
+});
+
+test("GET /v1/badge/{subject}.svg renders live, revoked with slot, expired, below tier and none", async () => {
+  const svg = async (s, q = {}) => {
+    const r = await handleV1({ method: "GET", path: `badge/${encodeURIComponent(s)}.svg`, query: q, env, fetch: log.fetch });
+    assert.equal(r.status, 200, r.body);
+    assert.match(r.headers["content-type"], /image\/svg\+xml/);
+    return r.body;
+  };
+  let b = await svg("@anon");
+  assert.match(b, /≥ 10,000 SOL/);
+  assert.match(b, />LIVE</);
+  assert.match(b, /^<svg/);
+  b = await svg(w.spent);
+  assert.match(b, /REVOKED · slot 4500/);
+  b = await svg(w.whale, { asset: "USDC" });
+  assert.match(b, />EXPIRED</);
+  b = await svg(w.whale, { asset: "SOL", minTier: "5" });
+  assert.match(b, /BELOW TIER/);
+  b = await svg(rand(), { theme: "dark" });
+  assert.match(b, /NO CERTIFICATE/);
+  assert.match(b, /#141518/);
+  const bad = await handleV1({ method: "GET", path: `badge/${encodeURIComponent("@<script>")}.svg`, query: {}, env });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body, /^<svg/);
+  assert.equal(bad.body.includes("<script>"), false);
+});
+
+test("GET /v1/witness serves the witness document with its cosignatures checked", async () => {
+  const { setWitnessSource } = await import("../_lib.js");
+  setWitnessSource(async () => null);
+  assert.equal((await get("witness")).status, 404);
+  const { Witness, signerFromSecret } = await import("../../../witness/witness.js");
+  const { MemoryState } = await import("../../../witness/store.js");
+  const { PofClient, LogReader } = await import("../../../sdk/dist/index.js");
+  const crypto = await import("node:crypto");
+  const kp = crypto.generateKeyPairSync("ed25519");
+  const secret = Uint8Array.from([...Buffer.from(kp.privateKey.export({ format: "jwk" }).d, "base64url"), ...Buffer.from(kp.publicKey.export({ format: "jwk" }).x, "base64url")]);
+  const state = new MemoryState();
+  const wit = new Witness({ reader: new LogReader(log.base, log.fetch), client: w.client, signer: signerFromSecret(secret), state });
+  assert.equal((await wit.step()).ok, true);
+  setWitnessSource(() => state.get());
+  const r = await get("witness");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.cosignaturesValid, true);
+  assert.equal(r.json.latest.treeSize, 7);
+  setWitnessSource(null);
+  void PofClient;
 });

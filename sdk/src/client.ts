@@ -6,7 +6,7 @@ import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, ASSETS, tierMinimum, parseAsset } 
 import { parseSubjectQuery, subjectHash, type Subject } from "./subject.js";
 import {
   certificateAddress, configAddress, treasuryAddress, decodeConfig, decodeTreasury, activeVerifier,
-  type PofConfig, type Treasury, decodeCertificate, decodeMember, decodeRoom, effectiveStatus, layout,
+  type PofConfig, type Treasury, decodeCertificate, decodeEvents, decodeMember, decodeRoom, effectiveStatus, layout,
   type Certificate, type Member, type Room, type StatusName,
 } from "./accounts.js";
 
@@ -129,6 +129,45 @@ export class PofClient {
     if (!acc || acc.owner !== this.programId) return null;
     const c = decodeConfig(acc.data);
     return { ...c, activeVerifier: activeVerifier(c, slot), slot };
+  }
+
+  /**
+   * The verifier keys a log head or entry may be signed with: the Config's verifier and scheduled next verifier, plus,
+   * with `history`, every key a `VerifierSet` event ever named (read from the Config account's transaction history,
+   * when the RPC serves it). Never trust the key a head or a leaf names about itself.
+   */
+  async verifierKeys(opts: { history?: boolean; maxTransactions?: number } = {}): Promise<{ current: string | null; next: string | null; all: string[]; fromHistory: boolean }> {
+    const c = await this.getConfig();
+    const keys = new Set<string>();
+    const DEFAULT = "11111111111111111111111111111111";
+    if (c) {
+      keys.add(c.verifier);
+      if (c.nextVerifier) keys.add(c.nextVerifier);
+    }
+    let fromHistory = false;
+    if (opts.history && this.rpc.getSignaturesForAddress && this.rpc.getTransactionLogs) {
+      const [cfg] = await configAddress(this.programId);
+      let before: string | undefined;
+      let seen = 0;
+      const max = opts.maxTransactions ?? 2000;
+      for (;;) {
+        const page = await this.rpc.getSignaturesForAddress(cfg, { before, limit: Math.min(1000, max - seen) });
+        if (!page.length) break;
+        for (const sig of page) {
+          if (sig.err) continue;
+          const logs = await this.rpc.getTransactionLogs(sig.signature);
+          for (const e of decodeEvents(logs ?? [])) {
+            if (e.name !== "VerifierSet") continue;
+            for (const k of [e.data.verifier, e.data.next_verifier]) if (k && k !== DEFAULT) keys.add(String(k));
+          }
+        }
+        seen += page.length;
+        before = page[page.length - 1].signature;
+        if (page.length < 1000 || seen >= max) break;
+      }
+      fromHistory = true;
+    }
+    return { current: c ? activeVerifier(c, c.slot) : null, next: c?.nextVerifier ?? null, all: [...keys], fromHistory };
   }
 
   /** The Treasury's public counters, and the transparency log head anchored on chain. */

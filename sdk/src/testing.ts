@@ -42,6 +42,18 @@ export class MemoryRpc implements RpcLike {
     });
   }
 
+  /** transaction history for verifierKeys({ history: true }): address → [{ signature, logs }] newest first */
+  history = new Map<string, { signature: string; logs: string[] }[]>();
+  async getSignaturesForAddress(address: string, opts: { before?: string; limit?: number } = {}) {
+    let list = this.history.get(address) ?? [];
+    if (opts.before) list = list.slice(list.findIndex((x) => x.signature === opts.before) + 1);
+    return list.slice(0, opts.limit ?? 1000).map((x, i) => ({ signature: x.signature, slot: 1000 - i, err: null }));
+  }
+  async getTransactionLogs(signature: string) {
+    for (const l of this.history.values()) for (const x of l) if (x.signature === signature) return x.logs;
+    return null;
+  }
+
   put(address: string, owner: string, data: Uint8Array) {
     this.accounts.set(address, { address, owner, lamports: 1_000_000, data });
   }

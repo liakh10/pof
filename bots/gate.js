@@ -25,3 +25,14 @@ export async function evaluate(client, roomInfo, linkRec) {
   }[r.reason];
   return { ok: r.ok, reason: r.reason, text, certificate: c, room: roomInfo, slot: r.slot };
 }
+
+/** POF-24: a creator-chosen room name, safe to put in a chat message: printable, short, no links, no markup. */
+export function safeName(room) {
+  const n = String(room?.name ?? "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, "")
+    .replace(/https?:\/\/\S+|www\.\S+|\S+\.(com|io|xyz|app|gg|me|net|org|so|fun)\S*/gi, "")
+    .replace(/[\[\]()<>@*_~`|#\\]/g, "")
+    .trim()
+    .slice(0, 32);
+  return n ? `"${n}"` : room?.address ?? "this room";
+}

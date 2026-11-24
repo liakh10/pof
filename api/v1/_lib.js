@@ -156,12 +156,40 @@ export function roomJson(r) {
   };
 }
 
+/** Where /v1/witness reads the witness document (tests inject one; production reads the witness's Blob). */
+let witnessSource = null;
+export function setWitnessSource(fn) {
+  witnessSource = fn;
+}
+export async function readWitnessDoc(env = process.env) {
+  if (witnessSource) return witnessSource();
+  if (!env.BLOB_READ_WRITE_TOKEN) return null;
+  const { BlobState } = await import("../../witness/store.js");
+  return new BlobState().get();
+}
+
 /** The transparency log lives with the verifier (CONTRACT §7, GET /api/attest/log). */
 export function logBase(env = process.env, origin) {
   if (env.POF_LOG_URL) return env.POF_LOG_URL.replace(/\/$/, "");
+  // POF-20: never derive a service URL from the Host header in production
+  if (env.VERCEL_ENV === "production" || env.NODE_ENV === "production") throw new HttpError(503, "log_not_configured", "POF_LOG_URL is not configured");
   if (origin) return `${origin}/api/attest/log`;
   throw new HttpError(503, "log_not_configured", "the transparency log URL is not configured");
 }
+
+/** POF-13: the verifier keys come from the chain (Config and its VerifierSet history), never from the log itself. */
+export async function trustedKeys(client) {
+  if (!client) return { all: [], current: null, fromHistory: false };
+  return remember("verifierKeys", 60_000, () => client.verifierKeys({ history: true, maxTransactions: 500 }).catch(() => client.verifierKeys()));
+}
+
+const keyEq = (a, b) => {
+  try {
+    return sdk.encodeBase58(sdk.keyBytes(a)) === sdk.encodeBase58(sdk.keyBytes(b));
+  } catch {
+    return false;
+  }
+};
 
 export async function logGet(base, qs, f = fetch) {
   let res;
@@ -179,7 +207,9 @@ export async function logGet(base, qs, f = fetch) {
 export async function verifiedHead(base, client, f) {
   const head = await logGet(base, "head", f);
   const programId = client?.programId ?? sdk.POF_PROGRAM_ID;
-  const signatureValid = await sdk.verifyTreeHead(head, programId).catch(() => false);
+  const keys = await trustedKeys(client);
+  const keyTrusted = keys.all.some((k) => keyEq(k, head.verifierKey));
+  const signatureValid = keyTrusted && (await sdk.verifyTreeHead(head, programId).catch(() => false));
   // the latest head anchored on chain by anchor_log (Treasury), and whether this head is consistent with it
   let anchor = null;
   const t = client ? await client.getTreasury().catch(() => null) : null;
@@ -195,11 +225,12 @@ export async function verifiedHead(base, client, f) {
       }
     } else anchor.consistent = false;
   }
-  return { ...head, signatureValid, programId, anchor };
+  return { ...head, signatureValid, keyTrusted, trustedKeys: keys.all, programId, anchor };
 }
 
-export async function verifiedProof(base, client, index, f) {
+export async function verifiedProof(base, client, index, f, { certificate } = {}) {
   const programId = client?.programId ?? sdk.POF_PROGRAM_ID;
+  const keys = await trustedKeys(client);
   const head = await logGet(base, "head", f);
   if (index >= head.treeSize) throw new HttpError(404, "not_found", `log entry ${index} does not exist yet (the log has ${head.treeSize})`);
   const [entry, proof] = await Promise.all([
@@ -207,8 +238,15 @@ export async function verifiedProof(base, client, index, f) {
     logGet(base, `proof=${index}&size=${head.treeSize}`, f),
   ]);
   const check = await sdk.verifyLogEntry({
-    leaf: entry.leaf, index, proof: { treeSize: proof.treeSize, rootHash: proof.rootHash, path: proof.path }, head, programId,
+    leaf: entry.leaf, index, proof: { treeSize: proof.treeSize, rootHash: proof.rootHash, path: proof.path }, head, programId, trustedKeys: keys.all,
   });
+  // POF-18: a certificate's log_index is the submitter's word; match the signed bytes instead
+  let certificateMatch = null;
+  if (certificate && check.leaf && client) {
+    const acc = await client.rpc.getAccount(certificate);
+    if (acc && acc.owner === client.programId) certificateMatch = sdk.matchCertificateLeaf(sdk.decodeCertificate(certificate, acc.data), check.leaf);
+    else certificateMatch = { matches: false, mismatched: ["certificate not found"] };
+  }
   const a = check.leaf?.attestation;
   return {
     index,
@@ -238,7 +276,9 @@ export async function verifiedProof(base, client, index, f) {
       : null,
     proof: { treeSize: proof.treeSize, rootHash: proof.rootHash, path: proof.path },
     head,
-    verified: check.ok,
+    trustedKeys: keys.all,
+    verified: check.ok && (certificateMatch ? certificateMatch.matches : true),
     checks: check.checks,
+    certificateMatch,
   };
 }
