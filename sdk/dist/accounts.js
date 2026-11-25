@@ -132,6 +132,7 @@ export function decodeConfig(data) {
         })),
         paused: !!r.paused, closing: !!r.closing, launchSlot: num(r.launch_slot) ?? 0,
         revokedKeys: (r.revoked_keys ?? []).map((k) => String(k)).filter((k) => k !== DEFAULT_KEY),
+        revokedAt: Object.fromEntries((r.revoked_keys ?? []).map((k, i) => [String(k), num(r.revoked_at?.[i]) ?? 0]).filter(([k]) => k !== DEFAULT_KEY)),
         heldDelay: num(r.held_delay) ?? 0,
         heldUntil: num(r.held_until) ?? 0,
         rotationDelayAt(slot) {

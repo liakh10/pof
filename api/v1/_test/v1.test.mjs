@@ -357,7 +357,7 @@ test("voided (revoked verifier key) and settling (zk) read through /v1, the badg
   const leaked = rand();
   const holder = rand();
   await w.rpc.putCertificate({ subject: sdk.walletSubject(holder), asset: 0, tier: 4, expirySlot: 9000, verifier: leaked });
-  await w.rpc.putConfig({ verifier: log.verifierKey, revoked_keys: [leaked, ...Array(3).fill("11111111111111111111111111111111")] });
+  await w.rpc.putConfig({ verifier: log.verifierKey, revoked_keys: [leaked, ...Array(7).fill("11111111111111111111111111111111")] });
   let r = await get(`certificates/${holder}`, { asset: "SOL", minTier: "1" });
   assert.equal(r.json.certificates[0].status, "voided");
   assert.equal(r.json.certificates[0].statusOnChain, "live");

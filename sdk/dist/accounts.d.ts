@@ -110,6 +110,8 @@ export interface PofConfig {
     launchSlot: number;
     /** verifier keys the admin revoked: every certificate they signed is dead (status 4 once voided) */
     revokedKeys: string[];
+    /** the slot each revoked key was revoked at, by key */
+    revokedAt: Record<string, number>;
     /** a lowered rotation delay takes effect only after the old one ran: until heldUntil, a new verifier waits heldDelay */
     heldDelay: number;
     heldUntil: number;

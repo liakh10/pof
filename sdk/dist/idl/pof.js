@@ -510,6 +510,27 @@ export const POF_IDL = {
                     }
                 },
                 {
+                    "name": "treasury",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
                     "name": "buffer",
                     "writable": true
                 },
@@ -776,6 +797,27 @@ export const POF_IDL = {
                     "name": "revoker",
                     "writable": true,
                     "signer": true
+                },
+                {
+                    "name": "treasury",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ]
+                            }
+                        ]
+                    }
                 },
                 {
                     "name": "certificate"
@@ -3264,7 +3306,20 @@ export const POF_IDL = {
                         "type": {
                             "array": [
                                 "pubkey",
-                                4
+                                8
+                            ]
+                        }
+                    },
+                    {
+                        "name": "revoked_at",
+                        "docs": [
+                            "The slot each was revoked at. A full list reuses an entry once VALIDITY_MAX slots have passed since its revocation: by then",
+                            "every certificate that key signed has expired."
+                        ],
+                        "type": {
+                            "array": [
+                                "u64",
+                                8
                             ]
                         }
                     },
@@ -3848,6 +3903,13 @@ export const POF_IDL = {
                         "name": "voided",
                         "docs": [
                             "Certificates voided because their Verifier key was revoked."
+                        ],
+                        "type": "u64"
+                    },
+                    {
+                        "name": "paths",
+                        "docs": [
+                            "Staged revoke buffers open now (close_config waits for 0, so no buffer's rent is ever stranded)."
                         ],
                         "type": "u64"
                     },

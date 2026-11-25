@@ -204,7 +204,7 @@ test("status 4 voided, a certificate signed by a revoked verifier key, and a zk 
     subject_kind: 0, subject_hash: await sdk.subjectHash(sdk.walletSubject(z)), asset: 0, tier: 3, status: 0, certified_slot: 5000, issued_slot: 5100,
     expiry_slot: 9000, note_count: 1, verifier: sdk.ZK_CONFIG, controller: z, revealed_index: 255, bump,
   }));
-  await rpc.putConfig({ verifier: good, revoked_keys: [leaked, "11111111111111111111111111111111", "11111111111111111111111111111111", "11111111111111111111111111111111"] });
+  await rpc.putConfig({ verifier: good, revoked_keys: [leaked, ...Array(7).fill("11111111111111111111111111111111")] });
   assert.equal((await client.checkProofOfFunds({ subject: a, asset: 0, minTier: 1 })).reason, "voided", "before anyone calls void_by_key");
   assert.equal((await client.checkProofOfFunds({ subject: b, asset: 0, minTier: 4 })).ok, true);
   assert.equal((await client.checkProofOfFunds({ subject: v, asset: 0, minTier: 1 })).reason, "voided");

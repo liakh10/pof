@@ -217,6 +217,8 @@ export interface PofConfig {
   launchSlot: number;
   /** verifier keys the admin revoked: every certificate they signed is dead (status 4 once voided) */
   revokedKeys: string[];
+  /** the slot each revoked key was revoked at, by key */
+  revokedAt: Record<string, number>;
   /** a lowered rotation delay takes effect only after the old one ran: until heldUntil, a new verifier waits heldDelay */
   heldDelay: number;
   heldUntil: number;
@@ -246,6 +248,7 @@ export function decodeConfig(data: Uint8Array): PofConfig {
     })),
     paused: !!r.paused, closing: !!r.closing, launchSlot: num(r.launch_slot) ?? 0,
     revokedKeys: (r.revoked_keys ?? []).map((k: any) => String(k)).filter((k: string) => k !== DEFAULT_KEY),
+    revokedAt: Object.fromEntries((r.revoked_keys ?? []).map((k: any, i: number) => [String(k), num(r.revoked_at?.[i]) ?? 0]).filter(([k]: [string]) => k !== DEFAULT_KEY)),
     heldDelay: num(r.held_delay) ?? 0,
     heldUntil: num(r.held_until) ?? 0,
     rotationDelayAt(slot: number) {

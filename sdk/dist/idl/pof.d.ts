@@ -247,6 +247,15 @@ export declare const POF_IDL: {
                 }];
             };
         }, {
+            readonly name: "treasury";
+            readonly writable: true;
+            readonly pda: {
+                readonly seeds: readonly [{
+                    readonly kind: "const";
+                    readonly value: readonly [116, 114, 101, 97, 115, 117, 114, 121];
+                }];
+            };
+        }, {
             readonly name: "buffer";
             readonly writable: true;
         }, {
@@ -374,6 +383,15 @@ export declare const POF_IDL: {
             readonly name: "revoker";
             readonly writable: true;
             readonly signer: true;
+        }, {
+            readonly name: "treasury";
+            readonly writable: true;
+            readonly pda: {
+                readonly seeds: readonly [{
+                    readonly kind: "const";
+                    readonly value: readonly [116, 114, 101, 97, 115, 117, 114, 121];
+                }];
+            };
         }, {
             readonly name: "certificate";
         }, {
@@ -1685,7 +1703,13 @@ export declare const POF_IDL: {
                 readonly name: "revoked_keys";
                 readonly docs: readonly ["Verifier keys revoked by the admin (leaked or retired): they sign nothing more, and every certificate they signed is dead", "for require_certificate and Rooms at once, and can be voided by anyone."];
                 readonly type: {
-                    readonly array: readonly ["pubkey", 4];
+                    readonly array: readonly ["pubkey", 8];
+                };
+            }, {
+                readonly name: "revoked_at";
+                readonly docs: readonly ["The slot each was revoked at. A full list reuses an entry once VALIDITY_MAX slots have passed since its revocation: by then", "every certificate that key signed has expired."];
+                readonly type: {
+                    readonly array: readonly ["u64", 8];
                 };
             }, {
                 readonly name: "bump";
@@ -2067,6 +2091,10 @@ export declare const POF_IDL: {
             }, {
                 readonly name: "voided";
                 readonly docs: readonly ["Certificates voided because their Verifier key was revoked."];
+                readonly type: "u64";
+            }, {
+                readonly name: "paths";
+                readonly docs: readonly ["Staged revoke buffers open now (close_config waits for 0, so no buffer's rent is ever stranded)."];
                 readonly type: "u64";
             }, {
                 readonly name: "log_size";
