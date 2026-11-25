@@ -95,12 +95,22 @@ await finding('FZ-06', 'a membership path longer than 24 levels cannot be submit
   return { reproduced: sizes[40] !== 'ok' && !staged, detail: `16: ${sizes[16]}, 24: ${sizes[24]}, 25: ${sizes[25]}, 40: ${sizes[40]}; a staged path instruction ${staged ? 'exists (' + staged.name + ')' : 'does not exist'}` };
 });
 
+await finding('FZ-18', 'certify_zk: a zk certificate revoked as spent is remade by replaying its own proof, and passes the gates after the settle window', async () => {
+  if (!P.ixs.certify_zk) return { reproduced: false, detail: 'launch build: no certify_zk' };
+  // the zk suite does it with real Groth16 proofs; run it here and read its record
+  const { zk } = await import('./suites/zk.mjs');
+  await zk(W, { proofOffsets: 2 });
+  const r = W.zkReplay;
+  return { reproduced: !!r, detail: r ? `replayed proof landed; after the settle window require_certificate ${r.passes ? 'passes' : 'refuses'}` : `the replayed proof was refused: ${W.zkReplayWhy}` };
+});
+
 await finding('FZ-09', 'revoked_keys holds 4 keys and nothing removes one: a fifth leaked Verifier key cannot be revoked', async () => {
   if (!P.ixs.revoke_verifier_key) return { reproduced: false, detail: 'no revoke_verifier_key in this build' };
   let n = 0, last;
-  for (let i = 0; i < 6; i++) { last = await h.send([P.ix('revoke_verifier_key', { key: W.kp().publicKey }, { admin: admin.publicKey })], [admin]); if (!last.ok) break; n++; }
+  for (let i = 0; i < 12; i++) { last = await h.send([P.ix('revoke_verifier_key', { key: W.kp().publicKey }, { admin: admin.publicKey })], [admin]); if (!last.ok) break; n++; }
   const c = await W.config();
-  return { reproduced: !last.ok, detail: `${c.revoked_keys.filter(k => k !== PublicKey.default.toBase58()).length} keys held; the next one: ${last.ok ? 'accepted' : last.why}` };
+  const reuse = 'revoked_at' in c;
+  return { reproduced: !reuse, detail: `${c.revoked_keys.filter(k => k !== PublicKey.default.toBase58()).length} keys held; the next one: ${last.ok ? 'accepted' : last.why}; ${reuse ? 'an entry is reusable VALIDITY_MAX slots after its revocation (revoked_at)' : 'no entry is ever freed'}` };
 });
 
 await finding('FZ-07', 'a kind 0 / kind 2 attestation whose controller is the default key (11111…) is accepted (nobody can ever revoke_by_holder it)', async () => {
@@ -125,6 +135,13 @@ await finding('FZ-08', 'close_config succeeds while a staged path buffer is open
   const cp = await h.send([P.ix('close_path', {}, { caller: rev.publicKey, buffer: buf, revoker: rev.publicKey })], [rev]);
   const left = await h.info(buf);
   return { reproduced: !!left, detail: `close_config ok; close_path afterwards: ${cp.ok ? 'ok' : cp.why}; buffer ${left ? 'still exists (' + left.lamports + ' lamports)' : 'gone'}` };
+});
+
+await finding('FZ-19', 'zk build: ZkOwner records ["zkowner", owner] have no close path: after the wind-down POF still owns them and their rent is stranded', async () => {
+  if (!P.ixs.register_zk_owner || !P.ixs.register_zk_owner.accounts.some(a => a.name === 'owner_record')) return { reproduced: false, detail: 'no ZkOwner records in this build' };
+  const left = (await h.conn.getProgramAccounts(P.programId)).filter(x => P.decodeAccount('ZkOwner', x.account.data));
+  const closer = Object.keys(P.ixs).find(n => /owner/.test(n) && /close|release/.test(n));
+  return { reproduced: left.length > 0 && !closer, detail: `${left.length} ZkOwner records left after the wind-down attempt (${left.reduce((a, x) => a + x.account.lamports, 0)} lamports); a closing instruction ${closer ? 'exists: ' + closer : 'does not exist'}` };
 });
 
 fs.writeFileSync(path.join(FUZZ, 'results', 'repro.json'), JSON.stringify({ at: new Date().toISOString(), snapshot: JSON.parse(fs.readFileSync(path.join(FUZZ, 'results/snapshot.json'), 'utf8')).sources['programs/pof/src/lib.rs'], findings: out }, null, 1));

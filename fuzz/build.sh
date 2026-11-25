@@ -6,6 +6,7 @@
 # results/snapshot.json, so each report row names the exact code it ran against.
 #   zsh fuzz/build.sh            snapshot the working tree of pof/program
 #   SNAP_REF=<commit> zsh fuzz/build.sh   snapshot a commit instead (git show)
+#   FEATURES=zk SNAP_REF=<commit> zsh fuzz/build.sh   also enable cargo features of pof (and pof_gate) beside quick: the zk build
 set -e
 here=${0:A:h}
 prog=$here/../program
@@ -29,20 +30,26 @@ export CARGO_TARGET_DIR=$S/target
 out=$S/so
 rm -rf $out && mkdir -p $out
 cd $ws
-cargo build-sbf --manifest-path programs/pof/Cargo.toml --features quick --sbf-out-dir $out 2>&1 | grep -vE '^\s*(Compiling|Downloaded|Downloading)' | tail -5
-cargo build-sbf --manifest-path programs/pof_gate/Cargo.toml --features quick --sbf-out-dir $out 2>&1 | grep -vE '^\s*(Compiling|Downloaded|Downloading)' | tail -5
-cargo build-sbf --manifest-path programs/hostile/Cargo.toml --sbf-out-dir $out 2>&1 | grep -vE '^\s*(Compiling|Downloaded|Downloading)' | tail -5
+# cargo build-sbf re-links its rustup toolchain on start; a first run right after that can fail to find rustc: retry once
+sbf() { cargo build-sbf "$@" > $S/sbf.log 2>&1 || cargo build-sbf "$@" > $S/sbf.log 2>&1 || { tail -20 $S/sbf.log; exit 1; }; grep -E 'Finished|warning: unused' $S/sbf.log | tail -2; }
+feat=quick${FEATURES:+,$FEATURES}
+gfeat=quick
+[[ -n $FEATURES ]] && grep -q "^zk" programs/pof_gate/Cargo.toml && gfeat=quick,$FEATURES
+sbf --manifest-path programs/pof/Cargo.toml --features $feat --sbf-out-dir $out
+sbf --manifest-path programs/pof_gate/Cargo.toml --features $gfeat --sbf-out-dir $out
+sbf --manifest-path programs/hostile/Cargo.toml --sbf-out-dir $out
 ls -la $out/*.so
 # the IDLs of this snapshot (the fuzzer's codec reads them, never pof/program/idl)
 mkdir -p $S/idl
-for p in pof pof_gate; do anchor idl build -p $p -o $S/idl/$p.json >/dev/null 2>$S/idl/$p.err || { echo "idl $p failed"; tail -20 $S/idl/$p.err; exit 1; }; done
+idlargs=(); [[ -n $FEATURES ]] && idlargs=(-- --features $FEATURES)
+for p in pof pof_gate; do anchor idl build -p $p -o $S/idl/$p.json $idlargs >/dev/null 2>$S/idl/$p.err || { echo "idl $p failed"; tail -20 $S/idl/$p.err; exit 1; }; done
 # what was built: the source hashes, the binaries' hashes and sizes
 node -e '
 const fs=require("fs"),c=require("crypto"),p=require("path");
 const ws=process.argv[1],out=process.argv[2],ref=process.argv[3];
 const h=f=>c.createHash("sha256").update(fs.readFileSync(f)).digest("hex");
-const files=["programs/pof/src/lib.rs","programs/pof/src/ext.rs","programs/pof/src/errors.rs","programs/pof_gate/src/lib.rs","programs/hostile/src/lib.rs","Cargo.lock"];
+const files=["programs/pof/src/lib.rs","programs/pof/src/ext.rs","programs/pof/src/errors.rs","programs/pof/src/zk.rs","programs/pof/src/groth16.rs","programs/pof/src/vk.rs","programs/pof_gate/src/lib.rs","programs/hostile/src/lib.rs","Cargo.lock"].filter(f=>fs.existsSync(p.join(ws,f)));
 const so=fs.readdirSync(out).filter(f=>f.endsWith(".so"));
-const snap={built:new Date().toISOString(),ref:ref||"working tree",feature:"quick",sources:Object.fromEntries(files.map(f=>[f,h(p.join(ws,f))])),binaries:Object.fromEntries(so.map(f=>[f,{sha256:h(p.join(out,f)),bytes:fs.statSync(p.join(out,f)).size}]))};
+const snap={built:new Date().toISOString(),ref:ref||"working tree",feature:"quick"+(process.env.FEATURES?","+process.env.FEATURES:""),sources:Object.fromEntries(files.map(f=>[f,h(p.join(ws,f))])),binaries:Object.fromEntries(so.map(f=>[f,{sha256:h(p.join(out,f)),bytes:fs.statSync(p.join(out,f)).size}]))};
 fs.mkdirSync(process.argv[4],{recursive:true});fs.writeFileSync(p.join(process.argv[4],"snapshot.json"),JSON.stringify(snap,null,1));console.log(JSON.stringify(snap.sources,null,1));
 ' $ws $out "$SNAP_REF" $here/results

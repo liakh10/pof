@@ -24,8 +24,11 @@ export async function revsig(W, o = {}) {
   }
   expect('valid_until in the past', 'revoke_signed', await h.sim([W.edIx(x.ctl, revBytes(x.addr, x.c, 5n)), ix(x.addr, 5n)], [caller]), 'Expired');
   const MAX = (1n << 64n) - 1n;
-  expect('valid_until = u64::MAX', 'revoke_signed', await h.sim([W.edIx(x.ctl, revBytes(x.addr, x.c, MAX)), ix(x.addr, MAX)], [caller]), null);
-  note('valid_until has no upper bound on chain: a signed revoke with valid_until = u64::MAX stays usable for the certificate\'s whole life (the client chooses now + 1,500)');
+  expect('valid_until = u64::MAX', 'revoke_signed', await h.sim([W.edIx(x.ctl, revBytes(x.addr, x.c, MAX)), ix(x.addr, MAX)], [caller]), W.fixed2 ? 'BadExpiry' : null);
+  if (W.fixed2) {
+    const s0 = BigInt(await h.slotNow());
+    for (const [d, want] of [[8_990n, null], [9_010n, 'BadExpiry']]) { const v = s0 + d; const r = await h.sim([W.edIx(x.ctl, revBytes(x.addr, x.c, v)), ix(x.addr, v)], [caller]); expect(`valid_until = now + ${d} (window 9,000)`, 'revoke_signed', r, want); }
+  } else note('valid_until has no upper bound on chain: a signed revoke with valid_until = u64::MAX stays usable for the certificate\'s whole life (the client chooses now + 1,500)');
   expect('signed by another key', 'revoke_signed', await h.sim([W.edIx(W.kp(), msg), ix(x.addr, vu)], [caller]), 'NotController');
   expect('signed by the Verifier key', 'revoke_signed', await h.sim([W.edIx(W.V, msg), ix(x.addr, vu)], [caller]), 'NotController');
   expect('no Ed25519 instruction', 'revoke_signed', await h.sim([ix(x.addr, vu)], [caller]), 'NoSignature');

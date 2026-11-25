@@ -48,8 +48,9 @@ export async function voidkey(W, o = {}) {
   expect('remake over a voided certificate', 'certify', await W.certify(x.ctl, rx), null);
   // the list holds 4 keys and nothing removes one
   let full = null;
-  for (let i = 0; i < 4; i++) { const r = await h.send([rk(W.kp().publicKey)], [admin]); if (!r.ok) { full = { i, why: r.why }; break; } }
+  for (let i = 0; i < 12; i++) { const r = await h.send([rk(W.kp().publicKey)], [admin]); if (!r.ok) { full = { i, why: r.why }; break; } }
   expect('a fifth revoked key once the list is full', 'revoke_verifier_key', full ? { ok: false, why: full.why } : await h.sim([rk(W.kp().publicKey)], [admin]), 'BadParams');
-  note(`revoked_keys holds ${P.codec.types.Config ? 4 : '?'} keys and has no removal: after ${full ? full.i + 1 : 4} revocations a further leaked key can only be paused, not revoked`);
+  const reuse = P.codec.types.Config.type.fields.some(f => f.name === 'revoked_at');
+  note(`revoked_keys is full after ${full ? full.i + 2 : '?'} keys; ${reuse ? 'an entry is reused once VALIDITY_MAX slots have passed since its revocation (revoked_at)' : 'nothing removes an entry'}`);
   await W.invariants('void end');
 }

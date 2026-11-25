@@ -98,9 +98,12 @@ export async function world(seed) {
 
   /* ---------------------------------------------------------------- the model of certify's checks before the signature */
   const DEFAULT = PublicKey.default;
+  // cd51f22 and later (the Treasury counts staged paths): FZ-05/07/08/09 fixed, e.g. no default controller for any kind
+  const fixed2 = (idls.pof.types.find(t => t.name === 'Treasury')?.type.fields || []).some(f => f.name === 'paths');
   function model(a, slot, c) {
     if (c.closing) return 'Closing';
     if (c.paused) return 'Paused';
+    if (fixed2 && new PublicKey(a.controller).equals(DEFAULT)) return 'NotController';
     if (a.subject_kind === 0 || a.subject_kind === 2) { if (!keySubject(a.subject_kind, new PublicKey(a.controller)).equals(Buffer.from(a.subject_hash))) return 'SubjectMismatch'; }
     else if (a.subject_kind === 1) { if (new PublicKey(a.controller).equals(DEFAULT)) return 'NotController'; }
     else return 'BadSubjectKind';
@@ -170,7 +173,7 @@ export async function world(seed) {
     if (!p.ok) throw Error('set_params: ' + p.why);
   }
 
-  const api = { h, P, G, HOSTILE, R, fx, admin, V, V2, V3, relayer, dev, users, kp, K, certPda, roomPda, memberPda, nfPda, decode, config, treasury, cert,
+  const api = { fixed2, h, P, G, HOSTILE, R, fx, admin, V, V2, V3, relayer, dev, users, kp, K, certPda, roomPda, memberPda, nfPda, decode, config, treasury, cert,
     results, suite, expect, note, cover, cu, att, notesOf, certifyIxs, certify, simCertify, revokeSpentIx, revokeHolderIx, expireIx, anchorIxs, joinIx, evictIx, transfer,
     model, invariants, setup, kindOf, attBytes, sthBytes, edIx, keySubject, subjectHash, salted, sha256, u64le };
   return api;

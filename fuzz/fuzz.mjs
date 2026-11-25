@@ -20,6 +20,7 @@ import { cu, cuHolder } from './suites/cu.mjs';
 import { revsig } from './suites/revsig.mjs';
 import { staged } from './suites/staged.mjs';
 import { voidkey } from './suites/voidkey.mjs';
+import { zk } from './suites/zk.mjs';
 
 const seed = BigInt(process.env.SEED || 1);
 const only = process.argv.slice(2);
@@ -73,6 +74,7 @@ await run('admin', async () => {
 await run('rotation', () => rotation(W, { steps: S(40) }));
 await run('machine', () => machine(W, { steps: S(300) }));
 await run('staged', () => staged(W));
+await run('zk', () => zk(W));
 await run('void', () => voidkey(W));
 await run('cu', () => cu(W));
 await run('holder', () => cuHolder(W));
@@ -100,10 +102,21 @@ await run('winddown', async () => {
   expect('close_config with certificates left', 'close_config', await h.sim([P.ix('close_config', {}, { admin: admin.publicKey })], [admin]), 'NotExpired');
   for (const c of inv.certs) { const r = await h.send([W.expireIx(users[1], c.c.subject_hash, c.c.asset, new PublicKey(c.c.payer))], [users[1]]); expect('expire during the wind-down', 'expire', r, null); }
   for (const m of inv.members) { const r = await h.send([W.evictIx(users[1], new PublicKey(m.m.room), m.m.subject_hash, m.m)], [users[1]]); expect('evict during the wind-down', 'evict', r, null); }
+  // the zk build: release every note lock (their certificates are gone), then close_zk (LW-01), before close_config
+  if (P.ixs.close_zk) {
+    const accs = await h.conn.getProgramAccounts(P.programId);
+    for (const x of accs) { const l = P.decodeAccount('NoteLock', x.account.data); if (!l) continue; expect('release a note lock during the wind-down', 'release_note_lock', await h.send([P.ix('release_note_lock', {}, { lock: x.pubkey, certificate: new PublicKey(l.certificate), payer: new PublicKey(l.payer) })], [users[1]]), null); }
+    const zkp = P.pda([Buffer.from('zk')]);
+    if (await h.info(zkp)) expect('close_zk', 'close_zk', await h.send([P.ix('close_zk', {}, { admin: admin.publicKey, zk: zkp, registry: P.pda([Buffer.from('zkreg')]) })], [admin]), null);
+  }
   const inv2 = await W.invariants('all expired');
   const cc = await h.send([P.ix('close_config', {}, { admin: admin.publicKey })], [admin]);
   if (buf?.ok) {
     expect('close_config while a staged path buffer is still open (must refuse, or the buffer is orphaned)', 'close_config', cc, '*');
+    if (!cc.ok) {
+      expect('  close_path during the wind-down', 'close_path', await h.send([buf.close()], [buf.rev]), null);
+      expect('  then close_config', 'close_config', await h.send([P.ix('close_config', {}, { admin: admin.publicKey })], [admin]), null);
+    }
     if (cc.ok) {
       const cp = await h.send([buf.close()], [buf.rev]);
       expect('  close_path after close_config (its config account is gone)', 'close_path', cp, null);
@@ -129,3 +142,4 @@ const out = path.join(FUZZ, 'results', `run-${seed}${only.length ? '-' + only.jo
 fs.writeFileSync(out, JSON.stringify(W.results, (k, v) => typeof v === 'bigint' ? String(v) : v === Infinity ? null : v, 1));
 console.log(`\nseed ${seed}: ${total} cases, ${W.results.unexpected.length} unexpected, ${W.results.invariantChecks || 0} invariant checks, ${W.results.seconds} s → ${path.relative(process.cwd(), out)}`);
 for (const [p, c] of Object.entries(W.results.errorCoverage)) console.log(`  ${p}: ${c.reached.length}/${c.reached.length + c.never.length} error variants reached; never: ${c.never.join(', ')}`);
+process.exit(0);   // snarkjs worker threads (zk suite) keep the event loop alive

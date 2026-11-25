@@ -92,6 +92,42 @@ fs.writeFileSync(path.join(SCRATCH, 'fixture.json'), JSON.stringify(fixture, nul
   fs.writeFileSync(path.join(SCRATCH, 'fixture.json'), JSON.stringify(fixture, null, 1));
 }
 
+/* phase 2 (certify_zk): the zk agent's own fixture scenarios (pof/zk/test/fixtures.mjs, read-only), one ring owned by a key
+   made from the prep seed. Their state roots go into our tree 0's state root history and their (shared) nullifier root becomes the
+   NEWEST nullifier root (the cursor moves to a slot none of the other roots uses); one scenario's note gets a spent nullifier PDA. */
+const ZKF = path.resolve(PROG, '../zk/test/fixtures.mjs');
+if (fs.existsSync(ZKF)) {
+  const F = await import(ZKF);
+  const Z = await import(path.resolve(PROG, '../zk/js/zk.js'));
+  const ringOwner = Keypair.fromSeed(R.bytes(32));
+  const ownerKey = ringOwner.publicKey.toBytes();
+  const SOL1 = 1_000_000_000n;
+  const specs = { one: { amounts: [3n * SOL1], seed: 1n }, four: { amounts: [4n, 3n, 2n, 1n].map(x => x * SOL1), minAmount: 10n * SOL1, seed: 2n }, shared: { amounts: [20n * SOL1], seed: 3n }, spend: { amounts: [2n * SOL1], seed: 4n }, again: { amounts: [6n * SOL1], seed: 7n } };
+  const S = {};
+  for (const [k, v] of Object.entries(specs)) S[k] = await F.scenario({ ...v, ownerKey });
+  const older = await F.scenario({ amounts: [5n * SOL1], seed: 8n, ownerKey, extraNullifiers: 2 });
+  const f = path.join(acc, TREE0 + '.json');
+  const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+  const d = Buffer.from(j.account.data[0], 'base64');
+  const roots = [...Object.values(S), older].map(x => Buffer.from(Z.be32(x.pub.stateRoot)));
+  const len = d.readUInt16LE(114);
+  roots.forEach((r, i) => r.copy(d, 1152 + ((i * 37) % len) * 32));
+  const used = new Set(fixture.tree0Slots);
+  const MF = JSON.parse(fs.readFileSync(path.join(PROG, 'test/fixtures/membership.json'), 'utf8'));
+  for (let i = 0; i < 100; i++) if (d.subarray(17232 + i * 32, 17264 + i * 32).toString('hex') === MF.root) used.add(i);
+  let newest = 20; while (used.has(newest) || used.has(newest - 1)) newest++;
+  Buffer.from(Z.be32(older.pub.nullRoot)).copy(d, 17232 + (newest - 1) * 32);
+  Buffer.from(Z.be32(S.one.pub.nullRoot)).copy(d, 17232 + newest * 32);
+  d.writeBigUInt64LE(BigInt(newest + 1 + 100 * 7), 17224);   // cursor: newest = cursor - 1 (mod 100)
+  j.account.data[0] = d.toString('base64');
+  fs.writeFileSync(f, JSON.stringify(j));
+  const spentNf = Buffer.from(Z.be32(Z.buildInputs(S.spend.P, S.spend).notes[0].nullifier));
+  write(nfPda(TREE0, spentNf), pdaData(55_400), SPP, 706_120);
+  fixture.zk = { ringOwner: Array.from(ringOwner.secretKey), specs: Object.fromEntries(Object.entries(specs).map(([k, v]) => [k, { ...v, amounts: v.amounts.map(String), minAmount: v.minAmount ? String(v.minAmount) : undefined, seed: String(v.seed) }])), older: { amounts: [String(5n * SOL1)], seed: '8', extraNullifiers: 2 }, newestNullSlot: newest, spentNf: hex(spentNf) };
+  fs.writeFileSync(path.join(SCRATCH, 'fixture.json'), JSON.stringify(fixture, null, 1));
+  console.log(`zk: ${Object.keys(S).length} scenarios + older, state roots in tree 0, newest nullifier root at slot ${newest}`);
+}
+
 /* POF's config and treasury at genesis (fuzz/chain.sh loads them unless FUZZ_BARE=1). init_config writes the launch parameters, and
    since POF-17 a lowered rotation delay is held for the old one (216,000 slots in a build whose launch delay is 216,000): the fuzzer
    starts from a config already at its own parameters instead, encoded with the snapshot IDL, so every field of the snapshot's
