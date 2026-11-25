@@ -102,8 +102,9 @@ nullifier = Poseidon( commitment, blinding, rightAlign(nk) )            (keypair
   `Poseidon(left, right)`, 40 levels. The Helius indexer has no membership call, but a **non-inclusion proof for `nf + 1`**
   returns `lowElement = nf` with its path. That path reproduced the current nullifier root, and that root was in the
   on-chain nullifier root history at index 11. **[mainnet read]**
-- **On chain within CU:** 41 two-input `sol_poseidon` calls at about 61·2² + 542 = 786 CU each, so about 32k CU plus
-  overhead. Instruction data: 40 × 32 path + 32 next value + 8 index = 1,320 bytes. That does not fit a legacy transaction
+- **On chain within CU:** 41 two-input `sol_poseidon` calls at about 61·2² + 542 = 786 CU each, about 32k CU for the
+  hashes alone. **Measured** in the program (`revoke_spent` with the membership path): **64,626 CU** in one transaction;
+  the staged path (the proof written to a buffer first) costs 22.6k, 5.3k and 68.4k CU over its three transactions. Instruction data: 40 × 32 path + 32 next value + 8 index = 1,320 bytes. That does not fit a legacy transaction
   (1,232) but fits a **version 1 transaction** (4,096 bytes, which mainnet already accepts: the Rings SDK sends only v1, and
   the registration we read was v1 **[mainnet read]**). The other way is to write the path into a buffer account first.
 - **Recommended `revoke_spent` check** (for CONTRACT §5, proposed text below): (a) the PDA path: the account at
@@ -316,3 +317,4 @@ X and badge certificates are submitted by the relayer.
 - 2026-11-25 · rings · §10: the client, the lab, the local validator, the size budget.
 - 2026-11-25 · rings · §10: the production indexer and prover proxies (api/spr), with limits and tests.
 - 2026-11-25 · rings · §11: the client API for /get.
+- 2026-11-25 · rings · §3: the measured CU of the membership revoke (64,626 single transaction; staged 22.6k / 5.3k / 68.4k).
