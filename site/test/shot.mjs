@@ -20,7 +20,7 @@ const wait = Number(args[args.indexOf('--wait') + 1]) || 2500;
 const click = args.includes('--click') ? args[args.indexOf('--click') + 1] : null;
 const exe = (() => { const base = path.join(os.homedir(), 'Library/Caches/ms-playwright'); const d = fs.readdirSync(base).filter(x => /^chromium-\d+$/.test(x)).sort().pop(); return path.join(base, d, 'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'); })();
 const browser = await chromium.launch({ executablePath: fs.existsSync(exe) ? exe : undefined });
-const ctx = await browser.newContext(mobile ? { viewport: { width: 375, height: 812 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+const ctx = await browser.newContext(mobile ? { viewport: { width: 375, height: 812 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true } : { viewport: { width: Number(process.env.VW || 1440), height: Number(process.env.VH || 900) }, deviceScaleFactor: 1 });
 const page = await ctx.newPage();
 const errors = [];
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });

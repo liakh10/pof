@@ -183,7 +183,7 @@ const art = s => s
 const CREDIT_FP = (() => { try { return JSON.parse(read('verifier/lib/credit-pins.json')).networks.mainnet.fingerprint; } catch { return ''; } })();
 
 const APP = [
-  { file: 'home', out: 'index.html', url: '/', nav: 'wall', title: '', scripts: ['/ui/home.js'], bodyClass: 'page-home' },
+  { file: 'home', out: 'index.html', url: '/', nav: 'wall', title: '', scripts: ['/ui/home.js'], bodyClass: 'page-home', head: '<link rel="stylesheet" href="/ui/home.css">\n<link rel="preload" href="/ui/fonts/ubuntu-sans-mono.woff2" as="font" type="font/woff2" crossorigin>' },
   { file: 'get', out: 'get.html', url: '/get', nav: 'get', title: 'Get certified', scripts: ['/ui/get.js'], description: 'Shield into your POF vault, choose a tier and a subject, and get a public certificate that never shows the amount.' },
   { file: 'verify', out: 'verify.html', url: '/verify', nav: 'verify', title: 'Verify', scripts: ['/ui/verify.js'], description: 'Check any wallet, X handle or badge against the chain: the tier, the status, the slot.' },
   { file: 'cert', out: 'c.html', url: '/c', nav: 'verify', title: 'Certificate', scripts: ['/ui/cert.js'], description: 'One Proof of Funds certificate, read live from the chain, with its log entry proven in your browser.' },
