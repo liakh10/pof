@@ -916,6 +916,53 @@ export type Pof = {
           "signer": true
         },
         {
+          "name": "payer",
+          "docs": [
+            "Pays the owner record's rent and the fee (the owner or a sponsor)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "registry",
           "writable": true,
           "pda": {
@@ -932,6 +979,34 @@ export type Pof = {
               }
             ]
           }
+        },
+        {
+          "name": "ownerRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107,
+                  111,
+                  119,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -962,6 +1037,24 @@ export type Pof = {
         199
       ],
       "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
         {
           "name": "lock",
           "writable": true,
@@ -2257,6 +2350,19 @@ export type Pof = {
       ]
     },
     {
+      "name": "zkOwner",
+      "discriminator": [
+        53,
+        206,
+        78,
+        0,
+        124,
+        164,
+        161,
+        109
+      ]
+    },
+    {
       "name": "zkRegistry",
       "discriminator": [
         179,
@@ -3546,6 +3652,14 @@ export type Pof = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "spent",
+            "docs": [
+              "Set by revoke_spent (audit FZ-18): this note is spent, so the lock is never released (except in the wind-down) and no",
+              "certify_zk may use its tag again."
+            ],
+            "type": "bool"
           }
         ]
       }
@@ -4306,6 +4420,43 @@ export type Pof = {
       }
     },
     {
+      "name": "zkOwner",
+      "docs": [
+        "One registration per ring owner (audit ZK-11): [\"zkowner\", owner], paid by whoever submits (rent plus the certify fee to",
+        "the treasury), so registrations that roll the root history cost real SOL each and nobody registers twice."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u64"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "zkOwnerRegistered",
       "type": {
         "kind": "struct",
@@ -4376,7 +4527,7 @@ export type Pof = {
                     32
                   ]
                 },
-                12
+                20
               ]
             }
           },

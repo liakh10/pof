@@ -210,6 +210,11 @@ path and falls back to path (b) when the PDA is gone; one note backs one live ce
   `verifier` = the ZkConfig address, `null_hashes` = the per-note tags `Poseidon("pof:zk:tag:v1", nullifier)` (revoke_spent
   checks the tag instead of the salted hash), `issued_slot` = the slot it settles at (gates refuse it before), `log_index` =
   u64::MAX. Instructions: `set_zk`, `register_zk_owner`, `certify_zk`, `release_note_lock`, `close_zk` (wind-down).
+  Audit FZ-18: `revoke_spent` / `revoke_spent_staged` on a zk certificate take its note lock `["znote", tag]` as the first
+  remaining account (writable) and mark it `spent`: a spent lock is never released outside the wind-down, so no certify_zk uses
+  that tag again, and a remake must carry a new nonce. Audit ZK-11: `register_zk_owner` makes one `ZkOwner` record
+  `["zkowner", owner]` per owner (accounts: owner, payer, config, treasury, registry, owner_record, system), paid rent plus the
+  certify fee to the treasury; the registry keeps its last 20 roots.
 - `PathBuffer` PDA `["path", revoker, certificate]` (zero-copy): revoker, certificate, nullifier [32], next_value [32],
   leaf_index u64, path [[32]; 40], levels u8, bump u8, padding [6].
 

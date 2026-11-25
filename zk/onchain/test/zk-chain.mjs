@@ -117,7 +117,7 @@ const table = await makeTable(admin, [q.K.config, q.K.treasury, ZKP, REG, TREE, 
 const regLeaves = [];
 async function registerOwner(kp, secret) {
   const commitment = Z.be32(Z.ownerCommitment(S.one.P, secret));
-  const sig = await send([q.P.ix('register_zk_owner', { commitment }, { owner: kp.publicKey })], [w1, kp], 200_000);
+  const sig = await send([q.P.ix('register_zk_owner', { commitment }, { owner: kp.publicKey, payer: w1.publicKey, owner_record: q.pda([Buffer.from('zkowner'), kp.publicKey.toBuffer()]) })], [w1, kp], 200_000);
   const e = await t.ev(sig, 'ZkOwnerRegistered');
   regLeaves[Number(e.index)] = Z.toBig(e.leaf);
   const mine = registryNow().root();
@@ -300,10 +300,27 @@ await check('revoke_spent on a zk certificate: the keeper opens the escrow from 
   // a wrong nullifier is refused (its tag differs)
   const other = Z.be32(nf + 1n);
   await refuses(send([q.P.ix('revoke_spent', { index: 0, salt: Buffer.alloc(32), nullifier: other, membership: null }, { caller: w1.publicKey, certificate: q.certPda(z.subject, 0), tree: TREE, nullifier_account: q.nullifierPda(TREE, other) })], [w1], 300_000), /NotSpent|NullifierMismatch/);
-  await send([q.P.ix('revoke_spent', { index: 0, salt: Buffer.alloc(32), nullifier: Z.be32(nf), membership: null }, { caller: w1.publicKey, certificate: q.certPda(z.subject, 0), tree: TREE, nullifier_account: nfPda })], [w1], 300_000);
+  const rv = withLock => { const ix = q.P.ix('revoke_spent', { index: 0, salt: Buffer.alloc(32), nullifier: Z.be32(nf), membership: null }, { caller: w1.publicKey, certificate: q.certPda(z.subject, 0), tree: TREE, nullifier_account: nfPda }); if (withLock) ix.keys.push({ pubkey: lockPda(z.zargs.tags[0]), isSigner: false, isWritable: true }); return send([ix], [w1], 300_000); };
+  await refuses(rv(false), /ZkLockMissing/);   // FZ-18: the note lock must come along, to be marked spent
+  await rv(true);
   const c = await cert(z.subject);
   ok(c.status === 1 && c.revealed_index === 0, 'revoked spent');
-  await send([q.P.ix('release_note_lock', {}, { lock: lockPda(z.zargs.tags[0]), certificate: q.certPda(z.subject, 0), payer: w5.publicKey })], [w5], 200_000);
+  ok(q.P.decodeAccount('NoteLock', (await info(lockPda(z.zargs.tags[0]))).data).spent === true, 'the lock is marked spent');
+  // FZ-18: the same proof (same nonce) cannot remake the certificate; a fresh proof of the same, spent note cannot either
+  await refuses(send([z.ix], z.signers, 400_000, [table]), /Replayed/);
+  const z2 = await zkIx(S.spend, { controller: w5 });
+  await refuses(send([z2.ix], z2.signers, 400_000, [table]), /ZkNoteLocked/);
+  // and its lock is never released (outside the wind-down), so the tag stays taken
+  await refuses(send([q.P.ix('release_note_lock', {}, { lock: lockPda(z.zargs.tags[0]), certificate: q.certPda(z.subject, 0), payer: w5.publicKey })], [w5], 200_000), /ZkNoteStillLive/);
+});
+
+await check('owner registration (ZK-11): one record per owner, paid (rent + the certify fee to the treasury); a second registration of the same owner is refused', async () => {
+  const kp = Keypair.generate();
+  const t0 = BigInt(await conn.getBalance(q.K.treasury, 'confirmed'));
+  await registerOwner(kp, 333n);
+  ok(BigInt(await conn.getBalance(q.K.treasury, 'confirmed')) - t0 === (await t.config()).params.fee_lamports, 'the fee went to the treasury');
+  const commitment = Z.be32(Z.ownerCommitment(S.one.P, 444n));
+  await refuses(send([q.P.ix('register_zk_owner', { commitment }, { owner: kp.publicKey, payer: w1.publicKey, owner_record: q.pda([Buffer.from('zkowner'), kp.publicKey.toBuffer()]) })], [w1, kp], 200_000), /already in use|custom program error: 0x0/);
 });
 
 await check('settle window (ZK-02): a gate in the same transaction as certify_zk refuses; after the settle slots it passes', async () => {

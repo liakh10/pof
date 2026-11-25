@@ -214,6 +214,17 @@ pub struct Config {
 }
 
 impl Config {
+    /// Where `revoke_verifier_key` records `key`: a free entry, else one revoked more than VALIDITY_MAX slots ago (every
+    /// certificate that key signed has expired by then). Audit RK-01: a reused entry never takes the key signing now.
+    pub fn revoked_entry_for(&self, key: &Pubkey, slot: u64) -> Option<usize> {
+        if let Some(i) = self.revoked_keys.iter().position(|k| *k == Pubkey::default()) {
+            return Some(i);
+        }
+        if *key == self.active_verifier(slot) {
+            return None;
+        }
+        (0..MAX_REVOKED_KEYS).find(|&i| slot > self.revoked_at[i].saturating_add(VALIDITY_MAX))
+    }
     pub fn is_revoked_key(&self, key: &Pubkey) -> bool {
         *key != Pubkey::default() && self.revoked_keys.iter().any(|k| k == key)
     }
@@ -839,7 +850,15 @@ macro_rules! pof_program {
             Some(m) => (ext::spent_in_nullifier_tree(&a.tree, &nullifier, &m.next_value, m.leaf_index, &m.path)?, 1),
         };
         require!(spent, PofError::NotSpent);
-        revoke_with_pair(&a.config, &mut a.treasury, &mut a.certificate, index, salt, nullifier, slot, a.caller.key(), path)
+        let key = a.certificate.key();
+        revoke_with_pair(&a.config, &mut a.treasury, &mut a.certificate, index, salt, nullifier, slot, a.caller.key(), path)?;
+        // FZ-18 (phase 2 only): a zk certificate's note lock is marked spent
+        #[cfg(feature = "zk")]
+        if a.certificate.verifier == zk::ZK_CONFIG {
+            zk::mark_lock_spent(ctx.remaining_accounts, &key, &a.certificate.null_hashes[index as usize])?;
+        }
+        let _ = key;
+        Ok(())
     }
 
     /// Open the revoker's buffer for this certificate (the revoker pays its rent) with the nullifier, its next value, its leaf
@@ -885,7 +904,14 @@ macro_rules! pof_program {
             b.nullifier
         };
         a.treasury.paths = a.treasury.paths.saturating_sub(1);
-        revoke_with_pair(&a.config, &mut a.treasury, &mut a.certificate, index, salt, nullifier, slot, a.revoker.key(), 1)
+        let key = a.certificate.key();
+        revoke_with_pair(&a.config, &mut a.treasury, &mut a.certificate, index, salt, nullifier, slot, a.revoker.key(), 1)?;
+        #[cfg(feature = "zk")]
+        if a.certificate.verifier == zk::ZK_CONFIG {
+            zk::mark_lock_spent(ctx.remaining_accounts, &key, &a.certificate.null_hashes[index as usize])?;
+        }
+        let _ = key;
+        Ok(())
     }
 
     /// The revoker drops its staged buffer (rent back); during the wind-down anyone may.
@@ -973,13 +999,7 @@ macro_rules! pof_program {
         let slot = Clock::get()?.slot;
         let c = &mut ctx.accounts.config;
         if !c.is_revoked_key(&key) {
-            // a free entry, else one revoked long enough ago that all its certificates have expired
-            let free = c
-                .revoked_keys
-                .iter()
-                .position(|k| *k == Pubkey::default())
-                .or_else(|| (0..MAX_REVOKED_KEYS).find(|&i| slot > c.revoked_at[i].saturating_add(VALIDITY_MAX)))
-                .ok_or(error!(PofError::BadParams))?;
+            let free = c.revoked_entry_for(&key, slot).ok_or(error!(PofError::BadParams))?;
             c.revoked_keys[free] = key;
             c.revoked_at[free] = slot;
         }
@@ -1511,6 +1531,17 @@ mod tests {
             bump: 0,
             treasury_bump: 0,
         };
+        // revoked-key entries (FZ-09, RK-01): free first; full: an entry older than VALIDITY_MAX, never for the active key
+        let k = |b: u8| Pubkey::new_from_array([b; 32]);
+        assert_eq!(c.revoked_entry_for(&k(9), 10), Some(0));
+        for i in 0..MAX_REVOKED_KEYS {
+            c.revoked_keys[i] = k(10 + i as u8);
+            c.revoked_at[i] = 100 + i as u64;
+        }
+        assert_eq!(c.revoked_entry_for(&k(9), 200), None);
+        assert_eq!(c.revoked_entry_for(&k(9), 101 + VALIDITY_MAX), Some(0));
+        assert_eq!(c.revoked_entry_for(&c.active_verifier(101 + VALIDITY_MAX), 101 + VALIDITY_MAX), None);
+        c.revoked_keys = [Pubkey::default(); MAX_REVOKED_KEYS];
         assert_eq!(c.active_verifier(99), Pubkey::new_from_array([1; 32]));
         assert_eq!(c.active_verifier(100), Pubkey::new_from_array([2; 32]));
         c.next_verifier = Pubkey::default();

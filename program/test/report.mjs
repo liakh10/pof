@@ -134,6 +134,11 @@ ${sizes.map(([n, b]) => `| ${n} | ${b ? b.toLocaleString('en-US') : '?'} | ${b ?
   \`set_zk\`'s discriminator is refused.
 - \`zsh test/zk.sh\` runs zk's own on-chain suite against this program built with the feature (IDL \`idl/pof-zk.json\`).
   - \`certify_zk\` takes about 241,000 CU for one note and about 298,000 for four.
+  - The audit fixes are tested in that suite:
+    - **FZ-18:** a zk certificate revoked as spent cannot be remade with the same proof (the nonce is refused). A fresh proof of
+      the spent note is refused too, because its note lock is marked spent and never released.
+    - **ZK-11:** owner registration is one paid record per owner (rent plus the certify fee). A second registration of the same
+      owner is refused. The registry keeps 20 roots.
   - **The 4-note transaction is 1,230 bytes**, 2 bytes under the 1,232-byte limit. The plan: at most 3 notes per proof in the client,
     or 4 only through a lookup table, which removes about 400 bytes of account keys.
 

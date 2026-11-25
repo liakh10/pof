@@ -45,7 +45,10 @@ pub const ZK_CONFIG: Pubkey = pubkey!("6q7PxLzgUtLHMfCDDHzkU4Ho54rC6b21VZmSFsD6T
 pub const RINGS_TREE: Pubkey = pubkey!("777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor");
 pub const ZK_NOTES: usize = 4;
 pub const REG_H: usize = 20;
-pub const REG_ROOTS: usize = 12;
+/// The owner registry's root history (audit ZK-11: long enough that registrations cannot age an honest proof's root out
+/// while it is proven and sent).
+pub const REG_ROOTS: usize = 20;
+pub const OWNER_SEED: &[u8] = b"zkowner";
 /// Slots between certify_zk and the certificate passing `gate` (ZK-02): the keeper and anyone watching nullifier PDAs revoke
 /// a queued spend inside it. About a minute at mainnet speed.
 #[cfg(not(feature = "quick"))]
@@ -125,6 +128,18 @@ pub struct ZkRegistry {
     pub bump: u8,
 }
 
+/// One registration per ring owner (audit ZK-11): ["zkowner", owner], paid by whoever submits (rent plus the certify fee to
+/// the treasury), so registrations that roll the root history cost real SOL each and nobody registers twice.
+#[account]
+#[derive(InitSpace)]
+pub struct ZkOwner {
+    pub owner: Pubkey,
+    pub index: u64,
+    pub commitment: [u8; 32],
+    pub slot: u64,
+    pub bump: u8,
+}
+
 /// One note behind one live certificate, with what the keeper needs to open the escrow.
 #[account]
 #[derive(InitSpace)]
@@ -138,6 +153,9 @@ pub struct NoteLock {
     pub escrow_epoch: u32,
     pub locked_slot: u64,
     pub bump: u8,
+    /// Set by revoke_spent (audit FZ-18): this note is spent, so the lock is never released (except in the wind-down) and no
+    /// certify_zk may use its tag again.
+    pub spent: bool,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
@@ -193,6 +211,24 @@ pub struct ZkConfigSet {
 pub struct NoteReleased {
     pub tag: [u8; 32],
     pub certificate: Pubkey,
+}
+
+/// FZ-18: revoke_spent on a zk certificate marks the note's lock spent. The lock ["znote", tag] comes as the first remaining
+/// account; it must be this certificate's.
+pub fn mark_lock_spent(remaining: &[AccountInfo], certificate: &Pubkey, tag: &[u8; 32]) -> Result<()> {
+    let lock = remaining.first().ok_or(error!(PofError::ZkLockMissing))?;
+    let (pda, _) = Pubkey::find_program_address(&[LOCK_SEED, tag], &crate::ID);
+    require_keys_eq!(lock.key(), pda, PofError::ZkLockMissing);
+    require!(lock.is_writable && *lock.owner == crate::ID, PofError::ZkLockMissing);
+    let mut l = {
+        let d = lock.try_borrow_data()?;
+        NoteLock::try_deserialize(&mut &d[..]).map_err(|_| error!(PofError::ZkLockMissing))?
+    };
+    require_keys_eq!(l.certificate, *certificate, PofError::ZkLockMissing);
+    l.spent = true;
+    let mut d = lock.try_borrow_mut_data()?;
+    l.try_serialize(&mut &mut d[..])?;
+    Ok(())
 }
 
 /// Poseidon(TAG_DOMAIN, nullifier): what a zk certificate stores per note, and what revoke_spent checks for one.
@@ -405,6 +441,21 @@ pub fn handle_register_zk_owner(ctx: Context<RegisterZkOwner>, commitment: [u8; 
     r.cursor = at as u8;
     r.roots[at] = cur;
     r.next_index = index + 1;
+    let o = &mut ctx.accounts.owner_record;
+    o.owner = owner;
+    o.index = index;
+    o.commitment = commitment;
+    o.slot = Clock::get()?.slot;
+    o.bump = ctx.bumps.owner_record;
+    // the fee (ZK-11): registrations are not free, so rolling the root history costs real SOL
+    let fee = ctx.accounts.config.params.fee_lamports;
+    if fee > 0 {
+        system_program::transfer(
+            CpiContext::new(ctx.accounts.system_program.key(), system_program::Transfer { from: ctx.accounts.payer.to_account_info(), to: ctx.accounts.treasury.to_account_info() }),
+            fee,
+        )?;
+        ctx.accounts.treasury.fees_in = add(ctx.accounts.treasury.fees_in, fee)?;
+    }
     emit!(ZkOwnerRegistered { owner, index, leaf, root: cur });
     Ok(())
 }
@@ -449,6 +500,8 @@ pub fn handle_certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkA
         t.open = add(t.open, 1)?;
     } else {
         require!(!cert.is_live(slot), PofError::AlreadyLive);
+        // FZ-18: a remake never reuses the proof it replaces (the nonce is bound into the proof's context)
+        require!(cert.nonce != args.nonce, PofError::Replayed);
         if cert.status == STATUS_LIVE {
             unlive(c, t, cert);
             t.expired += 1;
@@ -510,7 +563,7 @@ pub fn handle_certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkA
         let (pda, bump) = Pubkey::find_program_address(&[LOCK_SEED, &tag], &crate::ID);
         require_keys_eq!(lock.key(), pda, PofError::ZkLockMissing);
         require!(lock.is_writable, PofError::ZkLockMissing);
-        let value = NoteLock { certificate: cert_key, tag, payer, eph: args.eph, ct: args.cts[k], escrow_epoch: epoch, locked_slot: slot, bump };
+        let value = NoteLock { certificate: cert_key, tag, payer, eph: args.eph, ct: args.cts[k], escrow_epoch: epoch, locked_slot: slot, bump, spent: false };
         if *lock.owner == crate::ID {
             // an existing lock: only this certificate's own (remade over its revoked or expired self)
             let old = {
@@ -518,6 +571,7 @@ pub fn handle_certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkA
                 NoteLock::try_deserialize(&mut &d[..]).map_err(|_| error!(PofError::ZkNoteLocked))?
             };
             require_keys_eq!(old.certificate, cert_key, PofError::ZkNoteLocked);
+            require!(!old.spent, PofError::ZkNoteLocked);   // FZ-18: a spent note never backs a certificate again
         } else {
             // a fresh lock; lamports someone sent to the address first do not block it (ZK-07): top up, allocate, assign
             require_keys_eq!(*lock.owner, system_program::ID, PofError::ZkNoteLocked);
@@ -593,6 +647,8 @@ pub fn handle_release_note_lock(ctx: Context<ReleaseNoteLock>) -> Result<()> {
         }
     };
     require!(dead, PofError::ZkNoteStillLive);
+    // FZ-18: a spent note's lock stays, so its tag can never be certified again; only the wind-down returns its rent
+    require!(!lock.spent || a.config.closing, PofError::ZkNoteStillLive);
     emit!(NoteReleased { tag: lock.tag, certificate: lock.certificate });
     Ok(())
 }
@@ -614,8 +670,18 @@ pub struct SetZk<'info> {
 pub struct RegisterZkOwner<'info> {
     /// The ring owner (the vault key): its signature is the consent the circuit later proves.
     pub owner: Signer<'info>,
+    /// Pays the owner record's rent and the fee (the owner or a sponsor).
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, seeds = [TREASURY_SEED], bump = treasury.bump)]
+    pub treasury: Box<Account<'info, Treasury>>,
     #[account(mut, seeds = [REGISTRY_SEED], bump = registry.bump)]
     pub registry: Box<Account<'info, ZkRegistry>>,
+    #[account(init, payer = payer, space = 8 + ZkOwner::INIT_SPACE, seeds = [OWNER_SEED, owner.key().as_ref()], bump)]
+    pub owner_record: Box<Account<'info, ZkOwner>>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -654,6 +720,8 @@ pub struct CertifyZk<'info> {
 
 #[derive(Accounts)]
 pub struct ReleaseNoteLock<'info> {
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Box<Account<'info, Config>>,
     #[account(mut, close = payer, seeds = [LOCK_SEED, lock.tag.as_ref()], bump = lock.bump)]
     pub lock: Box<Account<'info, NoteLock>>,
     /// CHECK: the certificate the lock names (read, any state; closed counts as gone)
