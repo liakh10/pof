@@ -20,7 +20,7 @@ conveniences on top of it, and every one of them can be replaced by a direct rea
 | CLI | `node cli/pof.js` from the repository (`pof check`, `pof watch`, `pof log verify`) |
 | Embed | `<pof-badge>` from `{{ORIGIN}}/embed/pof-badge.js`, `{{ORIGIN}}/embed/frame.html`, `{{ORIGIN}}/v1/badge/{subject}.svg` |
 | Witness | `node witness/run.js`; the project's own at `{{ORIGIN}}/v1/witness` |
-| SDK | `@pof/sdk`, from `https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.2.tgz` |
+| SDK | `@pof/sdk`, from `https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.3.tgz` |
 | Source | `https://github.com/liakh10/pof` |
 
 > **Pin POF's program id.** A certificate is only a certificate if the account is owned by the pof program
@@ -117,7 +117,7 @@ The full schema, with every field, is the OpenAPI file. Import it into any clien
 ## SDK
 
 ```sh
-npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.2.tgz
+npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.3.tgz
 ```
 
 TypeScript, ESM with types, **no runtime dependencies** (WebCrypto for SHA-256 and Ed25519, its own base58, PDAs and

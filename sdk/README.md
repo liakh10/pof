@@ -28,7 +28,7 @@ Verifier's transparency log, and builds the accounts for gating your own program
 The package is not on npm. Install the release tarball from the repository:
 
 ```sh
-npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.2.tgz
+npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.3.tgz
 ```
 
 ## Check a subject in three lines

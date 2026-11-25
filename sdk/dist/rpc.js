@@ -69,7 +69,7 @@ export class Rpc {
         ]);
     }
     async getTransactionLogs(signature) {
-        const r = await this.call("getTransaction", [signature, { encoding: "json", maxSupportedTransactionVersion: 0, commitment: this.commitment === "processed" ? "confirmed" : this.commitment }]);
+        const r = await this.call("getTransaction", [signature, { encoding: "json", maxSupportedTransactionVersion: 1, commitment: this.commitment === "processed" ? "confirmed" : this.commitment }]);
         return r?.meta?.logMessages ?? null;
     }
     async getAccountsWithSlot(addresses) {

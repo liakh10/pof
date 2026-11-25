@@ -96,7 +96,7 @@ export class Rpc implements RpcLike {
   }
 
   async getTransactionLogs(signature: string): Promise<string[] | null> {
-    const r: any = await this.call("getTransaction", [signature, { encoding: "json", maxSupportedTransactionVersion: 0, commitment: this.commitment === "processed" ? "confirmed" : this.commitment }]);
+    const r: any = await this.call("getTransaction", [signature, { encoding: "json", maxSupportedTransactionVersion: 1, commitment: this.commitment === "processed" ? "confirmed" : this.commitment }]);
     return r?.meta?.logMessages ?? null;
   }
 
