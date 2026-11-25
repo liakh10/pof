@@ -43,6 +43,7 @@ carries it.
 | `BLOB_READ_WRITE_TOKEN` | the private Blob store (log, kits, escrow, locks, relay ledger, limits) |
 | `CRON_SECRET` | the keeper routes |
 | `POF_KEEPER_LIVE=1` | turns the keeper crons on (launch only) |
+| `POF_ZK_ESCROW_KEYS` | phase 2 only (unset on the launch program): `<epoch>:<hex k>,…`, the revocation secrets of `ZkConfig.escrow`; with it the keeper scan also opens every zk certificate's note locks and revokes on a spend, passing the note's `NoteLock` as the first remaining account (FZ-18) |
 | `POF_MIN_AGE_SLOTS` (150), `POF_VALIDITY_SLOTS` (216,000), `POF_SUBJECT_PROOF_SLOTS` (1,500), `POF_MAX_ROOT_LAG_SLOTS` (9,000), `POF_CERTIFY_WINDOW_SLOTS` (300) | must agree with the program's Config |
 | `POF_RELAY_DAILY_LAMPORTS` (2 SOL), `POF_RELAY_FLOOR_LAMPORTS` (0.05 SOL), `POF_ATTEST_PER_10MIN` (30) | relayer cap and floor, attest cap per client |
 | `POF_CREDIT_KEY`, `POF_CREDIT_UNIT_LAMPORTS` (0.01 SOL) | the relayer's RSA credit key (from `scripts/keys.mjs`), the price of one credit |

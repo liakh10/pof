@@ -1,6 +1,6 @@
 {
- "date": "2026-11-25T01:01:24.003Z",
- "pass": 13,
+ "date": "2026-11-25T01:15:44.290Z",
+ "pass": 14,
  "fail": 0,
  "results": [
   [
@@ -54,52 +54,56 @@
   [
    "ok",
    "the CPI gate reads a settled zk certificate like any other (require_certificate)"
+  ],
+  [
+   "ok",
+   "wind-down of phase 2 (FZ-19): owner records close only while closing, each rent back to its payer"
   ]
  ],
  "certify_zk": [
   {
    "ix": "set_zk",
-   "units": 394659
+   "units": 394699
   },
   {
    "ix": "register_zk_owner",
-   "units": 60308
+   "units": 62037
   },
   {
    "notes": 1,
-   "units": 249522,
+   "units": 242272,
    "size": 843,
-   "proveMs": 6366
+   "proveMs": 4521
   },
   {
    "notes": 4,
-   "units": 308472,
+   "units": 306160,
    "size": 1230,
-   "proveMs": 7140
+   "proveMs": 4506
   },
   {
    "notes": 1,
-   "units": 246989,
+   "units": 248823,
    "size": 843,
-   "proveMs": 7180
+   "proveMs": 4573
   },
   {
    "notes": 1,
-   "units": 246786,
+   "units": 242116,
    "size": 843,
-   "proveMs": 9228
+   "proveMs": 5014
   },
   {
    "notes": 1,
-   "units": 243534,
+   "units": 242242,
    "size": 843,
-   "proveMs": 7191
+   "proveMs": 4736
   },
   {
    "notes": 1,
-   "units": 244704,
+   "units": 242038,
    "size": 843,
-   "proveMs": 6760
+   "proveMs": 4548
   }
  ]
 }

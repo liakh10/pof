@@ -9,12 +9,17 @@ import { decodeAttestation } from './contract.js';
 import type { PofChain } from './chain.js';
 import { STATUS, landingWindow } from './chain.js';
 import type { RingsSource } from './rings.js';
+import { openLock } from './zk.js';
+import { toB58 } from './codec.js';
 
+const RINGS_TREE = '777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor';
 export interface Kit { subjectHash: string; asset: number; tree: string; expirySlot: number; attestation: string; kit: { h: string; salt: string; nullifier: string }[] }
 
 export class Keeper {
   /** the log and the escrow publish a kit's attestation once its certificate is seen on chain (A2-06) */
   publishers: { log?: { publish(id: string): Promise<number | null>; drop(id: string): Promise<void> }; escrow?: { put(k: Kit): Promise<unknown>; remove(k: Kit): Promise<void> } } = {};
+  /** phase 2: the revocation secrets k by key epoch (POF_ZK_ESCROW_KEYS); empty = zk certificates are not watched */
+  zkKeys: Map<number, bigint> = new Map();
   constructor(private store: Store, private sealKey: Uint8Array, private rings: RingsSource | null = null, private chain: PofChain | null = null, private maxAttestAge = 300n) {
     if (sealKey.length !== 32) throw new PofError('KEY_MISSING', 'POF_SEAL_KEY must be 32 bytes of hex', 500);
   }
@@ -80,9 +85,53 @@ export class Keeper {
       } catch (e: any) { report.errors.push(`${k.subjectHash.slice(0, 8)}: ${String(e?.code || e?.message).slice(0, 80)}`); }
     }
     (report as any).complete = !stoppedAt;
+    if (this.zkKeys.size && this.chain.zkLocks) {
+      try { (report as any).zk = await this.scanZk({ maxRevokes: Math.max(0, maxRevokes - report.revoked.length) }); }
+      catch (e: any) { report.errors.push(`zk: ${String(e?.code || e?.message).slice(0, 80)}`); }
+    }
     if (stoppedAt) { const i = names.indexOf(stoppedAt); await this.store.put('keeper/cursor', new Uint8Array(Buffer.from(i > 0 ? names[i - 1] : ''))); }
     else await this.store.del('keeper/cursor').catch(() => {});
     await putJson(this.store, 'keeper/last-scan.json', { slot: report.slot, kits: report.kits, live: report.live, pending: report.pending, dropped: report.dropped, revoked: report.revoked, errors: report.errors.length, complete: !stoppedAt, at: new Date().toISOString() }).catch(() => {});
     return report;
+  }
+
+  /** Phase 2: every zero-knowledge certificate is watched from chain data alone. Its note locks hold the nullifiers under the
+   *  revocation key; the keeper opens them, asks the Rings source whether any is spent, and revokes with revoke_spent (salt
+   *  zero: a zk certificate's hash is the tag) passing that note's lock as the first remaining account (FZ-18). A lock whose
+   *  certificate is gone, not live, or no longer lists the tag is skipped. */
+  async scanZk({ maxRevokes = 10 } = {}) {
+    if (!this.rings || !this.chain?.zkLocks || !this.chain.certificatesAt) throw new PofError('KEEPER_OFF', 'the keeper has no zk chain view', 503);
+    const slot = await this.chain.slot();
+    const out = { locks: 0, live: 0, revoked: [] as { certificate: string; index: number; signature: string }[], errors: [] as string[] };
+    const locks = (await this.chain.zkLocks()).filter(l => !l.spent);
+    out.locks = locks.length;
+    const byCert = new Map<string, typeof locks>();
+    for (const l of locks) { const k = toB58(l.certificate); byCert.set(k, [...(byCert.get(k) || []), l]); }
+    const addrs = [...byCert.keys()];
+    const certs = await this.chain.certificatesAt(addrs);
+    for (const [i, addr] of addrs.entries()) {
+      const c = certs[i];
+      if (!c || c.status !== STATUS.live || slot > c.expirySlot || (this.chain.zkConfig && c.verifier !== this.chain.zkConfig)) continue;
+      out.live++;
+      try {
+        const opened: { index: number; nf: Uint8Array; lock: string }[] = [];
+        for (const l of byCert.get(addr)!) {
+          const index = c.hashes.indexOf(hex(l.tag));
+          if (index < 0) continue;
+          const k = this.zkKeys.get(l.epoch);
+          if (k === undefined) { out.errors.push(`${addr.slice(0, 8)}: no revocation key for epoch ${l.epoch}`); continue; }
+          opened.push({ index, nf: await openLock(k, l, index), lock: l.address });
+        }
+        if (!opened.length || out.revoked.length >= maxRevokes) continue;
+        const spent = await this.rings.spent(RINGS_TREE, opened.map(x => x.nf));
+        const at = spent.findIndex(Boolean);
+        if (at < 0) continue;
+        const x = opened[at];
+        const r = await this.chain.revokeSpent({ subjectHash: unhex(c.subjectHash!, 32), asset: c.asset!, index: x.index, salt: new Uint8Array(32), nullifier: x.nf, tree: RINGS_TREE, zkLock: x.lock });
+        out.revoked.push({ certificate: addr, index: x.index, signature: r.signature });
+        out.live--;
+      } catch (e: any) { out.errors.push(`${addr.slice(0, 8)}: ${String(e?.code || e?.message).slice(0, 80)}`); }
+    }
+    return out;
   }
 }

@@ -14,6 +14,7 @@ import { TransparencyLog } from './log.js';
 import { HeliusRings, jsonRpc, type RingsSource } from './rings.js';
 import { Verifier } from './verify.js';
 import { Keeper } from './keeper.js';
+import { escrowKeys } from './zk.js';
 import { Relayer } from './relayer.js';
 import { Credits, creditKeyFromJson, pinFor, sdkHouseRing } from './credits.js';
 import { Linker } from './linker.js';
@@ -84,6 +85,7 @@ export async function context(overrides: Partial<Ctx> = {}): Promise<Ctx> {
   const locks = new NoteLocks(store, sha256(text('pof:locks:'), sealKey), certifyWindow, chain);
   const escrow = new Escrow(store);
   keeper.publishers = { log, escrow };
+  keeper.zkKeys = escrowKeys(env.POF_ZK_ESCROW_KEYS);   // phase 2 only; unset on the launch program
   const mints: Record<number, string> = { 0: ASSETS[0].mint, 1: env.POF_USDC_MINT || ASSETS[1].mint };
   const verifier = new Verifier({
     programId, minAgeSlots: BigInt(env.POF_MIN_AGE_SLOTS ?? 150), validitySlots: BigInt(env.POF_VALIDITY_SLOTS ?? 216_000),

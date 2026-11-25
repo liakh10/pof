@@ -5,7 +5,8 @@
   "description": "Proof of Funds browser client: Privacy Rings keys, shield, note sync, tier selection, disclosure package",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node --test --test-concurrency=1 test/dist.test.mjs test/core.test.mjs test/errors.test.mjs test/proxy.test.mjs test/local-e2e.mjs test/local-usdc.mjs test/localtree-versions.test.mjs test/vault.test.mjs",
+    "test": "node --test --test-concurrency=1 test/dist.test.mjs test/core.test.mjs test/errors.test.mjs test/proxy.test.mjs test/local-e2e.mjs test/local-usdc.mjs test/localtree-versions.test.mjs test/vault.test.mjs test/zk-flow.test.mjs",
+    "test:zk": "node ../lab/test/zk-e2e.mjs",
     "test:lab": "node ../lab/test/lab-e2e.mjs",
     "test:devnet": "node test/devnet-e2e.mjs",
     "test:wallets": "node ../lab/test/wallets.mjs",

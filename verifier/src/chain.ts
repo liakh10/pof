@@ -3,13 +3,16 @@
 export interface CertificateView {
   address: string; status: number; tier: number; expirySlot: bigint; hashes: string[]; payer: string;
   controller?: string; nullsetHash?: string; issuedSlot?: bigint;
+  /** the key that issued it: a Verifier key, or the ZkConfig address for a zero-knowledge certificate */
+  verifier?: string; subjectHash?: string; asset?: number;
 }
 export interface PofChain {
   slot(): Promise<bigint>;
   certificate(subjectHash: Uint8Array, asset: number): Promise<CertificateView | null>;
   /** the ed25519 instruction and certify in one transaction paid by the relayer */
   certify(input: { attestation: Uint8Array; signature: Uint8Array; verifierKey: Uint8Array; logIndex: number | bigint; hashes: Uint8Array[] }): Promise<{ signature: string; lamports: bigint }>;
-  revokeSpent(input: { subjectHash: Uint8Array; asset: number; index: number; salt: Uint8Array; nullifier: Uint8Array; tree: string }): Promise<{ signature: string; lamports: bigint }>;
+  /** zkLock: a zero-knowledge certificate's note lock ["znote", tag], passed as the first remaining account (FZ-18) */
+  revokeSpent(input: { subjectHash: Uint8Array; asset: number; index: number; salt: Uint8Array; nullifier: Uint8Array; tree: string; zkLock?: string }): Promise<{ signature: string; lamports: bigint }>;
   /** the ed25519 instruction over the §7 signed head and anchor_log (the program keeps the latest head in the treasury) */
   anchorLog(size: number, root: Uint8Array): Promise<{ signature: string; lamports: bigint }>;
   relayerBalance(): Promise<bigint>;
@@ -23,6 +26,11 @@ export interface PofChain {
   quoteLamports(): Promise<{ fee: bigint; rent: bigint; network: bigint }>;
   /** ZK-06: for each zk tag, whether its note lock ["znote", tag] holds it for a live zk certificate that still lists it */
   zkLocked?(tags: Uint8Array[]): Promise<boolean[]>;
+  /** phase 2: the ZkConfig address (the `verifier` of every zk certificate), every NoteLock under the program, and the
+   *  certificates at given addresses; absent or empty where the program has no zk build */
+  zkConfig?: string;
+  zkLocks?(): Promise<import('./zk.js').ZkLock[]>;
+  certificatesAt?(addresses: string[]): Promise<(CertificateView | null)[]>;
   /** the Config's max_attest_age: how long after its issue slot the program still accepts an attestation */
   maxAttestAge?(): Promise<bigint>;
 }

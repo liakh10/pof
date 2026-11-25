@@ -135,7 +135,10 @@ export async function createPofClient(opts = {}) {
     // seed come from the vault seed (audit POF-10); kitKeyLegacy opens kits sealed before that fix, which are re-sealed on open
     vault = { kind: 'vault', wallet, owner, kp, signing, mode, needsBackup, nk: nkBytes, ownerHash: kp.ownerHash(),
       kitKey: await C.sha256(C.utf8('pof:kit:v2'), seed), kitKeyLegacy: await C.sha256(C.utf8('pof:kit:v1'), nkBytes),
-      ctlSeed: await C.sha256(C.utf8('pof:ctl:v1'), seed), box };
+      ctlSeed: await C.sha256(C.utf8('pof:ctl:v1'), seed), box,
+      // phase 2 (docs-src/zk.md "Spend authority"): the owner secret s of the POF owner registry, from the vault seed, never
+      // sent anywhere (the Verifier sees nk, never this); used only by zk-flow.js when certify_zk is on
+      zkSecret: zkSecretOf(await C.sha256(C.utf8('pof:zk:own:v1'), seed)) };
     seed.fill(0);
     status('vault', { phase: 'ready', owner, mode, needsBackup });
     return { owner, ownerHash: C.hex(vault.ownerHash), registered: await isRegistered(owner), mode, needsBackup };
@@ -152,10 +155,23 @@ export async function createPofClient(opts = {}) {
     catch (e) { throw Object.assign(Error('derive: the wallet changed the bytes it signed, so it cannot make a Rings identity here (use the POF vault instead)'), { code: 'DERIVE_REFUSED', cause: e }); }
     const nkBytes = keys.withNullifierKey(k => k.secretBytes());
     const address = keys.address();
-    ring = { kind: 'ring', wallet, owner: wallet, keys, address, nk: nkBytes, ownerHash: address.ownerHash(), kitKey: await C.sha256(C.utf8('pof:kit:v2'), sig), kitKeyLegacy: await C.sha256(C.utf8('pof:kit:v1'), nkBytes), ctlSeed: await C.sha256(C.utf8('pof:ctl:v1'), sig) };
+    ring = { kind: 'ring', wallet, owner: wallet, keys, address, nk: nkBytes, ownerHash: address.ownerHash(), kitKey: await C.sha256(C.utf8('pof:kit:v2'), sig), kitKeyLegacy: await C.sha256(C.utf8('pof:kit:v1'), nkBytes), ctlSeed: await C.sha256(C.utf8('pof:ctl:v1'), sig), zkSecret: zkSecretOf(await C.sha256(C.utf8('pof:zk:own:v1'), sig)) };
     sig.fill(0);
     status('ring', { phase: 'ready', owner: wallet, ownerHash: C.hex(ring.ownerHash) });
     return { owner: wallet, ownerHash: C.hex(ring.ownerHash), registered: await isRegistered(wallet) };
+  }
+  /* sha256("pof:zk:own:v1" ‖ seed) with the top three bits cleared, as a field element (zk/js/zk.js ownerSecretFrom) */
+  const zkSecretOf = d => { d[0] &= 0x1f; let x = 0n; for (const b of d) x = (x << 8n) | BigInt(b); d.fill(0); return x; };
+  /* what the phase 2 flow (zk-flow.js) needs of a vault or Ring, without handing out the raw kit key: the owner, nk, the owner
+     secret, a signer for the vault key (the wallet signs for its own Ring), and sealing under the kit key */
+  function zkIdentity(from = 'vault') {
+    const id = who(from);
+    return {
+      kind: id.kind, owner: id.owner, nk: id.nk, ownerHash: id.ownerHash, ownerSecret: id.zkSecret,
+      signer: id.kind === 'vault' ? vaultSigner() : null,
+      seal: obj => seal(obj, id.kitKey), unseal: box => unseal(box, id.kitKey),
+      get: k => get(k), put: (k, v) => put(k, v),
+    };
   }
   const who = from => { const id = from === 'ring' ? ring : vault; if (!id) throw Error(from === 'ring' ? 'Derive your Ring first.' : 'Make your POF vault first.'); return id; };
   async function isRegistered(owner) {
@@ -788,10 +804,10 @@ export async function createPofClient(opts = {}) {
     config: cfg, onStatus: fn => { listeners.add(fn); return () => listeners.delete(fn); },
     ready: () => C.ready(), hasher: S.hasherState,
     connect: id => W.connect(id), wallet: () => W.state(),
-    deriveVault, deriveRing, isRegistered, register, shield, notes, balance, choose, subject, disclose, attest, certify, kits, controllerOf, vaultSigner: () => vaultSigner(), fundVault, withdraw, linkStart, linkCheck, waitForAge, randomDelay, privacy, credits, revokeRelayed, revokeBytesOf, holderCertifyArgs,
+    deriveVault, deriveRing, isRegistered, register, shield, notes, balance, choose, subject, disclose, attest, certify, kits, controllerOf, vaultSigner: () => vaultSigner(), fundVault, withdraw, linkStart, linkCheck, waitForAge, randomDelay, privacy, credits, revokeRelayed, revokeBytesOf, holderCertifyArgs, zkIdentity,
     progress: () => ({ hasher: S.hasherState(), last: lastStatus }),
     local, identity: from => { const id = from === 'ring' ? ring : vault; return id ? { kind: id.kind, owner: id.owner, ownerHash: C.hex(id.ownerHash) } : null; },
-    forget() { for (const id of [vault, ring]) if (id) { id.nk.fill(0); id.kitKey.fill(0); id.ctlSeed.fill(0); } vault = ring = null; },
+    forget() { for (const id of [vault, ring]) if (id) { id.nk.fill(0); id.kitKey.fill(0); id.ctlSeed.fill(0); id.zkSecret = 0n; } vault = ring = null; },
   };
 }
 export { C as core };

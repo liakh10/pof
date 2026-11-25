@@ -2,7 +2,7 @@
    test wallet the harness injects. With more than one wallet the picker asks (the house rule: never the first one found).
    One connection at a time; the choice is remembered by name. Adapted from the house wallet module (hush/lib/wallet.js);
    the site agent restyles the picker with the approved look. */
-import { PublicKey, Transaction, TransactionInstruction, ComputeBudgetProgram, Buffer } from './dist/web3.js';
+import { PublicKey, Transaction, TransactionInstruction, ComputeBudgetProgram, Buffer, VersionedTransaction, TransactionMessage } from './dist/web3.js';
 let CHAIN = 'solana:mainnet';
 export const setChain = c => { CHAIN = c; };
 import { rpc, b64 } from './chain.js';
@@ -178,6 +178,28 @@ export async function send(instructions, { cosigners = [], units = 0, price = 0 
   const raw = b64(signed.serialize());
   const signature = await rpc('sendTransaction', [raw, { encoding: 'base64', preflightCommitment: 'confirmed', maxRetries: 5 }]);
   return { signature, wait: () => confirm(signature, lastValidBlockHeight, raw) };
+}
+/* the same with a version 0 message over address lookup tables ({ key, state: { addresses } }), for a transaction that does
+   not fit a legacy message (zk-flow.js: certify_zk with 4 notes). Wallets that sign only legacy messages refuse it. */
+export async function sendVersioned(instructions, { cosigners = [], lookupTables = [], units = 0 } = {}) {
+  const payer = me();
+  const { blockhash, lastValidBlockHeight } = await rpc('getLatestBlockhash', [{ commitment: 'confirmed' }]).then(r => r.value);
+  const build = cu => new VersionedTransaction(new TransactionMessage({ payerKey: payer, recentBlockhash: blockhash, instructions: [ComputeBudgetProgram.setComputeUnitLimit({ units: cu }), ...instructions] }).compileToV0Message(lookupTables));
+  const sim = await rpc('simulateTransaction', [b64(build(1_400_000).serialize()), { encoding: 'base64', commitment: 'confirmed', sigVerify: false, replaceRecentBlockhash: true }]);
+  if (sim.value.err) { const e = Error('simulation failed: ' + JSON.stringify(sim.value.err)); e.logs = sim.value.logs; throw e; }
+  const tx = build(units || Math.min(1_400_000, Math.max(20_000, Math.ceil((Number(sim.value.unitsConsumed) || 0) * 1.25))));
+  let signed;
+  try {
+    if (W.kind === 'injected') signed = await W.provider.signTransaction(tx);
+    else { const r = await W.std.features['solana:signTransaction'].signTransaction({ account: W.std.accounts[0], chain: CHAIN, transaction: tx.serialize() }); signed = VersionedTransaction.deserialize(r[0].signedTransaction); }
+  } catch (e) { throw quietRefusal(e); }
+  if (!(signed instanceof VersionedTransaction)) signed = VersionedTransaction.deserialize(signed.serialize());
+  const message = signed.message.serialize();
+  for (const s of cosigners) signed.addSignature(new PublicKey(s.publicKey), await s.sign(message));
+  const bytes = signed.serialize();
+  const raw = b64(bytes);
+  const signature = await rpc('sendTransaction', [raw, { encoding: 'base64', preflightCommitment: 'confirmed', maxRetries: 5 }]);
+  return { signature, size: bytes.length, wait: () => confirm(signature, lastValidBlockHeight, raw) };
 }
 export async function confirm(signature, lastValidBlockHeight, raw) {
   const resend = raw ? setInterval(() => rpc('sendTransaction', [raw, { encoding: 'base64', skipPreflight: true, maxRetries: 0 }]).catch(() => {}), 2000) : 0;

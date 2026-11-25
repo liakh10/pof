@@ -9,6 +9,7 @@ import { decodeAttestation, revokeBytes, revokeBytesV2, sthBytes } from './contr
 import type { CertificateView, PofChain } from './chain.js';
 import type { Signer } from './keys.js';
 import type { RingsSource } from './rings.js';
+import { NOTE_LOCK_DISC, NOTE_LOCK_SIZE, decodeNoteLock } from './zk.js';
 
 type Idl = any;
 const idl: Idl = IDL;
@@ -112,6 +113,9 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
   }
   const edIx = (message: Uint8Array, signature: Uint8Array) => Ed25519Program.createInstructionWithPublicKey({ publicKey: Buffer.from(o.verifier.publicKey), message: Buffer.from(message), signature: Buffer.from(signature) });
 
+  const view = (address: string, c: any): CertificateView => ({ address, status: c.status, tier: c.tier, expirySlot: c.expiry_slot, hashes: c.null_hashes.slice(0, c.note_count).map((h: Uint8Array) => Buffer.from(h).toString('hex')), payer: c.payer, controller: c.controller, nullsetHash: Buffer.from(c.nullset_hash).toString('hex'), issuedSlot: c.issued_slot, verifier: c.verifier, subjectHash: Buffer.from(c.subject_hash).toString('hex'), asset: c.asset });
+  /* FZ-18: a zk certificate's revoke carries its note lock as the first remaining account (writable) */
+  const withLock = (ix: any, lock?: string) => { if (lock) ix.keys.push(meta(new PublicKey(lock), false, true)); return ix; };
   let cfgCache: { at: number; age: bigint } | null = null;
   const chain: PofChain = {
     async slot() { return BigInt(await conn.getSlot('confirmed')); },
@@ -119,9 +123,7 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
       const addr = certPda(sh, asset);
       const a = await conn.getAccountInfo(addr);
       if (!a || !a.owner.equals(PID)) return null;
-      const c = decodeAccount('Certificate', a.data);
-      const hashes = c.null_hashes.slice(0, c.note_count).map((h: Uint8Array) => Buffer.from(h).toString('hex'));
-      return { address: addr.toBase58(), status: c.status, tier: c.tier, expirySlot: c.expiry_slot, hashes, payer: c.payer, controller: c.controller, nullsetHash: Buffer.from(c.nullset_hash).toString('hex'), issuedSlot: c.issued_slot } as CertificateView;
+      return view(addr.toBase58(), decodeAccount('Certificate', a.data));
     },
     async certify(x) {
       const a = decodeAttestation(x.attestation);
@@ -143,7 +145,7 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
       // the fast path: the nullifier PDA is there, one transaction (CONTRACT §5 path (a))
       if (pdaLive) {
         const ix = ixOf('revoke_spent', { index: x.index, salt: x.salt, nullifier: x.nullifier, membership: null }, { ...common(), caller: payer.publicKey, certificate: cert, tree, nullifier_account: nfPda });
-        return send([ix], 'revoke_spent');
+        return send([withLock(ix, x.zkLock)], 'revoke_spent');
       }
       if (!o.rings || !(o.rings as any).nullifierMembership) throw new PofError('NO_SPEND_PROOF', 'the nullifier PDA is gone and no membership source is configured', 503);
       const has = (n: string) => idl.instructions.some((i: any) => i.name === n);
@@ -157,7 +159,7 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
         await send([open], 'open_path');
         const ixs: any[] = [];
         if (m.path.length > cut) ixs.push(ixOf('stage_path', { offset: cut, siblings: m.path.slice(cut) }, named));
-        ixs.push(ixOf('revoke_spent_staged', { index: x.index, salt: x.salt }, named));
+        ixs.push(withLock(ixOf('revoke_spent_staged', { index: x.index, salt: x.salt }, named), x.zkLock));
         try { return await send(ixs, 'revoke_spent_staged'); }
         finally {
           // give the buffer's rent back if the staged revoke left it open
@@ -169,7 +171,7 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
       // the older single-transaction membership (a trimmed path; fits while the nullifier tree is small)
       const membership = await (o.rings as any).nullifierMembership(x.tree, x.nullifier);
       const ix = ixOf('revoke_spent', { index: x.index, salt: x.salt, nullifier: x.nullifier, membership }, { ...common(), caller: payer.publicKey, certificate: cert, tree });
-      return send([ix], 'revoke_spent');
+      return send([withLock(ix, x.zkLock)], 'revoke_spent');
     },
     async anchorLog(size, root) {
       const msg = sthBytes(fromB58(o.programId), size, root);
@@ -217,6 +219,19 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
         const tag = Buffer.from(tags[i]).toString('hex');
         return c.status === 0 && slot <= BigInt(c.expiry_slot) && c.null_hashes.slice(0, c.note_count).some((h: Uint8Array) => Buffer.from(h).toString('hex') === tag);
       });
+    },
+    zkConfig: pda([Buffer.from('zk')]).toBase58(),
+    async zkLocks() {
+      const rows: any[] = await conn.getProgramAccounts(PID, { commitment: 'confirmed', filters: [{ dataSize: NOTE_LOCK_SIZE }, { memcmp: { offset: 0, bytes: toB58(NOTE_LOCK_DISC) } }] });
+      return rows.map(r => decodeNoteLock(r.pubkey.toBase58(), new Uint8Array(r.account.data)));
+    },
+    async certificatesAt(addresses) {
+      const out: (CertificateView | null)[] = [];
+      for (let i = 0; i < addresses.length; i += 100) {
+        const accs = await conn.getMultipleAccountsInfo(addresses.slice(i, i + 100).map(a => new PublicKey(a)), 'confirmed');
+        accs.forEach((a: any, k: number) => { let v: CertificateView | null = null; if (a && a.owner.equals(PID)) { try { v = view(addresses[i + k], decodeAccount('Certificate', a.data)); } catch {} } out.push(v); });
+      }
+      return out;
     },
     async maxAttestAge() {
       if (cfgCache && Date.now() - cfgCache.at < 60_000) return cfgCache.age;

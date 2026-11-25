@@ -1,0 +1,189 @@
+{
+ "date": "2026-11-25T01:17:57.236Z",
+ "program": "pof zk build of 73bcf04 (--features zk,quick)",
+ "pass": 33,
+ "fail": 0,
+ "results": [
+  [
+   "ok",
+   "the client derives the vault the test predicted (its nullifier key made the spent note's PDA)"
+  ],
+  [
+   "ok",
+   "before set_zk the flow sees no ZkConfig (as on the launch program): {\"deployed\":false,\"enabled\":false,\"reason\":\"ZK_NOT_DEPLOYED\"}"
+  ],
+  [
+   "ok",
+   "certify answers ZK_OFF and sends nothing"
+  ],
+  [
+   "ok",
+   "register answers ZK_OFF and sends nothing"
+  ],
+  [
+   "ok",
+   "set_zk on: deployed, still off until the rotation delay (pending at slot 473560678)"
+  ],
+  [
+   "ok",
+   "certify is still ZK_OFF during the delay"
+  ],
+  [
+   "ok",
+   "nine notes on the clone; the first is the predicted (spent) one"
+  ],
+  [
+   "ok",
+   "the client's own sync already hides the spent note (its nullifier PDA): 8"
+  ],
+  [
+   "ok",
+   "after the delay: on, with the revocation key set"
+  ],
+  [
+   "ok",
+   "certify before register_zk_owner: ZK_NOT_REGISTERED"
+  ],
+  [
+   "ok",
+   "register_zk_owner paid the fee (10000000 lamports) to the treasury; 60549 CU"
+  ],
+  [
+   "ok",
+   "a second register is a no-op (one record per owner)"
+  ],
+  [
+   "ok",
+   "certify_zk landed (1 note, wallet subject, 993 B legacy, 263001 CU, proof 5143 ms in Node); state settling for 20 slots"
+  ],
+  [
+   "ok",
+   "require_certificate refuses it while it settles (ZkSettling)"
+  ],
+  [
+   "ok",
+   "after the settle window require_certificate passes"
+  ],
+  [
+   "ok",
+   "without POF_ZK_ESCROW_KEYS the keeper does not look at zk certificates"
+  ],
+  [
+   "ok",
+   "keeper scanZk opened the lock, saw the spend, revoked it: {\"locks\":1,\"live\":0,\"revoked\":[{\"certificate\":\"7EjoDCwbNXgNuRWB7QtsV3z29qvxmVGmK9MAosrGBJBo\",\"index\":0,\"signature\":\"2eJk5Jd9LLMFWpafnREif7Ef9Y2qpnZksqXGpMwGPBow31Xv7it1f5YWvYUx29Ut757RbS1oKVUyCVsdi9ipZ579\"}],\"errors\":[]}"
+  ],
+  [
+   "ok",
+   "revoked_spent and its NoteLock marked spent (FZ-18); keeper revoke 35483 CU"
+  ],
+  [
+   "ok",
+   "the gate refuses it now"
+  ],
+  [
+   "ok",
+   "remake from the spent note: the client refuses (its lock is spent)"
+  ],
+  [
+   "ok",
+   "the program refuses the same nonce over the revoked certificate (Replayed)"
+  ],
+  [
+   "ok",
+   "and a fresh proof of the spent note (ZkNoteLocked)"
+  ],
+  [
+   "ok",
+   "a second scan has nothing to do"
+  ],
+  [
+   "ok",
+   "a badge certificate proven in headless Chrome (witness 196 ms, proof 4127 ms; artifacts loaded in 221 ms), 1089 B legacy with 2 signers, 264591 CU"
+  ],
+  [
+   "ok",
+   "a badge paid by the wallet needs allowWalletPayer (it links them in public)"
+  ],
+  [
+   "ok",
+   "the holder revokes (badge key signs) and the lock is released in the same transaction (net 2370320 lamports back after the fee)"
+  ],
+  [
+   "ok",
+   "tier 2 (10 SOL) from 3 notes over the revoked certificate of the same wallet: 1187 B legacy, 286740 CU, proof 5047 ms"
+  ],
+  [
+   "ok",
+   "the default pick skipped the spent note and the notes other certificates hold"
+  ],
+  [
+   "ok",
+   "four notes without a lookup table: refused even with allowFourNotes"
+  ],
+  [
+   "ok",
+   "three notes and two signers (a badge) do not fit a legacy transaction: ZK_TX_TOO_LARGE without a lookup table"
+  ],
+  [
+   "ok",
+   "four notes are refused by default even with a lookup table (3 is the cap: no room for a priority fee at 4)"
+  ],
+  [
+   "ok",
+   "4 notes (tier 2), badge with 2 signers, version 0 over the lookup table: 1230 B, 318279 CU, proof 4898 ms"
+  ],
+  [
+   "ok",
+   "the kits stay on the device, sealed: 3 certificates (one per subject)"
+  ]
+ ],
+ "numbers": {
+  "register_zk_owner_cu": 60549,
+  "node": {
+   "notes": 1,
+   "proveMs": {
+    "witness": 216,
+    "prove": 4927,
+    "total": 5143
+   },
+   "size": 993,
+   "cu": 263001
+  },
+  "keeper_revoke_cu": 35483,
+  "chrome_load_ms": 221,
+  "chrome": {
+   "notes": 1,
+   "proveMs": {
+    "witness": 196,
+    "prove": 4127,
+    "total": 4323
+   },
+   "size": 1089,
+   "cu": 264591,
+   "subject": "badge (2 signers)"
+  },
+  "three": {
+   "notes": 3,
+   "proveMs": {
+    "witness": 210,
+    "prove": 4836,
+    "total": 5047
+   },
+   "size": 1187,
+   "cu": 286740,
+   "version": "legacy"
+  },
+  "four": {
+   "notes": 4,
+   "proveMs": {
+    "witness": 221,
+    "prove": 4677,
+    "total": 4898
+   },
+   "size": 1230,
+   "cu": 318279,
+   "version": 0,
+   "subject": "badge (2 signers)"
+  }
+ }
+}

@@ -27,10 +27,12 @@ test vectors were read earlier.
 | Hashes = Rings (SDK and real mainnet leaves) | `node --test test/parity.test.mjs` | 4 | pass |
 | The circuit with snarkjs | `node --test test/circuit.test.mjs` | 12 | pass |
 | The on-chain verifier, native, against snarkjs proofs | `npm run test:native` | 5 | pass |
-| `certify_zk` on a local validator (patched `pof`, quick build) | `zsh onchain/test/run.sh` | 12 | pass |
+| `certify_zk` on a local validator (`pof/program` at HEAD, zk + quick build) | `zsh onchain/test/run.sh` | 14 | pass (73bcf04) |
 | Patched `pof` unit tests (zk module included) | `cargo test -p pof --lib` in the patched copy | 11 | pass |
 | The audit's round 3 zk proofs | `node --test audit/zk/` and `cargo test` in `audit/zk-native` | 3 + 1 | pass (they failed before the fixes) |
 | Proving in the browser | `node bench/run.mjs` | 5 proofs | all verify |
+| The integration end to end (client, Chrome prover, keeper, real non-inclusion paths) | `node ../lab/test/zk-e2e.mjs` | 33 | pass |
+| The client zk flow offline, the keeper's escrow and scan | `node --test client/test/zk-flow.test.mjs`, `verifier/test/zk.test.mjs` | 3 + 4 | pass |
 
 ## The circuit
 
@@ -187,18 +189,81 @@ The suite (12 checks, `onchain/test/zk-chain.mjs`):
 
 The entropy came from `/dev/urandom` and was never written. **Labelled a development setup everywhere it appears.**
 
+## Integration (2026-11-25, program 73bcf04, zk build)
+
+Everything below sits behind the switch. The launch program (1c02f89/a3b15d1/73bcf04 without the `zk` feature) has no
+`ZkConfig`, so the client's zk flow answers `ZK_OFF` and sends nothing, and the keeper never looks at zk certificates
+unless `POF_ZK_ESCROW_KEYS` is set. The site and the launch build behave as before.
+
+| part | files | what it does |
+|---|---|---|
+| client | `client/zk-flow.js`, `client/zk-idl.js` (from the committed `program/idl/pof-zk.json`, `tools/zk-idl.mjs`), `pof-client.js` (`zkIdentity`: the owner secret from the vault seed), `wallet.js` (`sendVersioned`) | `state()` (`ZkConfig.active(slot)` mirrored: off, pending, on, the key and its epoch), `register()` (`register_zk_owner`: owner, payer, config, treasury, registry, owner record; paid, one per owner), the registry path rebuilt from every `ZkOwner` record and checked against the program's 20 roots, the witness (state paths from the indexer or LocalRings, non-inclusion paths from the indexer at the tree's newest nullifier root, checked before proving), the proof in the page (snarkjs, the 38.5 MB key streamed and unpacked once), `certify()` (`certify_zk` plus one `NoteLock` per tag; notes other certificates hold are skipped; a forester batch between read and send re-proves once), `settle()` (status `settling` until the issued slot), `revoke()` (`revoke_by_holder` + `release_note_lock` in one transaction), `revokeSpent()` (anyone with the kit: `revoke_spent` with the `NoteLock` first), kits sealed under the vault's kit key |
+| keeper | `verifier/src/zk.ts`, `keeper.ts` (`scanZk`), `program.ts` (`zkLocks`, `certificatesAt`, `revokeSpent({ zkLock })`) | lists every unspent `NoteLock`, opens each nullifier from `(R, ct)` with the revocation secret of the lock's key epoch, checks it against the tag, asks the Rings source whether it is spent, and revokes with the lock as the first remaining account (PDA path, staged path the same). ZK-06 (`zkLocked` before signing) is unchanged. Bundle `1669327c…6091`, `BUILD.json` regenerated, `node --test` 50/50 incl. build |
+| tests | `client/test/zk-flow.test.mjs` (3), `verifier/test/zk.test.mjs` (4), `lab/test/zk-e2e.mjs` (33, results `lab/test/zk-e2e.json`) | below |
+| on-chain suite | `zk/onchain/test/run.sh` | now builds `pof/program` at git HEAD with `--features zk,quick` in a scratch copy (no `apply.py`); 14/14 on 73bcf04 |
+
+**Transaction limits.** At most 3 notes by default. A 4-note `certify_zk` is 1,230 of 1,232 bytes even over a lookup table
+with two signers, which leaves no room for a priority fee, so it needs `certify({ allowFourNotes: true })` and a lookup
+table. A badge (two signers) with 3 notes needs the lookup table too.
+
+**The end-to-end run** (`node lab/test/zk-e2e.mjs`, 33/33): a local validator with the zk build of 73bcf04, Privacy Rings
+cloned from mainnet with the tree account read fresh at the start, the real client, the Verifier's keeper. The
+non-inclusion paths are **real**: the Helius indexer on mainnet (read-only) answered for each nullifier at mainnet's newest
+nullifier root, which is the clone's, and the program accepted them. The spend is the nullifier PDA a real spend leaves
+(RINGS §8.3), preloaded at genesis at the address the test predicted from the vault the client then derived.
+
+1. No `ZkConfig` (as on the launch program): `state()` off, `certify` and `register` answer `ZK_OFF`, nothing sent.
+   `set_zk` on: still `ZK_OFF` until the rotation delay.
+2. Nine shields into the vault; `certify` before registering: `ZK_NOT_REGISTERED`. `register_zk_owner` pays the fee
+   (0.01 SOL) to the treasury, a second call is a no-op.
+3. Wallet subject, 1 note, proven in Node, `certify_zk` lands; `settling` for 20 slots (quick build; 150 in a real build);
+   `require_certificate` refuses (`ZkSettling`), then passes after `settle()`.
+4. The keeper without a key ignores zk certificates. With the key it opens the lock, sees the spend and revokes;
+   the certificate is `revoked_spent` and its `NoteLock` is marked spent (FZ-18); the gate refuses; a remake is refused by
+   the client (lock spent), and by the program with the same nonce (`Replayed`) and with a fresh proof (`ZkNoteLocked`).
+5. A badge certificate proven in **headless Chrome**, then revoked by the holder (badge key) with the lock released in the
+   same transaction (rent back).
+6. The same wallet remade at tier 2 from 3 notes picked by default (the spent note and held notes skipped), legacy.
+7. Four notes: refused without the option, refused without a table, then accepted as a version 0 transaction over a lookup
+   table with `allowFourNotes`.
+
+| measured (local validator, this laptop) | notes | tx | compute units | proof |
+|---|---|---|---|---|
+| `register_zk_owner` | | | 60,549 | |
+| `certify_zk`, wallet subject, Node | 1 | 993 B legacy | 263,001 | 5.1 s (witness 0.2 s) |
+| `certify_zk`, badge (2 signers), headless Chrome | 1 | 1,089 B legacy | 264,591 | 4.3 s (witness 0.2 s) |
+| `certify_zk`, wallet subject, Node | 3 | 1,187 B legacy | 286,740 | 5.0 s |
+| `certify_zk`, badge (2 signers), Node | 4 | 1,230 B, v0 + lookup table | 318,279 | 4.9 s |
+| keeper `revoke_spent` with the `NoteLock` | | | 35,483 | |
+
+The client's transactions add a compute unit limit instruction, so sizes are about 40 bytes above the on-chain suite's.
+
+**What remains before `set_zk(true)` on mainnet:**
+- **The public ceremony** (`docs-src/zk.md`), then `vk.rs` regenerated, the build hash published, the key served from a
+  GitHub Release (`scripts/publish-zkey-release.sh`).
+- **The revocation key**: generate `k` offline, put `K = k·B8` in `set_zk` and `POF_ZK_ESCROW_KEYS=<epoch>:<k>` in the
+  keeper's env (the epoch is 1 after the first `set_zk`, +1 at each key change; the keeper keeps old epochs while their
+  certificates live).
+- **The program upgrade**: `solana program extend` (about +103 KB, about 0.72 SOL) and the upgrade to the zk build.
+- **The site**: `zk/` is in `.vercelignore`; the page needs `zk/js/zk.js`, `zk/dist/snarkjs.min.js`, the wasm and the key
+  served (or `createZkFlow(pof, { assetBase })` pointed at the release), a `/get` path that calls `zk-flow.js`, and the
+  `settling` state shown. The SDK's `POF_ZK_IDL` is older than `pof-zk.json` (no `owner_record`) and `zkEnabled()` checks only
+  that `ZkConfig` exists, not that it is on.
+- **A real phone measurement**, and a **devnet run** with a real spend (here the spend is the preloaded PDA, and the state
+  tree's new leaves are ours on top of the cloned frontier).
+- **Out of scope for now**: the relayer for zk badges (the wallet pays, with `allowWalletPayer`), X-handle subjects.
+
 ## What remains
 
 - **The public ceremony** before mainnet (`docs-src/zk.md`), then rebuild `vk.rs`, publish the build hash, and `set_zk`.
-- **The merge into `pof`:** the program agent reviews `onchain/patch/pof-program.diff` and merges it with `apply.py`. The
-  zk part stays off on chain until the audit re-reviews it.
-- **ZK-06:** the Verifier checks the `znote` lock of each note it attests (it knows the nullifier, so `tag = Poseidon(TAG, nf)`).
-  A CONTRACT §3 v2 would let signed certificates create the locks too.
-- **The rings client:** `register_zk_owner` (one vault-key signature) and the zk certify flow with `zk.js`.
-- **The keeper:** open the escrow from `NoteLock` accounts, and watch new nullifiers against live zk tags.
+- ~~The merge into `pof`~~: done (cd51f22, behind the `zk` feature).
+- ~~ZK-06 (Verifier side)~~: done (the Verifier refuses a note whose `znote` lock is live). A CONTRACT §3 v2 would let signed
+  certificates create the locks too (parked for the zk launch).
+- ~~The rings client~~ and ~~the keeper~~: done, see Integration.
 - **The API and SDK:** show a settling zk certificate as "settling" (its `issued_slot` is in the future).
 - **A real phone measurement.**
 - **A devnet run against the real tree**, with a real deposit, a real non-inclusion proof from the indexer, and a real
-  spend. The local suite uses a tree account that holds synthetic roots.
+  spend. The on-chain suite uses synthetic roots; the integration run uses the real mainnet nullifier tree (read-only) and a
+  preloaded spend PDA.
 - **Not in this version:** X-handle subjects (they need the linker's proof in the circuit), more than 4 notes, unlinkable
   (salted) tags, and the subgroup check of the escrow key on chain.
