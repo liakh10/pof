@@ -1,0 +1,27 @@
+{
+ "built": "2026-11-24T23:41:42.154Z",
+ "ref": "187914b",
+ "feature": "quick",
+ "sources": {
+  "programs/pof/src/lib.rs": "24d18ba716c973e46e1f4caaf048db36c0a18b3674e9ae200d4451e31534f223",
+  "programs/pof/src/ext.rs": "171210e764a09e25bd68b243decd5cc92df993add5e9991bbdbdee0314598005",
+  "programs/pof/src/errors.rs": "d674ab8a9c7acfe31e9d515a842f9747ff828125b68ccc2e01afc2e3ff58c740",
+  "programs/pof_gate/src/lib.rs": "0ef0643e206bbf4bd9352f9b58412dbdfaa063587593045c951da96569f89bc7",
+  "programs/hostile/src/lib.rs": "7a510fb4d8630ae54d274e46c232ef7899630fe3cafb982cfbf28d4fa6bf523a",
+  "Cargo.lock": "8d23d669c2d4b37e7d48978a561fe01546a601732b89d673be2377c799ea654b"
+ },
+ "binaries": {
+  "hostile.so": {
+   "sha256": "fea6615b604b3959d84f26dc89644e5f6e213c191601e5f93e1e517e911e9dfd",
+   "bytes": 182032
+  },
+  "pof.so": {
+   "sha256": "695d9d6f9b822a060de746878c526a669ff932e87f1dace7dc045ee0d852aecd",
+   "bytes": 397792
+  },
+  "pof_gate.so": {
+   "sha256": "ba1e0fa8b12b0a916aeb180d4a61fd45c5f99b2cb9c41cea40ae7a16798c60c8",
+   "bytes": 240656
+  }
+ }
+}

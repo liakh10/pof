@@ -1,0 +1,51 @@
+{
+ "at": "2026-11-24T23:53:08.536Z",
+ "snapshot": "24d18ba716c973e46e1f4caaf048db36c0a18b3674e9ae200d4451e31534f223",
+ "findings": {
+  "FZ-01": {
+   "title": "a certificate signed by a rotated-out (leaked) Verifier key stays live for every gate; pause does not stop it, nothing voids it",
+   "reproduced": false,
+   "detail": "after revoke_verifier_key (ok): require_certificate KeyRevoked; void_by_key voided it"
+  },
+  "FZ-02": {
+   "title": "anchor_log accepts a signed head of size 2^64-1, after which no head can ever be anchored (no reset, survives rotation)",
+   "reproduced": false,
+   "detail": "refused: LogNotGrowing"
+  },
+  "FZ-03": {
+   "title": "revoke_spent trusts any Privacy Program account as `tree`: a spent PDA under the protocol config (not a tree) revokes",
+   "reproduced": false,
+   "detail": "refused: BadRingsAccounts"
+  },
+  "FZ-04": {
+   "title": "set_roles accepts an SPL token ACCOUNT as the $ROOT mint (one-way: the holder exemption is then dead for good)",
+   "reproduced": false,
+   "detail": "refused: BadMint"
+  },
+  "FZ-05": {
+   "title": "revoke_signed has no cap on valid_until: a signed revoke with valid_until = 2^64-1 is usable for the certificate's whole life",
+   "reproduced": true,
+   "detail": "valid_until = 2^64-1 accepted"
+  },
+  "FZ-06": {
+   "title": "a membership path longer than 24 levels cannot be submitted (v0 over 1,232 bytes; this validator refuses larger v1 too), so path (b) covers trees under 2^24 nullifiers only",
+   "reproduced": false,
+   "detail": "16: ok, 24: ok, 25: TxTooLarge, 40: TxTooLarge; a staged path instruction exists (stage_path)"
+  },
+  "FZ-09": {
+   "title": "revoked_keys holds 4 keys and nothing removes one: a fifth leaked Verifier key cannot be revoked",
+   "reproduced": true,
+   "detail": "4 keys held; the next one: BadParams"
+  },
+  "FZ-07": {
+   "title": "a kind 0 / kind 2 attestation whose controller is the default key (11111…) is accepted (nobody can ever revoke_by_holder it)",
+   "reproduced": true,
+   "detail": "accepted (simulated)"
+  },
+  "FZ-08": {
+   "title": "close_config succeeds while a staged path buffer is open; close_path then needs the closed config: the buffer and its rent are stranded",
+   "reproduced": true,
+   "detail": "close_config ok; close_path afterwards: AccountNotInitialized; buffer still exists (10857600 lamports)"
+  }
+ }
+}

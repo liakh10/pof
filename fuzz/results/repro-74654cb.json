@@ -1,0 +1,41 @@
+{
+ "at": "2026-11-24T23:38:38.026Z",
+ "snapshot": "81552e628f88b4b38b3816869f961042edc8ae36c75274c8ce29672cd94eab64",
+ "findings": {
+  "FZ-01": {
+   "title": "a certificate signed by a rotated-out (leaked) Verifier key stays live for every gate; pause does not stop it, nothing voids it",
+   "reproduced": true,
+   "detail": "require_certificate after rotation + pause: yes; an admin void instruction does not exist"
+  },
+  "FZ-02": {
+   "title": "anchor_log accepts a signed head of size 2^64-1, after which no head can ever be anchored (no reset, survives rotation)",
+   "reproduced": true,
+   "detail": "size 2^64-1 accepted (simulated)"
+  },
+  "FZ-03": {
+   "title": "revoke_spent trusts any Privacy Program account as `tree`: a spent PDA under the protocol config (not a tree) revokes",
+   "reproduced": true,
+   "detail": "accepted with tree = the protocol config EienwB…"
+  },
+  "FZ-04": {
+   "title": "set_roles accepts an SPL token ACCOUNT as the $ROOT mint (one-way: the holder exemption is then dead for good)",
+   "reproduced": true,
+   "detail": "a 165-byte token account accepted as the mint (simulated)"
+  },
+  "FZ-05": {
+   "title": "revoke_signed has no cap on valid_until: a signed revoke with valid_until = 2^64-1 is usable for the certificate's whole life",
+   "reproduced": true,
+   "detail": "valid_until = 2^64-1 accepted"
+  },
+  "FZ-06": {
+   "title": "a membership path longer than 24 levels cannot be submitted (v0 over 1,232 bytes; this validator refuses larger v1 too), so path (b) covers trees under 2^24 nullifiers only",
+   "reproduced": true,
+   "detail": "16: ok, 24: ok, 25: TxTooLarge, 40: TxTooLarge; a staged path instruction does not exist"
+  },
+  "FZ-07": {
+   "title": "a kind 0 / kind 2 attestation whose controller is the default key (11111…) is accepted (nobody can ever revoke_by_holder it)",
+   "reproduced": true,
+   "detail": "accepted (simulated)"
+  }
+ }
+}

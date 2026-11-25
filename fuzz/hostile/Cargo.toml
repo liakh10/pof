@@ -1,0 +1,28 @@
+[package]
+name = "hostile"
+version = "0.1.0"
+description = "POF fuzz: a hostile program around pof and pof_gate (a fake POF answering require_certificate, a consumer that forgets to pin POF, certify through a CPI with a PDA payer, a program-controlled certificate that joins rooms and revokes itself mid-instruction). Test only, never deployed outside a local validator."
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "hostile"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "pof/idl-build", "pof_gate/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { version = "1.2.0" }
+# fuzz/build.sh copies this crate next to its snapshot of the programs and points these paths at the snapshot
+pof = { path = "../../program/programs/pof", features = ["cpi"] }
+pof_gate = { path = "../../program/programs/pof_gate", features = ["cpi"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
