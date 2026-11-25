@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proof of Funds: on-chain fuzz and property testing · Proof of Funds</title>
+<meta name="description" content="Status: round 1 complete on 187914b, open items listed in §5. Reviewer: the POF fuzz agent, a second reviewer independent of
+the audit agent, working only on the on-chain programs pof and pof_gate. It wrote none of the program code and changed none of
+it: ever">
+<link rel="canonical" href="https://proofoffunds.vercel.app/reports/fuzz">
+<meta name="theme-color" content="#f3efe6">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/ui/fonts/mona-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/tokens.css">
+<link rel="stylesheet" href="/ui/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proof of Funds">
+<meta property="og:title" content="Proof of Funds: on-chain fuzz and property testing · Proof of Funds">
+<meta property="og:description" content="Status: round 1 complete on 187914b, open items listed in §5. Reviewer: the POF fuzz agent, a second reviewer independent of
+the audit agent, working only on the on-chain programs pof and pof_gate. It wrote none of the program code and changed none of
+it: ever">
+<meta property="og:url" content="https://proofoffunds.vercel.app/reports/fuzz">
+<meta property="og:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://proofoffunds.vercel.app/api/card/proof-of-funds.png">
+
+<script src="/config.js"></script>
+<script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/docs.js"></script>
+</head>
+<body class="page-docs" data-page="docs">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Proof of Funds, home"><svg class="mark mark-live" viewBox="-50 -50 100 100" width="30" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle r="46" fill="none" stroke="var(--ink)" stroke-width="2.5"/><circle r="37" fill="none" stroke="var(--signal)" stroke-width="8"/><circle r="26" fill="var(--ink)"/><path d="M -11 0 L -3 8 L 12 -7" stroke="var(--paper)" stroke-width="7" fill="none" stroke-linecap="square" stroke-linejoin="miter"/></svg><span class="brand-name">Proof of Funds</span></a>
+  <nav class="nav" id="nav" aria-label="Main"><a href="/">Certificates</a><a href="/get">Get certified</a><a href="/verify">Verify</a><a href="/rooms">Rooms</a><a href="/log">Log</a><a href="/docs" aria-current="page">Docs</a><a href="/developers">Developers</a></nav>
+  <div class="top-end"><span class="top-slot" data-slot-mini hidden><span class="dot"></span><span data-slot-text></span></span><button class="menu" type="button" aria-expanded="false" aria-controls="nav"><span class="menu-bars"></span><span class="sr">Menu</span></button></div>
+</header>
+<main id="main">
+<div class="docs">
+  <aside class="docs-side" aria-label="Sections">
+    <details class="docs-pick" open><summary>Test reports</summary><ol class="docs-list"><li><a href="/reports/program"><span class="n">01</span>Program test report: pof and pofgate</a></li><li><a href="/reports/verifier"><span class="n">02</span>Test report: the Verifier, the transparency log, the relayer, the keeper and the X-handle linker</a></li><li><a href="/reports/rings"><span class="n">03</span>Test report: the Privacy Rings client (browser client, lab, proxies)</a></li><li><a href="/reports/devx"><span class="n">04</span>Test report: developer surfaces (API, SDK, MCP, bots)</a></li><li><a href="/reports/audit"><span class="n">05</span>Proof of Funds: internal security review</a></li><li><a href="/reports/fuzz" aria-current="page"><span class="n">06</span>Proof of Funds: on-chain fuzz and property testing</a></li><li><a href="/reports/zk"><span class="n">07</span>Test report: phase 2, the zero-knowledge proof of funds (zk/)</a></li><li><a href="/reports/audit2"><span class="n">08</span>Proof of Funds: second internal security review (audit2)</a></li><li><a href="/reports/performance"><span class="n">09</span>Performance and load</a></li></ol></details>
+  </aside>
+  <article class="prose" data-docs>
+    
+    <h1 id="proof-of-funds-on-chain-fuzz-and-property-testing">Proof of Funds: on-chain fuzz and property testing</h1>
+<p>Status: <strong>round 1 complete on <code>187914b</code></strong>, open items listed in §5. Reviewer: the POF <code>fuzz</code> agent, a second reviewer independent of
+the <code>audit</code> agent, working only on the on-chain programs <code>pof</code> and <code>pof_gate</code>. It wrote none of the program code and changed none of
+it: every finding below went to the program owner, who fixed it in their own commits. Everything here can be re-run from <code>pof/fuzz/</code>
+(§8).</p>
+<h2 id="1-scope-and-snapshots">1. Scope and snapshots<a class="anchor" href="#1-scope-and-snapshots" aria-label="Link to this section">#</a></h2>
+<p>The program changed three times while the fuzzer ran. Each run therefore names the exact source it tested. <code>fuzz/build.sh</code> builds a
+snapshot of one commit in the scratchpad, never in <code>pof/program</code>, and records the sha256 of every source file in
+<code>fuzz/results/snapshot.json</code>.</p>
+<div class="table"><table><thead><tr><th>run</th><th>program commit</th><th>what it added</th><th>seed</th><th>cases</th><th>invariant checks</th><th>unexpected</th></tr></thead><tbody><tr><td>1</td><td><code>73d71dd</code></td><td>POF-07/17/22 fixes</td><td>1</td><td>9,666</td><td>29</td><td>27 (see note)</td></tr><tr><td>2</td><td><code>74654cb</code></td><td><code>revoke_signed</code> (POF-REVOKE1, 156 bytes)</td><td>2</td><td>10,803</td><td>33</td><td>3 (findings FZ-04, FZ-06)</td></tr><tr><td>3</td><td><code>187914b</code></td><td>fixes for FZ-01..04 and FZ-06 (revoked keys, <code>void_by_key</code>, tree 0 pinned, anchor step bound, mint-only <code>set_roles</code>, the staged 40-level path)</td><td>3</td><td>10,645</td><td>34</td><td>1 (a harness bug, fixed)</td></tr><tr><td>4</td><td><code>187914b</code></td><td>the same, a second seed</td><td>4</td><td>10,345</td><td>34</td><td>2 (finding FZ-08) + 1 harness slip (fixed)</td></tr></tbody></table></div>
+<p>Note on run 1: 24 of the 27 were the harness's own fault (a signer or writable flag removed from an account that was also the fee
+payer does not change the message; fixed by a separate fee payer). The other 3 were findings. Every &quot;unexpected&quot; row is kept in
+<code>fuzz/results/run-&lt;seed&gt;-&lt;commit&gt;.json</code> (and <code>repro-&lt;commit&gt;.json</code> for §5) with the case name, what was wanted and what came back.</p>
+<p>In scope: all 31 instructions of <code>pof</code> at <code>187914b</code> and all 8 of <code>pof_gate</code>, the Ed25519 precompile as <code>certify</code>, <code>renew</code>,
+<code>anchor_log</code> and <code>revoke_signed</code> read it through the instructions sysvar, the Rings spent proofs (PDA, membership path, staged path),
+and the <code>require_certificate</code> CPI as other programs call it. Not in scope: <code>certify_zk</code> (not merged into <code>pof/program</code> when this
+round closed; it will get the same treatment in a later seed), the off-chain Verifier, client, API and bots (<code>reports/audit.md</code>).</p>
+<h2 id="2-method">2. Method<a class="anchor" href="#2-method" aria-label="Link to this section">#</a></h2>
+<p><strong>Engine: a seeded JavaScript (Node ESM) fuzzer against a real local validator</strong> (<code>solana-test-validator</code> 4.1.2, Agave). LiteSVM
+and Mollusk were considered and not used: neither was installed on the machine, adding them means downloading new packages, and the
+validator gives the exact runtime the programs meet on mainnet, including the Ed25519 precompile, the <code>sol_poseidon</code> syscall,
+transaction size limits and version 1 transactions. Speed was not a problem: a simulation with <code>replaceRecentBlockhash</code> costs 2 to 3
+ms, so most suites run tens of thousands of cases in seconds. Three properties make the validator usable as a fuzz target:</p>
+<ul><li><code>simulateTransaction</code> returns the bank slot it ran at. Every slot-dependent outcome (stale, expired, rotation switch) is judged
+against a model evaluated <strong>at that exact slot</strong>, so boundaries are tested exactly, not with margins.</li><li>Simulation runs the Ed25519 precompile (checked: a corrupt signature with a valid layout fails in simulation with
+<code>InvalidSignature</code>, and again when sent). A case that must fail but simulates ok is also sent for real before it counts.</li><li>Every transaction is unique (the compute-unit limit carries a counter). Two identical transactions under one blockhash share a
+signature, and the second would silently never run.</li></ul>
+<p><strong>Determinism.</strong> All keys, notes, salts, nonces, mutations and random walks come from a xoshiro256** generator seeded by <code>SEED</code>.
+The genesis state comes from a fixed prep seed. Only the slot timing of the chain is not reproducible, and the model reads it.</p>
+<p><strong>Genesis</strong> (<code>fuzz/prep.mjs</code>, <code>fuzz/chain.sh</code>): the Rings accounts the program suite cloned read-only from mainnet (tree 0 with its
+real nullifier root history, the protocol config, the spent-PDA fixtures); a synthetic indexed nullifier tree of height 40 built with
+the SDK's Poseidon (leaves at indexes 0, 1, 2, 3, 77, 2^39 + 12345 and 2^40 − 1) whose roots are written into the fuzzer's copy of
+tree 0 and into forged tree accounts (owned by the Privacy Program with discriminator 1; and look-alikes with discriminator 0, one
+byte short, system-owned); spent nullifier PDAs under tree 0, under a forged tree and under the protocol config, plus five
+look-alikes at the right addresses (first byte 7, 12 bytes, 10 bytes, system-owned, registry-owned); and POF's <code>Config</code> and
+<code>Treasury</code> written at genesis with the fuzzer's parameters (since POF-17 a lowered rotation delay is held for the old one, so a chain
+started with launch parameters cannot rotate in test time).</p>
+<p><strong>The hostile program</strong> (<code>fuzz/hostile/</code>, Anchor, loaded only on the fuzz chain): a fake POF whose <code>require_certificate</code> has the same
+Anchor discriminator and answers &quot;tier 5&quot; for anything; a consumer that does not pin POF's program id; a careful consumer that checks
+the return data's program id and compares the CPI answer with a direct <code>read_certificate</code> + <code>gate</code>; <code>certify</code> through a CPI with a
+program PDA as payer, once and twice under one signature; and a program-controlled X-handle certificate that joins a room through a
+CPI and revokes itself between two <code>require_certificate</code> calls in one instruction.</p>
+<h3 id="the-suites-fuzzsuites">The suites (<code>fuzz/suites/</code>)<a class="anchor" href="#the-suites-fuzzsuites" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>suite</th><th>what it does</th><th>cases (seed 3)</th></tr></thead><tbody><tr><td>attest</td><td>every byte of the 240 signed bytes mutated (3 values per offset); every instruction field mutated under the original signature; 1,500 random attestations (kinds 0..255, controllers incl. the default key, assets 0..255, tiers 0..255, 0..10 notes, unsorted and repeated hashes, issue, root and expiry slots at and around every bound, u64 extremes) judged against a model of <code>check_attestation</code></td><td>2,312</td></tr><tr><td>ed25519</td><td>count 0 / 2 (both orders), each index field by number, at another instruction, at <code>u16::MAX − 1</code>; message length ±1; trailing data; account metas on the precompile instruction; the signature after <code>certify</code>, two before, at index 0; data inside a memo; a key offset into the message; the sysvar replaced; 400 random header mutations (any that simulates ok is sent)</td><td>406</td></tr><tr><td>revoke</td><td><code>revoke_spent</code> path (a) against every forged and look-alike account; path (b) every leaf, every path length 0..41, each sibling level and each leaf-index bit flipped, index ≥ 2^40 and u64::MAX, values ≥ the field modulus, a level-1 node presented as a leaf, roots at history slots 0, 50 and 99, the real mainnet 16-level path, the real 40-level path in v0 and v1</td><td>283</td></tr><tr><td>revsig</td><td><code>revoke_signed</code>: every byte of the 156 signed bytes; <code>valid_until</code> past, now, u64::MAX; another signer, the Verifier's key; X's message on Y; a message from before a renew or a remake; replay</td><td>328</td></tr><tr><td>accounts</td><td>every account of 22 canonical calls replaced by each of 22 interesting accounts, writable made read-only, read-only made writable, signer removed, every pair made duplicates</td><td>2,389</td></tr><tr><td>data</td><td>instruction data truncated at every length, 1/8/64 trailing bytes, discriminator and every argument byte changed, vector lengths 0..2^32 − 1, option tags 2..255</td><td>2,377</td></tr><tr><td>orderings</td><td>revoke/remake, certify/revoke/certify, double revocations, join/revoke/evict, renew/revoke, expire/remake inside one transaction; conflicting transactions raced into the same slot</td><td>43</td></tr><tr><td>donations</td><td>lamports sent to revoked, empty and future certificate, member, room and treasury addresses before remakes, expiry and withdrawal (POF-07)</td><td>23</td></tr><tr><td>gate</td><td>rooms against revoked, expired, closed, re-issued (same and other controller, lower tier) certificates; creator controls; the hostile program</td><td>45</td></tr><tr><td>admin</td><td>pause, parameter bounds, fee cap, withdraw limits, re-init, close before closing</td><td>20</td></tr><tr><td>rotation</td><td>the switch slot by slot (old key ok iff slot &lt; switch, judged per simulation); the POF-17 hold; a 40-step random walk of <code>set_params</code>/<code>set_verifier</code>/<code>apply_verifier</code>/waits compared field by field with a model, plus the delay promise (no key takes over before t + E(t) of any earlier observation)</td><td>2,146</td></tr><tr><td>machine</td><td>a 300-step random walk over 6 subjects (certify, renew, both revokes, expire, join, evict, leave, donations, waits) with a model of every outcome evaluated at the landing slot</td><td>202</td></tr><tr><td>staged</td><td><code>open_path</code> / <code>stage_path</code> / <code>revoke_spent_staged</code> / <code>close_path</code>: the real 40-level path and the synthetic leaf 2^40 − 1 in chunks; partial staging, gaps, overflow, empty writes; another revoker; buffers swapped between certificates; a wrong level rewritten; renew, remake and holder revoke while a buffer is open</td><td>32</td></tr><tr><td>void</td><td><code>revoke_verifier_key</code>, <code>void_by_key</code>, the key check in <code>check_signed</code>, <code>require_certificate</code>, <code>join</code> and <code>evict</code>; renew and remake after a revocation; the key list full</td><td>22</td></tr><tr><td>cu, holder</td><td>worst-case compute units and transaction sizes (§4); the $ROOT exemption</td><td>12</td></tr><tr><td>winddown</td><td>the anchor step bound, <code>close_begin</code>, expire and evict everything, <code>close_config</code> with a staged buffer open, <code>release_room</code>, nothing left</td><td>85</td></tr></tbody></table></div>
+<p><strong>Invariants</strong>, checked after every state-changing suite and every 15 steps of the random walk, over every account the two programs
+own: <code>Treasury.open</code> = certificate accounts; <code>live</code> = certificates with status live = <code>certified − revoked_spent − revoked_holder −
+expired − voided</code>; <code>live_min[a]</code> = the sum of tier minimums of live certificates of asset a; every certificate at its PDA, at or above
+rent, with 1..8 notes, a revealed note when revoked as spent; the treasury's free lamports ≥ <code>fees_in − fees_out</code>; every room's
+member count = its member accounts; every member at its PDA. 130 invariant checks over runs 1 to 4: none broke.</p>
+<h3 id="the-programs-own-suites-re-run">The program's own suites, re-run<a class="anchor" href="#the-programs-own-suites-re-run" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>commit</th><th>unit (cargo test)</th><th>suite (test.mjs)</th><th>wind-down (closing.mjs)</th></tr></thead><tbody><tr><td><code>73d71dd</code></td><td>7/7</td><td>20 of 20 pass up to the rotation test, which then waits about 216,000 slots: the test lowered the launch delay 216,000 → 40, and the POF-17 fix (correctly) holds the old delay. A test bug, not a program bug; fixed in <code>b605c03</code> (quick build launches at 40). Log: <code>fuzz/results/suite-73d71dd-hang.log</code></td><td>not reached</td></tr><tr><td><code>187914b</code></td><td>see <code>fuzz/results/suite-runs.txt</code></td><td></td><td></td></tr></tbody></table></div>
+<h2 id="3-coverage">3. Coverage<a class="anchor" href="#3-coverage" aria-label="Link to this section">#</a></h2>
+<p><strong>Instructions.</strong> Every instruction of both programs was called canonically and adversarially: <code>pof</code> (31 at <code>187914b</code>): init_config
+(re-init only, the first init is covered by the program suite), set_roles, set_params, set_fee, set_asset, set_verifier,
+apply_verifier, set_paused, certify, renew, revoke_spent, open_path, stage_path, revoke_spent_staged, close_path, revoke_by_holder,
+revoke_signed, expire, anchor_log, require_certificate, revoke_verifier_key, void_by_key, withdraw_fees, close_begin, close_config;
+<code>pof_gate</code> (8): create_room, set_room, join, evict, leave, close_room, release_room.</p>
+<p><strong>Error branches.</strong> Every error variant a call returned was recorded per instruction (<code>coverage</code> in the results). Reached in runs 3
+and 4 together: 40 of 49 <code>pof</code> variants and 8 of 9 <code>pof_gate</code> variants. The ones not reached, and why:</p>
+<div class="table"><table><thead><tr><th>variant</th><th>why</th></tr></thead><tbody><tr><td>NotUpgradeAuthority</td><td><code>init_config</code> runs once at genesis in the fuzz chain; the program suite covers it on a bare chain</td></tr><tr><td>NoVerifier</td><td>unreachable while a verifier key is set (genesis sets one; nothing clears it)</td></tr><tr><td>PayerMismatch</td><td>defined in <code>errors.rs</code>, used nowhere: the payer is bound through the signed bytes (AttestationMismatch)</td></tr><tr><td>AssetMismatch</td><td>unreachable through <code>require_certificate</code>: the PDA is derived from the asset first (BadCertificate)</td></tr><tr><td>Overflow</td><td>would need <code>live_min</code> sums near 2^64</td></tr><tr><td>RootSet, BadHolderAccount, Replayed, RenewMismatch, RoomShut</td><td>tests added after run 3 (holder, orderings, gate suites)</td></tr></tbody></table></div>
+<h2 id="4-compute-units-and-transaction-sizes">4. Compute units and transaction sizes<a class="anchor" href="#4-compute-units-and-transaction-sizes" aria-label="Link to this section">#</a></h2>
+<p>Top-level units of the instruction itself (from the program's own <code>consumed</code> log line), worst case built on purpose, run 3
+(<code>187914b</code>). Size is the whole transaction in bytes, v0, one signer, with a compute-unit limit instruction.</p>
+<div class="table"><table><thead><tr><th>instruction (worst case)</th><th>CU</th><th>tx bytes</th></tr></thead><tbody><tr><td>certify: wallet subject (base58 of the controller on chain), 8 notes, new, fee, PDA bump 249 (6 extra tries; ≈1,500 CU each)</td><td>75,876</td><td>1,183</td></tr><tr><td>certify: remake over a revoked certificate holding a donation, prior payer refunded, surplus moved, fee, 8 notes</td><td>74,659</td><td>1,215</td></tr><tr><td>certify: $ROOT holder (ATA derivation + token read), 8 notes</td><td>67,531</td><td>1,215</td></tr><tr><td>renew, 8 notes, fee</td><td>58,757</td><td>1,174</td></tr><tr><td>revoke_spent (a) nullifier PDA</td><td>28,338</td><td>451</td></tr><tr><td>revoke_spent (b) membership, 16 levels (real mainnet path)</td><td>64,626</td><td>976</td></tr><tr><td>revoke_spent_staged, 40 levels (after open_path 17,908 CU / 908 B and two stage_path ≈4,434 CU / 643 B)</td><td>64,751</td><td>418</td></tr><tr><td>revoke_signed</td><td>36,200</td><td>664</td></tr><tr><td>revoke_by_holder</td><td>24,491</td><td>319</td></tr><tr><td>expire</td><td>23,207</td><td>352</td></tr><tr><td>anchor_log</td><td>28,429</td><td>587</td></tr><tr><td>pof_gate join (incl. the require_certificate CPI, 21,256)</td><td>44,034</td><td>451</td></tr><tr><td>pof_gate evict (expired certificate)</td><td>38,772</td><td>385</td></tr><tr><td>pof_gate create_room / set_room / leave / close_room</td><td>29,027 / 23,863 / 11,563 / 6,377</td><td>≤ 361</td></tr><tr><td>admin calls (set_params, set_fee, set_paused, set_verifier, set_roles, withdraw_fees)</td><td>13,968 to 18,433</td><td>≤ 327</td></tr></tbody></table></div>
+<p>Every instruction stays under 80k CU, far from the 200k default and the 1.4M cap. A membership revoke costs about 64k CU, not
+&quot;about 35k&quot; as CONTRACT §5 and RINGS §3 say (FZ-15).</p>
+<p><strong>Transaction sizes</strong> (limit 1,232 bytes for legacy and v0):</p>
+<div class="table"><table><thead><tr><th>transaction</th><th>bytes</th></tr></thead><tbody><tr><td>revoke_spent membership, 16 / 20 / 24 levels</td><td>976 / 1,104 / <strong>1,232</strong></td></tr><tr><td>revoke_spent membership, 25+ levels (v0)</td><td>does not fit</td></tr><tr><td>revoke_spent membership, 40 levels as a version 1 transaction</td><td>1,714: <strong>refused by the Agave 4.1.2 RPC</strong> (raw limit 1,232 for every version)</td></tr><tr><td>staged 40-level revoke: open_path, 2 × stage_path, revoke_spent_staged</td><td>4 transactions, ≤ 908 each</td></tr><tr><td>certify as <code>verifier/src/program.ts</code> sends it (legacy, Ed25519 + certify), 8 notes</td><td>1,141</td></tr><tr><td>certify, 8 notes, plus the CONTRACT §7 memo and a CU limit + price (v0 / legacy)</td><td><strong>1,316 / 1,314</strong></td></tr><tr><td>certify, 8 notes, memo, CU limit + price, holder pays and the relayer pays the fee (2 signers)</td><td><strong>1,412</strong></td></tr><tr><td>two certify instructions in one transaction (even with 1 note each)</td><td>does not fit</td></tr></tbody></table></div>
+<h2 id="5-findings">5. Findings<a class="anchor" href="#5-findings" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>id</th><th>severity</th><th>title</th><th>where</th><th>status</th></tr></thead><tbody><tr><td>FZ-01</td><td>Medium</td><td>Certificates signed by a leaked or retired Verifier key stay live for every gate after pause and rotation</td><td><code>73d71dd</code> lib.rs:452 <code>gate</code>, :360 <code>check_signed</code></td><td><strong>fixed</strong> in <code>187914b</code> (<code>revoke_verifier_key</code>, <code>void_by_key</code>, key check in <code>gate</code> and <code>check_signed</code>); repro FIXED</td></tr><tr><td>FZ-02</td><td>Low</td><td>One signed head of size 2^64 − 1 ends on-chain log anchoring for good, across rotations</td><td><code>73d71dd</code> lib.rs:790</td><td><strong>fixed</strong> in <code>187914b</code> lib.rs:918 (step ≤ 10,000,000); repro FIXED</td></tr><tr><td>FZ-03</td><td>Low</td><td>Spent proofs accept any Privacy Program account as <code>tree</code></td><td><code>73d71dd</code> ext.rs:195, :275</td><td><strong>fixed</strong> in <code>187914b</code> ext.rs:208, :289 (tree 0 pinned); repro FIXED</td></tr><tr><td>FZ-04</td><td>Low</td><td><code>set_roles</code> accepts a token account as the $ROOT mint, and the mint can be set once</td><td><code>73d71dd</code> lib.rs:524</td><td><strong>fixed</strong> in <code>187914b</code> (<code>ext::is_mint</code>); repro FIXED</td></tr><tr><td>FZ-05</td><td>Low</td><td><code>revoke_signed</code> puts no upper bound on <code>valid_until</code></td><td><code>187914b</code> lib.rs:886</td><td>open</td></tr><tr><td>FZ-06</td><td>Low</td><td>The 40-level membership path cannot be submitted: v0 fits 24 levels, and v1 over 1,232 bytes is refused</td><td><code>73d71dd</code> ext.rs:275; RINGS §3</td><td><strong>fixed</strong> in <code>187914b</code> (staged path, lib.rs:815..870); repro FIXED</td></tr><tr><td>FZ-07</td><td>Info</td><td>A kind 0 or kind 2 attestation whose controller is the default key is accepted</td><td><code>187914b</code> lib.rs:429</td><td>open</td></tr><tr><td>FZ-08</td><td>Low</td><td><code>close_config</code> succeeds with a staged path buffer open; <code>close_path</code> then needs the closed config, so the buffer and its rent are stranded</td><td><code>187914b</code> lib.rs:983..985, :1121</td><td>open</td></tr><tr><td>FZ-09</td><td>Low</td><td><code>revoked_keys</code> holds 4 keys and nothing removes one</td><td><code>187914b</code> lib.rs:939</td><td>open</td></tr><tr><td>FZ-10</td><td>Info</td><td>The new key's renew revives a certificate signed by a revoked key that nobody voided yet</td><td><code>187914b</code> lib.rs:759..767</td><td>open (by design?)</td></tr><tr><td>FZ-11</td><td>Info</td><td>The $ROOT exemption is read at the instant of certify: a balance borrowed in the same transaction counts</td><td>lib.rs <code>is_holder</code></td><td>open</td></tr><tr><td>FZ-12</td><td>Info</td><td>A relayed certify with 8 notes plus the CONTRACT §7 memo and a priority fee does not fit 1,232 bytes</td><td>CONTRACT §7; <code>verifier/src/program.ts</code></td><td>open</td></tr><tr><td>FZ-13</td><td>Info</td><td>Trailing instruction bytes are ignored; <code>log_index</code> is not signed (POF-18)</td><td>every instruction (Anchor)</td><td>open (known)</td></tr><tr><td>FZ-14</td><td>Info</td><td>Donation accounting: a same-payer remake sends the payer's own donation to the treasury; a donation to an empty certificate address is a gift to whoever certifies there; <code>fees_out</code> can exceed <code>fees_in</code></td><td>lib.rs <code>certify</code>, <code>withdraw_fees</code></td><td>open (harmless)</td></tr><tr><td>FZ-15</td><td>Info</td><td>A membership revoke costs about 64k CU, not &quot;about 35k&quot;</td><td>CONTRACT §5, RINGS §3</td><td>open (docs)</td></tr><tr><td>FZ-16</td><td>Info</td><td>The program suite at <code>73d71dd</code> could not finish (its rotation test waited out the POF-17 hold)</td><td><code>73d71dd</code> test/test.mjs</td><td><strong>fixed</strong> in <code>b605c03</code></td></tr><tr><td>FZ-17</td><td>Info</td><td>A consumer that does not pin POF's program id accepts a fake POF</td><td>integrators (pof_gate is fine)</td><td>open (docs)</td></tr></tbody></table></div>
+<p>Critical: 0. High: 0. Medium: 1 (fixed). Low: 7 (4 fixed). Info: 9.</p>
+<h3 id="fz-01-medium-fixed-certificates-of-a-leaked-verifier-key-outlive-the-incident">FZ-01 · Medium · fixed · Certificates of a leaked Verifier key outlive the incident<a class="anchor" href="#fz-01-medium-fixed-certificates-of-a-leaked-verifier-key-outlive-the-incident" aria-label="Link to this section">#</a></h3>
+<p>At <code>73d71dd</code>, the response to a leaked Verifier key was &quot;pause, then rotate&quot;. Pause stops new certifies, but every certificate the
+key already signed stays live until its expiry (up to <code>validity_slots</code>, about 30 days at launch then, 1 day now). <code>gate()</code> and
+<code>require_certificate</code> never look at <code>cert.verifier</code>. Nothing on chain can end them: <code>revoke_by_holder</code> needs the controller (the
+attacker's key), <code>revoke_spent</code> needs a spent nullifier (the attacker chose the salted hashes, so they never will be). So the forged
+certificates pass every room for their whole life.</p>
+<ul><li><strong>Repro:</strong> <code>fuzz/repro.mjs</code> FZ-01, and the rotation suite (a tier-5 certificate of the outgoing key passes <code>require_certificate</code>
+after the switch, while paused).</li><li><strong>Fix (done in <code>187914b</code>):</strong> <code>revoke_verifier_key</code> (admin, immediate), <code>void_by_key</code> (anyone), and the key check in <code>gate</code>,
+<code>check_signed</code>, <code>join</code> and <code>evict</code>. Verified by the void suite: certify, anchor_log and join with the revoked key are refused with
+<code>KeyRevoked</code>, the member is evictable at once, <code>void_by_key</code> sets status 4, a certificate of a key that is not revoked gives
+<code>KeyNotRevoked</code>, and the invariants hold with <code>voided</code> counted.</li></ul>
+<h3 id="fz-02-low-fixed-the-anchored-log-could-be-frozen-by-one-signature">FZ-02 · Low · fixed · The anchored log could be frozen by one signature<a class="anchor" href="#fz-02-low-fixed-the-anchored-log-could-be-frozen-by-one-signature" aria-label="Link to this section">#</a></h3>
+<p><code>anchor_log</code> only required <code>size &gt; log_size</code>. One head of size 2^64 − 1, signed by the active key (a leaked key, or a Verifier bug),
+made every later head fail <code>LogNotGrowing</code>; pause does not cover <code>anchor_log</code>, and rotation does not reset <code>log_size</code>. Shown in the
+wind-down suite at <code>73d71dd</code> and <code>74654cb</code>. <strong>Fix (done):</strong> at most 10,000,000 entries per step; with FZ-01 a revoked key cannot
+anchor at all. The bound and the bound + 1 are both tested.</p>
+<h3 id="fz-03-low-fixed-tree-was-checked-for-its-owner-only">FZ-03 · Low · fixed · <code>tree</code> was checked for its owner only<a class="anchor" href="#fz-03-low-fixed-tree-was-checked-for-its-owner-only" aria-label="Link to this section">#</a></h3>
+<p>Path (a) derived the nullifier PDA under whatever <code>tree</code> account was passed, and path (b) read roots from any Privacy Program account
+whose byte 0 is 1. A spent PDA under the protocol config revoked a certificate (repro FZ-03). Only the Privacy Program creates those
+accounts, and the revoker must know the note's salt, so this was defence in depth, not an exploit. <strong>Fix (done):</strong> tree 0 is pinned in
+both proofs; a forged tree and the protocol config now give <code>BadRingsAccounts</code>.</p>
+<h3 id="fz-04-low-fixed-a-token-account-accepted-as-the-root-mint">FZ-04 · Low · fixed · A token account accepted as the $ROOT mint<a class="anchor" href="#fz-04-low-fixed-a-token-account-accepted-as-the-root-mint" aria-label="Link to this section">#</a></h3>
+<p><code>set_roles</code> checked &quot;owned by a token program and at least 82 bytes&quot;, which a 165-byte token account passes, and the root mint can be
+set only once (<code>RootSet</code>). An admin slip would have disabled the holder exemption for good. <strong>Fix (done):</strong> <code>ext::is_mint</code> (82 bytes,
+or a Token-2022 mint with account type 1 at 165, initialized).</p>
+<h3 id="fz-05-low-open-validuntil-has-no-upper-bound">FZ-05 · Low · open · <code>valid_until</code> has no upper bound<a class="anchor" href="#fz-05-low-open-validuntil-has-no-upper-bound" aria-label="Link to this section">#</a></h3>
+<p><code>revoke_signed</code> refuses a message past <code>valid_until</code>, but nothing caps how far ahead <code>valid_until</code> may be: a POF-REVOKE1 message with
+<code>valid_until = 2^64 − 1</code> revokes the certificate whenever its holder submits it, for the certificate's whole life (repro FZ-05). The
+design goal (&quot;a signed revoke cannot be held back for later&quot;) then depends on every client choosing <code>now + 1,500</code>. A phishing page
+that gets a wallet to sign such bytes holds a revoke for that certificate until the next renew or remake.</p>
+<ul><li><strong>Fix:</strong> <code>require!(valid_until &lt;= slot + MAX_REVOKE_WINDOW)</code> (for example 9,000 slots), in <code>revoke_signed</code> before the signature
+check.</li></ul>
+<h3 id="fz-06-low-fixed-the-full-depth-membership-path-could-not-be-sent">FZ-06 · Low · fixed · The full-depth membership path could not be sent<a class="anchor" href="#fz-06-low-fixed-the-full-depth-membership-path-could-not-be-sent" aria-label="Link to this section">#</a></h3>
+<p>The membership proof takes up to 40 siblings. A v0 transaction fits 24 levels (exactly 1,232 bytes); the full path is 1,714 bytes as
+a version 1 transaction, and the local Agave 4.1.2 RPC refuses any transaction over 1,232 raw bytes, whatever its version. RINGS §3
+counted on v1 carrying 4,096 bytes; that is not what this runtime accepts. Today the mainnet nullifier tree needs 16 levels (55k
+leaves), so path (b) worked up to 2^24 nullifiers and failed silently beyond. <strong>Fix (done):</strong> the staged path. The staged suite
+revokes with the real 40-level mainnet path and with the synthetic leaf 2^40 − 1 in 4 transactions of at most 908 bytes, and the
+buffer rent comes back to the revoker to the lamport.</p>
+<h3 id="fz-07-info-open-the-default-key-as-controller">FZ-07 · Info · open · The default key as controller<a class="anchor" href="#fz-07-info-open-the-default-key-as-controller" aria-label="Link to this section">#</a></h3>
+<p>For kinds 0 and 2 the program checks <code>subject_hash == §1 hash of controller</code> but not <code>controller != default</code>. A certificate of the
+subject <code>sha256(&quot;pof:wallet:11111111111111111111111111111111&quot;)</code> with the default controller is accepted; nobody can ever
+<code>revoke_by_holder</code> or <code>revoke_signed</code> it, or join a room with it. The Verifier would have to sign it. <strong>Fix:</strong> <code>require_keys_neq!(a.controller, Pubkey::default())</code> for every kind.</p>
+<h3 id="fz-08-low-open-a-staged-buffer-survives-the-wind-down">FZ-08 · Low · open · A staged buffer survives the wind-down<a class="anchor" href="#fz-08-low-open-a-staged-buffer-survives-the-wind-down" aria-label="Link to this section">#</a></h3>
+<p><code>close_config</code> checks <code>treasury.open == 0</code>, which counts certificates only. A <code>PathBuffer</code> opened before (or during) the wind-down is
+still there afterwards, and <code>close_path</code> cannot close it any more because its <code>config</code> account (seeds <code>[&quot;config&quot;]</code>, deserialized)
+is gone: <code>AccountNotInitialized</code>. The buffer, its 10,857,600 lamports of rent and a POF-owned account stay forever (repro FZ-08:
+close_begin, expire everything, close_config ok, close_path refused, buffer still there). wind-down.mjs closes the buffers it finds
+first, but one opened between that sweep and <code>close_config</code> (open_path needs only a live certificate) is stranded.</p>
+<ul><li><strong>Fix:</strong> count open buffers in the treasury (<code>open_path</code> +1, <code>revoke_spent_staged</code>/<code>close_path</code> −1) and require 0 in
+<code>close_config</code>; or take <code>config</code> in <code>ClosePath</code> as an unchecked account at the PDA and treat an empty one as &quot;closing&quot; (as
+<code>pof_gate::release_room</code> does).</li></ul>
+<h3 id="fz-09-low-open-four-revoked-keys-then-none">FZ-09 · Low · open · Four revoked keys, then none<a class="anchor" href="#fz-09-low-open-four-revoked-keys-then-none" aria-label="Link to this section">#</a></h3>
+<p><code>revoke_verifier_key</code> writes into a fixed <code>[Pubkey; 4]</code> and nothing ever removes an entry (<code>BadParams</code> when full, repro FZ-09). After
+four revocations (leaks, or simply retiring each rotated key as the docs suggest) a fifth leaked key can be paused but not revoked,
+and its certificates cannot be voided: FZ-01 comes back.</p>
+<ul><li><strong>Fix:</strong> let the admin drop a revoked key once every certificate it signed is past <code>issued + validity_slots</code> (record the revocation
+slot), or keep revoked keys in their own PDAs (<code>[&quot;revoked&quot;, key]</code>) passed to <code>gate</code> as an optional account.</li></ul>
+<h3 id="fz-10-info-the-new-key-can-revive-a-revoked-keys-certificate">FZ-10 · Info · The new key can revive a revoked key's certificate<a class="anchor" href="#fz-10-info-the-new-key-can-revive-a-revoked-keys-certificate" aria-label="Link to this section">#</a></h3>
+<p><code>renew</code> does not refuse a certificate whose <code>verifier</code> is revoked. Until someone calls <code>void_by_key</code>, a fresh attestation of the same
+notes by the new key renews it, and it passes the gates again (void suite). That needs the honest new Verifier to re-check real notes,
+so it is not a bypass; but if the intent is &quot;every certificate of a revoked key is dead&quot;, <code>renew</code> should require
+<code>!is_revoked_key(cert.verifier)</code> (or void it first).</p>
+<h3 id="fz-11-info-the-root-exemption-can-be-borrowed">FZ-11 · Info · The $ROOT exemption can be borrowed<a class="anchor" href="#fz-11-info-the-root-exemption-can-be-borrowed" aria-label="Link to this section">#</a></h3>
+<p><code>is_holder</code> reads the payer's ATA balance when <code>certify</code> runs. Moving 1,000,000 $ROOT into the payer's account and back inside one
+transaction makes the certify fee-free (holder suite). The cost is the fee (0.01 SOL) against a flash loan or a round-trip swap.
+Document it, or snapshot holdings.</p>
+<h3 id="fz-12-info-relayed-certify-sizes">FZ-12 · Info · Relayed certify sizes<a class="anchor" href="#fz-12-info-relayed-certify-sizes" aria-label="Link to this section">#</a></h3>
+<p>The relayer sends legacy <code>[Ed25519, certify]</code> (1,141 bytes with 8 notes). CONTRACT §7 still says every relayed certify carries a memo
+anchor; with 8 notes that memo plus a compute-unit price makes 1,314 to 1,316 bytes, which does not fit, and a two-signer form (the
+holder pays, the relayer pays the fee) is 1,412. Keep anchoring in <code>anchor_log</code> (as the verifier does) and fix the §7 text, or cap
+relayed certifies at the note count that fits.</p>
+<h3 id="fz-13-to-fz-17-info">FZ-13 to FZ-17 · Info<a class="anchor" href="#fz-13-to-fz-17-info" aria-label="Link to this section">#</a></h3>
+<ul><li><strong>FZ-13:</strong> every instruction accepts trailing bytes after its arguments (Anchor deserializes from the front); <code>certify</code>'s
+<code>log_index</code> changes freely (it is not signed, POF-18). Readers must match log entries by the attestation bytes.</li><li><strong>FZ-14:</strong> donations cannot hurt anyone after POF-07 (the remake costs exactly rent + fee + signatures for every donation size
+tried, 1 lamport to 250 SOL), but: a same-payer remake moves that payer's own donation to the treasury as fees; a donation to an
+address before the certificate exists means the certifier pays no rent and gets the whole amount back at <code>expire</code>; a treasury
+donation is withdrawn as fees, so <code>fees_out</code> may exceed <code>fees_in</code>.</li><li><strong>FZ-15:</strong> the membership revoke is about 64k CU (16 levels: 64,626), not about 35k as CONTRACT §5 and RINGS §3 say. Fine within
+limits; fix the text.</li><li><strong>FZ-16:</strong> see §2 (the suite at <code>73d71dd</code>).</li><li><strong>FZ-17:</strong> Anchor's CPI return check compares the return data with the program id the caller put in its <code>CpiContext</code>. A consumer
+that takes POF's program id from an unchecked account accepts the hostile program's fake answer (tier 5 for a random subject).
+<code>pof_gate</code> pins POF with <code>Program&lt;Pof&gt;</code> and refuses the fake (<code>InvalidProgramId</code>). The SDK and <code>/developers</code> should say: pin
+<code>pofP4QR…</code> and pass POF's config.</li></ul>
+<h2 id="6-what-held-up">6. What held up<a class="anchor" href="#6-what-held-up" aria-label="Link to this section">#</a></h2>
+<p>Checked hard and found sound at every snapshot:</p>
+<ul><li><strong>The signed bytes.</strong> No mutation at any of the 240 offsets, of any instruction field, of the payer or of the program id passed;
+1,500/1,500 random attestations matched the model at the exact bank slot, every boundary (issue age, root lag, validity, expiry,
+tier count per asset, 1..8 notes, strict ordering) exactly where CONTRACT §3 puts it.</li><li><strong>The Ed25519 check.</strong> Only &quot;one signature, all three indexes u16::MAX, in the instruction right before the top-level one&quot; passes.
+400 random header mutations: none landed. Account metas on the precompile instruction and trailing data are parsed correctly. A
+router program cannot reuse one signature for two certificates (the second CPI fails), and <code>certify</code> through a CPI with a PDA payer
+still binds the payer the Verifier signed. The same holds for <code>revoke_signed</code> (156 offsets) and <code>anchor_log</code>.</li><li><strong>Spent proofs.</strong> Path (a) refuses every look-alike; path (b) refuses every single-bit change of any sibling and of any leaf-index
+bit, a leaf index ≥ 2^40, out-of-field values (no panic), and a level-1 node presented as a leaf (the fixed 40-level fold blocks the
+second-preimage trick). The staged path is bound to (revoker, certificate) by its seeds and to the note by the salted hash; swapping
+buffers between certificates, another revoker, gaps, overflow and partial staging all fail; it survives renew, and after a remake it
+revokes only if the remade certificate carries the same spent note.</li><li><strong>Accounts and data.</strong> 2,389 account mutations and 2,377 data mutations: every success was a position free by design (the caller of
+a permissionless call, <code>holder_token</code> while no mint is set, <code>prior_payer</code> when unused, the member's rent payer) or a read-only
+account made writable.</li><li><strong>Lifecycle and counters.</strong> No ordering inside one transaction, no race in one slot, and no step of the 300-step walks broke an
+invariant. Exactly one of two racing certifies, revokes, expires or evict/leave lands.</li><li><strong>Rotation.</strong> The key switches exactly at <code>next_verifier_slot</code> (old key ok through slot − 1, new key from the slot); 40-step random
+walks matched a model of <code>set_params</code>/<code>set_verifier</code> field by field, and the POF-17 promise held for every proposal against every
+earlier observation.</li><li><strong>pof_gate.</strong> Join refuses revoked, expired, closed, other-asset, other-subject, wrong-controller and shut-room cases; evict
+refuses while the certificate is good and accepts every way it stops being good; a program-controlled certificate that revokes
+itself between two checks gets &quot;no&quot; the second time.</li></ul>
+<h2 id="7-limits-of-this-round">7. Limits of this round<a class="anchor" href="#7-limits-of-this-round" aria-label="Link to this section">#</a></h2>
+<ul><li><code>certify_zk</code> (and its <code>[&quot;zk&quot;]</code> PDA) is not in <code>pof/program</code> yet: it gets its own seed when merged.</li><li>Mainnet's acceptance of version 1 transactions over 1,232 bytes was not tested (no mainnet transactions). The staged path makes it
+irrelevant for POF.</li><li>Deep leaves (index ≥ 2^30) could only be exercised through the staged path; the direct path covers 24 levels.</li><li>Error-branch coverage, not instruction-level branch coverage: the BPF binary was not instrumented.</li></ul>
+<h2 id="8-how-to-re-run">8. How to re-run<a class="anchor" href="#8-how-to-re-run" aria-label="Link to this section">#</a></h2>
+<div class="code"><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>zsh fuzz/build.sh                     # or SNAP_REF=&lt;commit&gt; zsh fuzz/build.sh; builds into the scratchpad, writes results/snapshot.json
+node fuzz/prep.mjs                    # genesis accounts (deterministic)
+zsh fuzz/chain.sh                     # own validator: RPC 52899, ledger in the scratchpad; refuses when 3 validators run
+SEED=1 node fuzz/fuzz.mjs [suite …]   # results/run-&lt;seed&gt;.json; SCALE=0.3 for a quick pass
+node fuzz/repro.mjs                   # one test per finding: REPRODUCED or FIXED, results/repro.json
+zsh fuzz/chain.sh stop                # also deletes the ledger
+zsh fuzz/suite.sh 2                   # the program's own suites on the snapshot, twice (results/suite-runs.txt)</code></pre></div>
+<h2 id="9-changes">9. Changes<a class="anchor" href="#9-changes" aria-label="Link to this section">#</a></h2>
+<ul><li>2026-11-25 · fuzz · round 1 on <code>73d71dd</code>, <code>74654cb</code> and <code>187914b</code>: 17 findings (1 Medium, 7 Low, 9 Info), 6 fixed by the program
+owner during the round and confirmed by <code>fuzz/repro.mjs</code>.</li></ul>
+    <nav class="docs-next" aria-label="Pages"><a class="prev" href="/reports/audit"><span>Previous</span>Proof of Funds: internal security review</a><a class="next" href="/reports/zk"><span>Next</span>Test report: phase 2, the zero-knowledge proof of funds (zk/)</a></nav>
+  </article>
+  <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#1-scope-and-snapshots">1. Scope and snapshots</a></li><li class="d2"><a href="#2-method">2. Method</a></li><li class="d3"><a href="#the-suites-fuzzsuites">The suites (fuzz/suites/)</a></li><li class="d3"><a href="#the-programs-own-suites-re-run">The program's own suites, re-run</a></li><li class="d2"><a href="#3-coverage">3. Coverage</a></li><li class="d2"><a href="#4-compute-units-and-transaction-sizes">4. Compute units and transaction sizes</a></li><li class="d2"><a href="#5-findings">5. Findings</a></li><li class="d3"><a href="#fz-01-medium-fixed-certificates-of-a-leaked-verifier-key-outlive-the-incident">FZ-01 · Medium · fixed · Certificates of a leaked Verifier key outlive the incident</a></li><li class="d3"><a href="#fz-02-low-fixed-the-anchored-log-could-be-frozen-by-one-signature">FZ-02 · Low · fixed · The anchored log could be frozen by one signature</a></li><li class="d3"><a href="#fz-03-low-fixed-tree-was-checked-for-its-owner-only">FZ-03 · Low · fixed · tree was checked for its owner only</a></li><li class="d3"><a href="#fz-04-low-fixed-a-token-account-accepted-as-the-root-mint">FZ-04 · Low · fixed · A token account accepted as the $ROOT mint</a></li><li class="d3"><a href="#fz-05-low-open-validuntil-has-no-upper-bound">FZ-05 · Low · open · valid_until has no upper bound</a></li><li class="d3"><a href="#fz-06-low-fixed-the-full-depth-membership-path-could-not-be-sent">FZ-06 · Low · fixed · The full-depth membership path could not be sent</a></li><li class="d3"><a href="#fz-07-info-open-the-default-key-as-controller">FZ-07 · Info · open · The default key as controller</a></li><li class="d3"><a href="#fz-08-low-open-a-staged-buffer-survives-the-wind-down">FZ-08 · Low · open · A staged buffer survives the wind-down</a></li><li class="d3"><a href="#fz-09-low-open-four-revoked-keys-then-none">FZ-09 · Low · open · Four revoked keys, then none</a></li><li class="d3"><a href="#fz-10-info-the-new-key-can-revive-a-revoked-keys-certificate">FZ-10 · Info · The new key can revive a revoked key's certificate</a></li><li class="d3"><a href="#fz-11-info-the-root-exemption-can-be-borrowed">FZ-11 · Info · The $ROOT exemption can be borrowed</a></li><li class="d3"><a href="#fz-12-info-relayed-certify-sizes">FZ-12 · Info · Relayed certify sizes</a></li><li class="d3"><a href="#fz-13-to-fz-17-info">FZ-13 to FZ-17 · Info</a></li><li class="d2"><a href="#6-what-held-up">6. What held up</a></li><li class="d2"><a href="#7-limits-of-this-round">7. Limits of this round</a></li><li class="d2"><a href="#8-how-to-re-run">8. How to re-run</a></li><li class="d2"><a href="#9-changes">9. Changes</a></li></ol></aside>
+</div>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-lead">
+      <p class="foot-claim">Post proof,<br>not wallet.</p>
+      <div class="ca" data-ca></div>
+      <div class="foot-links" data-token-links></div>
+    </div>
+    <div class="foot-col"><h2>Protocol</h2><ul><li><a href="/docs">The paper</a></li><li><a href="/docs/trust">Trust points</a></li><li><a href="/docs/threat-model">Threat model</a></li><li><a href="/docs/privacy">Privacy</a></li><li><a href="/docs/revocation">Revocation</a></li><li><a href="/docs/fees">Fees</a></li></ul></div><div class="foot-col"><h2>Check</h2><ul><li><a href="/verify">Verify a subject</a></li><li><a href="/log">Transparency log</a></li><li><a href="/rooms">Rooms</a></li><li><a href="/status">Status</a></li></ul></div><div class="foot-col"><h2>Build</h2><ul><li><a href="/developers">Developers</a></li><li><a href="/developers#http-api">HTTP API</a></li><li><a href="/developers#the-sdk">SDK</a></li><li><a href="/v1/openapi.json">OpenAPI</a></li></ul></div><div class="foot-col"><h2>Record</h2><ul><li><a href="/changelog">Changelog</a></li><li><a href="/reports">Test reports</a></li><li><a href="/docs/glossary">Glossary</a></li><li><a href="https://github.com/liakh10/pof" rel="noopener" target="_blank">Source code</a></li></ul></div>
+  </div>
+  <dl class="foot-facts">
+    <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
+    <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">d36cb4c68f0317caeb66bb7b9b1fd83a0dd4258226a037e22732eaff7ad30757</dd></div>
+  </dl>
+  <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
+</footer>
+</body>
+</html>

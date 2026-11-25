@@ -3,7 +3,9 @@ import { esc, num, short, tierParts, subjectLine, certPath, STATUS_SHORT, KIND_T
 import { markSVG, sealSVG } from './seal.js';
 
 const isRevoked = s => s === 'revoked_spent' || s === 'revoked_by_holder';
-export const stateOf = c => (c.status === 'live' ? 'live' : isRevoked(c.status) ? 'revoked' : 'expired');
+/* the seal a status shows: live and settling keep the ring whole (settling waits for its slot), a revoke breaks it, an
+   expired or voided certificate (signed by a key the program revoked) fades */
+export const stateOf = c => (c.status === 'live' || c.status === 'settling' ? 'live' : isRevoked(c.status) ? 'revoked' : 'expired');
 
 export function certCard(c, { link = true, cls = '', seal = false } = {}) {
   const t = tierParts(c.tierLabel, c.asset);
@@ -11,8 +13,8 @@ export function certCard(c, { link = true, cls = '', seal = false } = {}) {
   const subj = subjectLine(c);
   const hashOnly = subj === c.subjectHash;
   const tag = link ? 'a' : 'div';
-  const slotLine = state === 'revoked' && c.revokedSlot ? `revoked at ${num(c.revokedSlot)}` : `slot ${num(c.certifiedSlot)}`;
-  return `<${tag} class="cert is-${state} ${cls}"${link ? ` href="${esc(certPath(c))}"` : ''} data-addr="${esc(c.address)}" data-status="${esc(c.status)}">
+  const slotLine = state === 'revoked' && c.revokedSlot ? `revoked at ${num(c.revokedSlot)}` : c.status === 'settling' && c.issuedSlot ? `live from ${num(c.issuedSlot)}` : `slot ${num(c.certifiedSlot)}`;
+  return `<${tag} class="cert is-${state} is-${esc(c.status)} ${cls}"${link ? ` href="${esc(certPath(c))}"` : ''} data-addr="${esc(c.address)}" data-status="${esc(c.status)}">
   <div class="cert-top"><div><div class="cert-kind">${esc(KIND_TEXT[c.kind] || c.kind)}</div><div class="cert-subject" title="${esc(subj)}">${hashOnly ? `hash ${esc(short(subj, 6))}` : esc(short(subj, 6))}</div></div>${seal ? '' : markSVG({ state })}</div>
   ${seal ? `<div class="cert-seal">${sealSVG({ state, crosshair: false })}</div>` : ''}
   <div class="cert-tier" aria-label="at least ${esc(t.amt)} ${esc(t.sym)}"><span class="least">At least</span><span class="amt">${esc(t.amt)}</span><span class="sym">${esc(t.sym)}</span></div>

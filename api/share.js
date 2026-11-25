@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PAGE = () => fs.readFileSync(path.join(here, "..", "c.html"), "utf8");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const STATUS = { live: "live", revoked_spent: "revoked: the funds moved", revoked_by_holder: "revoked by the holder", expired: "expired" };
+const STATUS = { live: "live", revoked_spent: "revoked: the funds moved", revoked_by_holder: "revoked by the holder", expired: "expired", voided: "voided: its signing key was revoked", settling: "settling" };
 
 export function withTags(html, { origin, subject, title, description }) {
   const enc = encodeURIComponent(subject);

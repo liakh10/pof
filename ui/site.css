@@ -260,6 +260,9 @@ a.cert:hover { color: var(--ink); border-color: var(--signal); }
 .status.live { background: var(--signal); border-color: var(--signal); color: var(--ink); }
 .status.revoked_spent, .status.revoked_by_holder, .status.revoked { background: var(--ink); color: var(--on-ink); }
 .status.expired { background: transparent; color: var(--ink-2); border-color: var(--ink-3); }
+.status.voided { background: transparent; color: var(--ink); border-color: var(--ink); text-decoration: line-through; text-decoration-thickness: 2px; }
+.status.settling { background: transparent; color: var(--signal-ink); border-color: var(--signal); }
+.cert.is-voided .cert-tier .amt, .cert.is-voided .cert-tier .sym { color: var(--ink-3); }
 .cert.is-revoked { background: var(--paper); }
 .cert.is-revoked .cert-tier .amt, .cert.is-revoked .cert-tier .sym { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: var(--ink); }
 .cert.is-expired { opacity: .62; }

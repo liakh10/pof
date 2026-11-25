@@ -5,7 +5,7 @@ import { certCard } from './cards.js';
 
 const form = $('[data-verify-form]'), out = $('[data-results]'), verdict = $('[data-verdict]');
 $('[data-host]').textContent = location.host;
-const REASON = { ok: 'Yes.', no_certificate: 'No certificate.', below_tier: 'Below that tier.', revoked_spent: 'Revoked: the funds moved.', revoked_by_holder: 'Revoked by the holder.', expired: 'Expired.' };
+const REASON = { ok: 'Yes.', no_certificate: 'No certificate.', below_tier: 'Below that tier.', revoked_spent: 'Revoked: the funds moved.', revoked_by_holder: 'Revoked by the holder.', expired: 'Expired.', voided: 'Voided: its signing key was revoked.', settling: 'Not yet: it is still settling.' };
 
 function tiers() {
   const a = $('input[name="asset"]:checked').value;

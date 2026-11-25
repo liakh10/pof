@@ -41,8 +41,8 @@ export function ago(slot, now) {
   if (d < 0) return `in ${num(-d)} slots (${span(-d)})`;
   return `${num(d)} slots ago (${span(d)})`;
 }
-export const STATUS_TEXT = { live: 'Live', revoked_spent: 'Revoked: funds moved', revoked_by_holder: 'Revoked by holder', expired: 'Expired', none: 'No certificate' };
-export const STATUS_SHORT = { live: 'Live', revoked_spent: 'Revoked', revoked_by_holder: 'Revoked', expired: 'Expired' };
+export const STATUS_TEXT = { live: 'Live', revoked_spent: 'Revoked: funds moved', revoked_by_holder: 'Revoked by holder', expired: 'Expired', voided: 'Voided: signing key revoked', settling: 'Settling', none: 'No certificate' };
+export const STATUS_SHORT = { live: 'Live', revoked_spent: 'Revoked', revoked_by_holder: 'Revoked', expired: 'Expired', voided: 'Voided', settling: 'Settling' };
 export const KIND_TEXT = { wallet: 'Wallet', x: 'X handle', badge: 'Badge' };
 
 /** what a subject looks like on a card: a wallet and a badge show their key; an X handle shows only its hash */

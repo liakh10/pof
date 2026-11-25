@@ -46,10 +46,10 @@ or let an agent ask.</p>
 <p>Everything here reads public state. The chain is the source of truth; the API, the MCP server and the bots are
 conveniences on top of it, and every one of them can be replaced by a direct read with the SDK.</p>
 <p><code>https://proofoffunds.vercel.app</code> below is this site's address.</p>
-<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td><code>pof</code> program</td><td><code>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code></td></tr><tr><td><code>pof_gate</code> program</td><td><code>gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</code></td></tr><tr><td>IDLs</td><td><code>program/idl/pof.json</code>, <code>program/idl/pof_gate.json</code> in the repository</td></tr><tr><td>HTTP API</td><td><code>https://proofoffunds.vercel.app/v1</code>, OpenAPI 3.1 at <code>https://proofoffunds.vercel.app/v1/openapi.json</code></td></tr><tr><td>MCP</td><td><code>https://proofoffunds.vercel.app/mcp</code> (Streamable HTTP), or <code>node mcp/stdio.js</code></td></tr><tr><td>CLI</td><td><code>node cli/pof.js</code> from the repository (<code>pof check</code>, <code>pof watch</code>, <code>pof log verify</code>)</td></tr><tr><td>Embed</td><td><code>&lt;pof-badge&gt;</code> from <code>https://proofoffunds.vercel.app/embed/pof-badge.js</code>, <code>https://proofoffunds.vercel.app/embed/frame.html</code>, <code>https://proofoffunds.vercel.app/v1/badge/{subject}.svg</code></td></tr><tr><td>Witness</td><td><code>node witness/run.js</code>; the project's own at <code>https://proofoffunds.vercel.app/v1/witness</code></td></tr><tr><td>SDK</td><td><code>@pof/sdk</code>, from <code>https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz</code></td></tr><tr><td>Source</td><td><code>https://github.com/liakh10/pof</code></td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td><code>pof</code> program</td><td><code>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code></td></tr><tr><td><code>pof_gate</code> program</td><td><code>gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</code></td></tr><tr><td>IDLs</td><td><code>program/idl/pof.json</code>, <code>program/idl/pof_gate.json</code> in the repository</td></tr><tr><td>HTTP API</td><td><code>https://proofoffunds.vercel.app/v1</code>, OpenAPI 3.1 at <code>https://proofoffunds.vercel.app/v1/openapi.json</code></td></tr><tr><td>MCP</td><td><code>https://proofoffunds.vercel.app/mcp</code> (Streamable HTTP), or <code>node mcp/stdio.js</code></td></tr><tr><td>CLI</td><td><code>node cli/pof.js</code> from the repository (<code>pof check</code>, <code>pof watch</code>, <code>pof log verify</code>)</td></tr><tr><td>Embed</td><td><code>&lt;pof-badge&gt;</code> from <code>https://proofoffunds.vercel.app/embed/pof-badge.js</code>, <code>https://proofoffunds.vercel.app/embed/frame.html</code>, <code>https://proofoffunds.vercel.app/v1/badge/{subject}.svg</code></td></tr><tr><td>Witness</td><td><code>node witness/run.js</code>; the project's own at <code>https://proofoffunds.vercel.app/v1/witness</code></td></tr><tr><td>SDK</td><td><code>@pof/sdk</code>, from <code>https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.0.tgz</code></td></tr><tr><td>Source</td><td><code>https://github.com/liakh10/pof</code></td></tr></tbody></table></div>
 <h2 id="what-a-certificate-is">What a certificate is<a class="anchor" href="#what-a-certificate-is" aria-label="Link to this section">#</a></h2>
 <p>One account per subject and asset, at the PDA <code>[&quot;cert&quot;, subject_hash, [asset]]</code> of the <code>pof</code> program.</p>
-<div class="table"><table><thead><tr><th>field</th><th>meaning</th></tr></thead><tbody><tr><td><code>subject_kind</code>, <code>subject_hash</code></td><td>who: 0 wallet, 1 X handle, 2 badge, and <code>sha256(&quot;pof:&lt;kind&gt;:&quot; ‖ value)</code> (the value is never stored)</td></tr><tr><td><code>asset</code>, <code>tier</code></td><td>0 SOL or 1 USDC, tier 1 to 5 (table below)</td></tr><tr><td><code>status</code></td><td>0 live, 1 revoked because a disclosed note was spent, 2 revoked by its holder</td></tr><tr><td><code>certified_slot</code>, <code>issued_slot</code>, <code>expiry_slot</code>, <code>revoked_slot</code></td><td>when. Live means <code>status == 0</code> and <code>slot &lt;= expiry_slot</code></td></tr><tr><td><code>controller</code></td><td>the key that can revoke it and join rooms with it: the wallet itself, the badge key itself, or a key the holder's client keeps for an X handle</td></tr><tr><td><code>null_hashes</code>, <code>nullset_hash</code></td><td>salted hashes of the disclosed notes' nullifiers. Anyone holding a salt can call <code>revoke_spent</code> once that note is spent</td></tr><tr><td><code>verifier</code>, <code>log_index</code></td><td>the Verifier key that signed, and the attestation's entry in the transparency log</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>field</th><th>meaning</th></tr></thead><tbody><tr><td><code>subject_kind</code>, <code>subject_hash</code></td><td>who: 0 wallet, 1 X handle, 2 badge, and <code>sha256(&quot;pof:&lt;kind&gt;:&quot; ‖ value)</code> (the value is never stored)</td></tr><tr><td><code>asset</code>, <code>tier</code></td><td>0 SOL or 1 USDC, tier 1 to 5 (table below)</td></tr><tr><td><code>status</code></td><td>0 live, 1 revoked because a disclosed note was spent, 2 revoked by its holder, 4 voided (its verifier key was revoked)</td></tr><tr><td><code>certified_slot</code>, <code>issued_slot</code>, <code>expiry_slot</code>, <code>revoked_slot</code></td><td>when. Live means <code>status == 0</code> and <code>slot &lt;= expiry_slot</code></td></tr><tr><td><code>controller</code></td><td>the key that can revoke it and join rooms with it: the wallet itself, the badge key itself, or a key the holder's client keeps for an X handle</td></tr><tr><td><code>null_hashes</code>, <code>nullset_hash</code></td><td>salted hashes of the disclosed notes' nullifiers. Anyone holding a salt can call <code>revoke_spent</code> once that note is spent</td></tr><tr><td><code>verifier</code>, <code>log_index</code></td><td>the Verifier key that signed, and the attestation's entry in the transparency log</td></tr></tbody></table></div>
 <div class="table"><table><thead><tr><th>asset</th><th>id</th><th>tier 1</th><th>tier 2</th><th>tier 3</th><th>tier 4</th><th>tier 5</th></tr></thead><tbody><tr><td>SOL</td><td>0</td><td>≥ 1</td><td>≥ 10</td><td>≥ 100</td><td>≥ 1,000</td><td>≥ 10,000</td></tr><tr><td>USDC</td><td>1</td><td>≥ 100</td><td>≥ 1,000</td><td>≥ 10,000</td><td>≥ 100,000</td><td>≥ 1,000,000</td></tr></tbody></table></div>
 <p>The tables live in the program's <code>Config</code> (base units) and can only be extended, never re-meant: a tier issued today
 keeps its meaning. <code>GET /v1/config</code> shows them.</p>
@@ -79,13 +79,15 @@ one shape.</p>
   }],
   &quot;check&quot;: { &quot;asset&quot;: &quot;SOL&quot;, &quot;minTier&quot;: 4, &quot;minTierLabel&quot;: &quot;≥ 1,000 SOL&quot;, &quot;ok&quot;: true, &quot;reason&quot;: &quot;ok&quot; }
 }</code></pre></div>
-<p><code>check.reason</code> is one of <code>ok</code>, <code>no_certificate</code>, <code>below_tier</code>, <code>revoked_spent</code>, <code>revoked_by_holder</code>, <code>expired</code>.
+<p><code>check.reason</code> is one of <code>ok</code>, <code>no_certificate</code>, <code>below_tier</code>, <code>revoked_spent</code>, <code>revoked_by_holder</code>, <code>expired</code>, <code>voided</code>,
+<code>settling</code>. <code>voided</code> covers both status 4 and a live byte signed by a verifier key the Config has revoked (dead for
+<code>require_certificate</code> at once, before anyone calls <code>void_by_key</code>). <code>settling</code> is a zk certificate before its settle slot.
 <code>status</code> is the status at <code>slot</code>: a certificate whose expiry slot has passed reads <code>expired</code> even before anyone calls
 <code>expire</code> (which closes the account and returns its rent). <code>subject</code> is <code>null</code> in lists, because the chain only holds the
 hash.</p>
 <p>The full schema, with every field, is the OpenAPI file. Import it into any client generator.</p>
 <h2 id="sdk">SDK<a class="anchor" href="#sdk" aria-label="Link to this section">#</a></h2>
-<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.2.0.tgz</code></pre></div>
+<div class="code" data-lang="sh"><span class="code-lang">sh</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-sh">npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.0.tgz</code></pre></div>
 <p>TypeScript, ESM with types, <strong>no runtime dependencies</strong> (WebCrypto for SHA-256 and Ed25519, its own base58, PDAs and
 Borsh). Node 20+ or a modern browser. It reads the chain through any RPC you give it, so your gate does not depend on us.</p>
 <div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">import { PofClient } from &quot;@pof/sdk&quot;;
@@ -105,9 +107,9 @@ expired certificates.</p>
 <h2 id="gate-an-instruction-requirecertificate">Gate an instruction: <code>require_certificate</code><a class="anchor" href="#gate-an-instruction-requirecertificate" aria-label="Link to this section">#</a></h2>
 <p>Any program can ask <code>pof</code> before it does something:</p>
 <div class="code"><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code>pof::require_certificate(subject_hash: [u8; 32], asset: u8, min_tier: u8)
-accounts: [certificate]   (the PDA [&quot;cert&quot;, subject_hash, [asset]])
+accounts: [certificate, config]   (the PDA [&quot;cert&quot;, subject_hash, [asset]], and the pof Config [&quot;config&quot;])
 returns:  CertView { subject_kind: u8, tier: u8, expiry_slot: u64, controller: Pubkey }
-fails:    NotLive · CertificateExpired · TierTooLow · AssetMismatch · BadCertificate</code></pre></div>
+fails:    NotLive · KeyRevoked · ZkSettling · CertificateExpired · TierTooLow · AssetMismatch · BadCertificate</code></pre></div>
 <p>It checks the account's owner and PDA, the status, the expiry against the current slot, the asset and the tier. It does
 <strong>not</strong> know who is calling: compare <code>controller</code> with your signer, or anyone could use anyone's certificate.</p>
 <div class="code" data-lang="toml"><span class="code-lang">toml</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-toml">pof = { git = &quot;https://github.com/liakh10/pof&quot;, features = [&quot;cpi&quot;] }   # Anchor 1.2</code></pre></div>
@@ -116,20 +118,22 @@ pub struct Enter&lt;'info&gt; {
     pub user: Signer&lt;'info&gt;,
     /// CHECK: pof checks it in the CPI
     pub certificate: UncheckedAccount&lt;'info&gt;,
+    /// CHECK: the pof Config (its PDA is checked in the CPI); it holds the revoked verifier keys
+    pub pof_config: UncheckedAccount&lt;'info&gt;,
     pub pof_program: Program&lt;'info, pof::program::Pof&gt;,
 }
 
 pub fn enter(ctx: Context&lt;Enter&gt;, subject_hash: [u8; 32]) -&gt; Result&lt;()&gt; {
     let a = &amp;ctx.accounts;
     let view = pof::cpi::require_certificate(
-        CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info() }),
+        CpiContext::new(a.pof_program.key(), pof::cpi::accounts::RequireCertificate { certificate: a.certificate.to_account_info(), config: a.pof_config.to_account_info() }),
         subject_hash, 0 /* SOL */, 3 /* ≥ 100 SOL */,
     )?.get();
     require_keys_eq!(view.controller, a.user.key());
     Ok(())
 }</code></pre></div>
-<p>To skip the CPI, <code>pof::read_certificate(&amp;info, &amp;subject_hash, asset)</code> and <code>pof::gate(&amp;cert, asset, min_tier, slot)</code> apply
-the same rule inside your program.</p>
+<p>To skip the CPI, <code>pof::read_certificate(&amp;info, &amp;subject_hash, asset)</code> and <code>pof::gate(&amp;cert, &amp;config, asset, min_tier, slot)</code>
+apply the same rule inside your program; read the Config from its PDA, as <code>examples/otc-desk</code> does.</p>
 <p>The SDK builds the client side:</p>
 <div class="code" data-lang="ts"><span class="code-lang">ts</span><button class="code-copy" type="button" aria-label="Copy code">Copy</button><pre><code class="lang-ts">import { requireCertificateAccounts, walletSubject } from &quot;@pof/sdk&quot;;
 const { subjectHash, certificate } = await requireCertificateAccounts({ subject: walletSubject(user), asset: &quot;SOL&quot;, minTier: 3 });</code></pre></div>
@@ -259,7 +263,7 @@ lookup does not need it.</li></ul>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">ee23bf475bd8aae2406fa04cd5b6f39e8b3be8e2612222bde129639d1bea42b0</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">d36cb4c68f0317caeb66bb7b9b1fd83a0dd4258226a037e22732eaff7ad30757</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

@@ -47,10 +47,10 @@ function frame(inner, state = "live") {
 
 /** the card for one certificate (the /v1 JSON shape) */
 export function certificateCard({ cert, subjectText, slot }) {
-  const state = cert.status === "live" ? "live" : cert.status.startsWith("revoked") ? "revoked" : "expired";
+  const state = cert.status === "live" || cert.status === "settling" ? "live" : cert.status.startsWith("revoked") ? "revoked" : "expired";
   const m = /([\d,]+)\s*(\w+)/.exec(cert.tierLabel || "") || [];
   const amt = m[1] || "?", sym = m[2] || cert.asset;
-  const pill = { live: ["LIVE", C.signal, C.ink], revoked: ["REVOKED", C.ink, C.paper], expired: ["EXPIRED", C.paper, C.ink] }[state];
+  const pill = cert.status === "voided" ? ["VOIDED", C.paper, C.ink] : cert.status === "settling" ? ["SETTLING", C.paper, C.ink] : { live: ["LIVE", C.signal, C.ink], revoked: ["REVOKED", C.ink, C.paper], expired: ["EXPIRED", C.paper, C.ink] }[state];
   const kind = { wallet: "WALLET", x: "X HANDLE", badge: "BADGE" }[cert.kind] || "SUBJECT";
   const big = amt.length > 7 ? 150 : 196;
   const dead = state === "revoked";
@@ -61,9 +61,9 @@ export function certificateCard({ cert, subjectText, slot }) {
   <text x="64" y="150" font-family="${TEXT}" font-weight="700" font-size="22" letter-spacing="2" fill="${C.ink}">${kind}</text>
   <text x="64" y="186" font-family="${MONO}" font-size="30" fill="${C.ink}">${esc(subjectText)}</text>
   <text x="64" y="${380 - big * 0.86}" font-family="${TEXT}" font-weight="700" font-size="20" letter-spacing="2.4" fill="${C.ink}">AT LEAST</text>
-  <text x="58" y="${380}" font-family="${DISPLAY}" font-weight="800" font-size="${big}" letter-spacing="-6" fill="${dead ? C.quiet : C.ink}">${esc(amt)}</text>
+  <text x="58" y="${380}" font-family="${DISPLAY}" font-weight="800" font-size="${big}" letter-spacing="-6" fill="${dead || cert.status === "voided" ? C.quiet : C.ink}">${esc(amt)}</text>
   ${dead ? `<line x1="58" x2="${Math.round(58 + figureWidth(amt, big))}" y1="${Math.round(380 - big * 0.34)}" y2="${Math.round(380 - big * 0.34)}" stroke="${C.ink}" stroke-width="3"/>` : ""}
-  <text x="64" y="${458}" font-family="${DISPLAY}" font-weight="800" font-size="50" fill="${dead ? C.quiet : C.ink}">${esc(sym)}</text>
+  <text x="64" y="${458}" font-family="${DISPLAY}" font-weight="800" font-size="50" fill="${dead || cert.status === "voided" ? C.quiet : C.ink}">${esc(sym)}</text>
   <rect x="64" y="486" width="${pill[0].length * 19 + 40}" height="52" fill="${pill[1]}" stroke="${C.ink}" stroke-width="3"/>
   <text x="84" y="522" font-family="${TEXT}" font-weight="700" font-size="26" letter-spacing="2" fill="${pill[2]}">${pill[0]}</text>
   <text x="${64 + pill[0].length * 19 + 64}" y="522" font-family="${MONO}" font-size="22" fill="${C.ink}">${state === "revoked" && cert.revokedSlot ? `revoked at slot ${num(cert.revokedSlot)}` : `certified at slot ${num(cert.certifiedSlot)}`}</text>

@@ -78,6 +78,7 @@ export async function fixtureSource() {
     const r = rnd();
     if (r < 0.16) await addCertificate({ ...p, status: 1, revokedAt: Math.min(SLOT0 - 20, p.at + Math.floor(rnd() * 20_000)) });
     else if (r < 0.22) await addCertificate({ ...p, status: 2, revokedAt: Math.min(SLOT0 - 20, p.at + Math.floor(rnd() * 20_000)) });
+    else if (r < 0.25) await addCertificate({ ...p, status: 4, revokedAt: Math.min(SLOT0 - 20, p.at + Math.floor(rnd() * 20_000)) });
     else await addCertificate(p);
   }
 

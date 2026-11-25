@@ -87,7 +87,9 @@ function render(look) {
   $('[data-c-lead]').textContent = c0.status === 'live'
     ? 'Live right now. The notes behind it were unspent when it was certified, and a spend would have revoked it on chain.'
     : c0.status === 'revoked_spent' ? 'A note behind this certificate was spent, and the chain recorded it at the slot below. It no longer proves anything.'
-    : c0.status === 'revoked_by_holder' ? 'The holder revoked it. It no longer proves anything.' : `It expired. A certificate is valid for ${num(validity)} slots (${span(validity)}) from its Verifier signature unless the holder renews it.`;
+    : c0.status === 'revoked_by_holder' ? 'The holder revoked it. It no longer proves anything.'
+    : c0.status === 'voided' ? 'The program revoked the Verifier key that signed it, so it proves nothing, whatever the notes behind it hold. The holder can certify again under the current key.'
+    : c0.status === 'settling' ? `Certified by a zero-knowledge proof. It turns live at slot ${num(c0.issuedSlot)}, when it settles.` : `It expired. A certificate is valid for ${num(validity)} slots (${span(validity)}) from its Verifier signature unless the holder renews it.`;
   const url = location.origin + certPath(c0);
   body.innerHTML = certs.map(c => `
     <article class="cert-page grid" style="padding:0;row-gap:var(--s5)" data-addr="${esc(c.address)}">
