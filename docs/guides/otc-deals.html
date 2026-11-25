@@ -83,7 +83,10 @@ itself with one CPI:</p>
     Ok(())
 }</code></pre></div>
 <p><code>require_certificate</code> fails unless the certificate is live, unexpired, of that asset and at least that tier. It does not
-know who is calling, so always compare <code>controller</code> with the signer. A check at open time can go stale: re-check at
+know who is calling, so always compare <code>controller</code> with the signer. And <strong>pin POF's program id</strong>: declare
+<code>pof_program</code> as <code>Program&lt;'info, pof::program::Pof&gt;</code> (which checks the id) or compare it with
+<code>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code> yourself. A program that calls whatever program its caller passes would
+accept a fake POF that says yes to everything. A check at open time can go stale: re-check at
 settlement, or let anyone close a deal whose certificate died, the way <code>pof_gate</code> lets anyone <code>evict</code>. The full CPI
 reference, the accounts and the SDK helper are in <a href="/developers">Developers</a>.</p>
 <h2 id="what-a-certificate-does-not-tell-you">What a certificate does not tell you<a class="anchor" href="#what-a-certificate-does-not-tell-you" aria-label="Link to this section">#</a></h2>

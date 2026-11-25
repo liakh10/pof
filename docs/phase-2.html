@@ -56,11 +56,11 @@ they, can recover it and show the spend to <code>revoke_spent</code>.</li></ul>
 on-chain instruction <code>certify_zk</code>. <strong>It is not live.</strong> The third round of the internal security review found one Critical
 and three High findings in <code>certify_zk</code> (ZK-01 to ZK-04 in
 <a href="https://github.com/liakh10/pof/blob/main/reports/audit.md" rel="noopener" target="_blank"><code>reports/audit.md</code></a>); among them, a note spent long ago could
-prove &quot;unspent&quot; against an older nullifier root. <code>certify_zk</code> is switched off on chain (<code>ZkConfig.enabled</code>) and stays off
-until those findings are fixed, re-reviewed, and the public setup ceremony has run. No certificate today is issued by a
-proof: every live certificate comes from the phase 1 Verifier described in this paper. The
+prove &quot;unspent&quot; against an older nullifier root. <strong>The launch build of the <code>pof</code> program does not include <code>certify_zk</code> at all.</strong> Phase 2 arrives later as a program
+upgrade, only after those findings are fixed and re-reviewed and the public setup ceremony has run. No certificate today
+is issued by a proof: every live certificate comes from the phase 1 Verifier described in this paper. The
 <a href="/docs/zk">zero-knowledge circuit</a> page describes the circuit, the setup and the on-chain verifier in full; the
-<a href="https://github.com/liakh10/pof/blob/main/CHANGELOG.md" rel="noopener" target="_blank">changelog</a> records when it ships.</p>
+<a href="https://github.com/liakh10/pof/blob/main/CHANGELOG.md" rel="noopener" target="_blank">changelog</a> will record the upgrade when it ships.</p>
     <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/fees"><span>Previous</span>Fees and the $POF holder rule</a><a class="next" href="/docs/zk"><span>Next</span>Zero-knowledge circuit</a></nav>
   </article>
   <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#the-statement">The statement</a></li><li class="d2"><a href="#what-changes-and-what-stays">What changes and what stays</a></li><li class="d2"><a href="#status-under-review-not-live">Status: under review, not live</a></li></ol></aside>

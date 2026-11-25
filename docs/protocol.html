@@ -171,6 +171,11 @@ updates the root, the slots and the tier, and charges the fee again.</p>
 most its expiry slot. Other programs call <code>require_certificate(subject_hash, asset, min_tier)</code>, which fails unless the
 certificate is live, unexpired, of that asset and at least that tier, and returns <code>{ subject_kind, tier, expiry_slot,
 controller }</code>. Rooms (<code>pof_gate</code>) use exactly that. See <a href="/developers">Developers</a>.</p>
+<p><strong>Pin the program id.</strong> A reader must check that the certificate account is owned by <code>pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code>
+at the PDA <code>[&quot;cert&quot;, subject_hash, [asset]]</code> of that program, and a program calling <code>require_certificate</code> must check that
+the program it calls is that id. A consumer that takes the program from its caller accepts a fake POF that answers
+&quot;tier 5&quot; for anything (fuzz finding FZ-17). <code>pof_gate</code> pins it; <code>@pof/sdk</code> and <code>read_certificate</code> check the owner and the
+PDA.</p>
     <nav class="docs-next" aria-label="Pages"><a class="prev" href="/docs/system-model"><span>Previous</span>System model</a><a class="next" href="/docs/threat-model"><span>Next</span>Threat model</a></nav>
   </article>
   <aside class="docs-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="d2"><a href="#step-0-a-vault-ring">Step 0. A vault ring</a></li><li class="d2"><a href="#step-1-notes-and-their-age">Step 1. Notes and their age</a></li><li class="d2"><a href="#step-2-the-disclosure-message-and-the-subject-proof">Step 2. The disclosure message and the subject proof</a></li><li class="d2"><a href="#step-3-the-disclosure-package">Step 3. The disclosure package</a></li><li class="d2"><a href="#step-4-what-the-verifier-checks">Step 4. What the Verifier checks</a></li><li class="d2"><a href="#step-5-salts-hashes-and-the-240-bytes">Step 5. Salts, hashes and the 240 bytes</a></li><li class="d2"><a href="#step-6-submitting-certify">Step 6. Submitting certify</a></li><li class="d2"><a href="#step-7-what-the-program-checks">Step 7. What the program checks</a></li><li class="d2"><a href="#step-8-renew">Step 8. Renew</a></li><li class="d2"><a href="#step-9-reading-and-gating">Step 9. Reading and gating</a></li></ol></aside>

@@ -78,6 +78,8 @@ enable or disable an asset. A tier table, once set,
 cannot be changed, so an issued tier never changes meaning.</p></li><li><strong>revoke a Verifier key at once</strong> (<code>revoke_verifier_key</code>, up to 4 keys): from that slot every certificate the key signed
 stops passing <code>require_certificate</code> and Rooms, and anyone can mark each one voided (<code>void_by_key</code>). This is the remedy
 for a leaked key; it also means the admin can end every certificate one key signed, in one transaction.</li></ul>
+<p>The fee exemption for $POF holders reads the payer's balance at the moment of <code>certify</code>, so it can be borrowed for one
+transaction. That only costs the protocol its fee (<a href="/docs/fees">Fees</a>).</p>
 <p>The admin cannot sign attestations. The <code>pof</code> program is deployed with the upgradeable loader, and its upgrade
 authority is the admin key: whoever holds it can change the program. Check the current authority on chain
 (<code>solana program show pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</code>); any change to it is recorded in the
