@@ -162,8 +162,8 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 | RV-01 | Low | The relayed revoke is sent without checking the signature first; a signed revoke never expires | `verifier/src/relayer.ts` `revoke`; `lib.rs` `revoke_bytes` | **fixed** `2a36df1` + `cd51f22` (checked before sending; v2 156 bytes with `valid_until`, at most 9,000 slots ahead) |
 | W-04 | Info | Gossip trusts the key a peer document names, and the monitor reads the whole log to index nonces | `witness/witness.js` `gossip`, `monitor` | open |
 | LW-01 | Info | When phase 2 ships, `wind-down.mjs` must close `ZkConfig` and every `["znote", tag]` lock before it closes the program | `program/wind-down.mjs` | **fixed** `cd51f22` (`close_zk`; the wind-down releases note locks and closes staged paths) |
-| ZK-11 | Medium (zk build only) | Anyone can append to the owner registry for a transaction fee, and a proof must use one of its last 12 roots: a few registrations a minute make every honest proof stale | `zk.rs` `handle_register_zk_owner`, `REG_ROOTS = 12` | open (not in the launch build) |
-| RK-01 | Info | A revoked-key entry is reused after `VALIDITY_MAX` even when that key is still the verifier or the proposed one | `lib.rs` `revoke_verifier_key` | open |
+| ZK-11 | Medium (zk build only) | Anyone can append to the owner registry for a transaction fee, and a proof must use one of its last 12 roots: a few registrations a minute make every honest proof stale | `zk.rs` `handle_register_zk_owner`, `REG_ROOTS = 12` | **fixed** `a3b15d1` (one paid `["zkowner", owner]` record per owner: rent plus the certify fee; root history 20). Rolling 20 roots inside one proving window now costs about 0.23 SOL at launch fees; filling the tree, thousands of SOL |
+| RK-01 | Info | A revoked-key entry is reused after `VALIDITY_MAX` even when that key is still the verifier or the proposed one | `lib.rs` `revoke_verifier_key` | **still open, and a regression** after `a3b15d1`: `revoked_entry_for` refuses when the key being **added** is the active one, not when the key being **evicted** is still `verifier` or `next_verifier`; see §4e |
 
 ### POF-01 · Medium · Spend-revocation is custodial in practice
 `revoke_spent` is permissionless on chain, but it needs a note's secret `salt` and its `nullifier`. Only two parties hold them:
@@ -622,6 +622,18 @@ The programs' own suites were not re-run by this reviewer; the program report st
 - Parallel attest: the reads run in parallel, while the lock and the verdicts stay in a fixed order. The race tests still pass.
 - The credit pins live in the client build. Residual: pins served by the same deployment protect against the relayer tagging buyers at run time, not against a malicious deploy. The published bundle hash is how outsiders catch that.
 
+**Re-check of `a3b15d1` (ZK-11, FZ-18, RK-01).**
+- **ZK-11: fixed.** Registration now creates a rent-bearing `["zkowner", owner]` record, one per key, and charges the certify fee to the treasury. The root history is 20. Keeping every honest proof stale now costs real SOL at a steady rate, and filling the tree is out of reach.
+- **FZ-18 (from fuzz.md): fixed.**
+  - `revoke_spent` and `revoke_spent_staged` mark a zk certificate's `znote` lock spent; the lock must be passed and must belong to that certificate.
+  - A spent lock is never released outside the wind-down, and `certify_zk` refuses it.
+  - A remake must carry a nonce other than the current one.
+  - **Info:** the nonce check compares only with the *last* nonce. The holder can still resubmit an older proof after an A, B, A sequence, as long as its roots are still accepted. Only the holder can do it (controller and payer sign), and spent notes stay refused, so it gains nothing. Keep a short list of used nonces per certificate if it matters.
+- **RK-01: still open, and inverted.** `revoked_entry_for(key, slot)` returns `None` when the list is full and `key`, the key being newly revoked, is the active verifier. The unit test asserts exactly that: `revoked_entry_for(&c.active_verifier(..), ..) == None`.
+  - That leaves the original problem unchanged: a reused entry still drops the protection of the *evicted* key, even if it is still `verifier` or `next_verifier`.
+  - It also adds a regression: with all 8 entries full, the admin **cannot revoke the active key at all** (`BadParams`), which is the leaked-key emergency the instruction exists for.
+  - **Fix:** choose an entry `i` whose key `revoked_keys[i]` is neither `active_verifier(slot)`, `verifier` nor `next_verifier`, and is older than `VALIDITY_MAX`. Never refuse to revoke the active key. Unit-test both cases.
+
 ## 5. What held up
 These were checked specifically and found sound at the reviewed commits:
 - `ext::signed_before` reads the instruction at `current - 1`, requires exactly one signature, and requires all three instruction indexes to be `u16::MAX` (data inside the Ed25519 instruction itself). The pubkey and message are read from the offsets the precompile verified.
@@ -658,6 +670,7 @@ Off the launch build: ZK-08 (accepted), ZK-11, and the development ceremony.
 
 ## 7. Changes
 - 2026-11-25 · audit · round 1: 25 findings, 9 failing proof tests (`cf763b5`). High findings posted on `_x/pof/BOARD.md` and sent to the lead.
+- 2026-11-25 · audit · re-check of `a3b15d1`: ZK-11 and FZ-18 fixed; RK-01 still open and inverted (the active key cannot be revoked when the list is full).
 - 2026-11-25 · audit · POF-14 closed: firewall config version 2 re-read (heavy rule widened to `/api/mcp` and `/link`; `/api/bots` at 120 a minute). The docs fix from 4 to 8 revoked keys landed in `10bea31`.
 - 2026-11-25 · audit · round 5 addendum: edge firewall rules verified from the active config (POF-14 mostly fixed; `/api/mcp`, `/api/bots/*`, `/link` uncovered); trust.md admin-power wording checked (says 4 keys, the program keeps 8).
 - 2026-11-25 · audit · round 5: final statuses for the launch build `1c02f89` (no zk); every suite green; ZK-01 to ZK-07, ZK-09, ZK-10 and CR-01 to CR-04 fixed and re-tested; new ZK-11 (zk build only) and RK-01.
