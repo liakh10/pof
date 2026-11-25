@@ -116,7 +116,7 @@ With the CPI `require_certificate(subject_hash, asset, min_tier)`, with a `pof_g
 Discord bots ([Developers](developers)).
 
 **Is the zero-knowledge version live?**
-No. Phase 2 is under internal review and switched off on chain; every certificate today comes from the phase 1 Verifier
+No. Phase 2 is under internal review and not part of the launch program; every certificate today comes from the phase 1 Verifier
 ([Phase 2](phase-2)).
 
 **Has the code been audited?**

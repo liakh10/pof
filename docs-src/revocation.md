@@ -33,7 +33,8 @@ program: 11 bytes, first byte 8. The program checks the account at that address 
 **(b) The nullifier tree.** The pool may later close nullifier PDAs once their batch is folded into the indexed nullifier
 tree (height 40). Then the caller passes `membership = { leaf_index, next_value, path }`: the leaf
 `Poseidon(nullifier, next_value)` and its siblings must hash to one of the 100 nullifier roots stored at offset 17,232 of
-the tree account. About 35,000 compute units with the Poseidon syscall.
+the tree account. About 64,000 compute units in one transaction with the Poseidon syscall (64,626 measured for a real
+16-level mainnet path).
 
 **(b') The staged path.** A full 40-level path does not fit a legacy transaction, so it can also be written in steps:
 `open_path` creates the revoker's own buffer account `["path", revoker, certificate]` with the nullifier, its next value,

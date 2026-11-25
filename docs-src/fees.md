@@ -28,6 +28,10 @@ returned when the member leaves or is evicted.
 program takes no fee and counts the call as `exempt` in the Treasury. The check reads that one account, owned by the
 payer, of that mint; tokens held elsewhere do not count. Until the root mint is set in Config, nobody is exempt.
 
+The balance is read at the instant of the call, so a payer can borrow 1,000,000 $POF for a single transaction (a flash
+loan, or a swap in and back out around the `certify`) and certify without the fee (fuzz finding FZ-11). That costs the
+protocol one fee, 0.01 SOL at launch, and nothing else: the exemption changes who pays, never what a certificate says.
+
 **Relayed certificates.** When the relayer is the payer, the program charges no on-chain fee and counts the call as
 `relayed`: the holder already paid the relayer. The relayer's quote is the Config fee, the certificate rent, a
 10,000-lamport network allowance and a unique tag of 1 to 99,999 lamports that identifies the payment, all in one transfer.

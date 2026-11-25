@@ -43,8 +43,8 @@ Phase 2 is in development in `zk/`: the circuit (4 notes per proof), a developme
 on-chain instruction `certify_zk`. **It is not live.** The third round of the internal security review found one Critical
 and three High findings in `certify_zk` (ZK-01 to ZK-04 in
 [`reports/audit.md`](https://github.com/liakh10/pof/blob/main/reports/audit.md)); among them, a note spent long ago could
-prove "unspent" against an older nullifier root. `certify_zk` is switched off on chain (`ZkConfig.enabled`) and stays off
-until those findings are fixed, re-reviewed, and the public setup ceremony has run. No certificate today is issued by a
-proof: every live certificate comes from the phase 1 Verifier described in this paper. The
+prove "unspent" against an older nullifier root. **The launch build of the `pof` program does not include `certify_zk` at all.** Phase 2 arrives later as a program
+upgrade, only after those findings are fixed and re-reviewed and the public setup ceremony has run. No certificate today
+is issued by a proof: every live certificate comes from the phase 1 Verifier described in this paper. The
 [zero-knowledge circuit](zk) page describes the circuit, the setup and the on-chain verifier in full; the
-[changelog](https://github.com/liakh10/pof/blob/main/CHANGELOG.md) records when it ships.
+[changelog](https://github.com/liakh10/pof/blob/main/CHANGELOG.md) will record the upgrade when it ships.

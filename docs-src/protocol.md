@@ -223,3 +223,9 @@ Anyone reads the certificate account. A certificate is **live** when its status 
 most its expiry slot. Other programs call `require_certificate(subject_hash, asset, min_tier)`, which fails unless the
 certificate is live, unexpired, of that asset and at least that tier, and returns `{ subject_kind, tier, expiry_slot,
 controller }`. Rooms (`pof_gate`) use exactly that. See [Developers](developers).
+
+**Pin the program id.** A reader must check that the certificate account is owned by `pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`
+at the PDA `["cert", subject_hash, [asset]]` of that program, and a program calling `require_certificate` must check that
+the program it calls is that id. A consumer that takes the program from its caller accepts a fake POF that answers
+"tier 5" for anything (fuzz finding FZ-17). `pof_gate` pins it; `@pof/sdk` and `read_certificate` check the owner and the
+PDA.

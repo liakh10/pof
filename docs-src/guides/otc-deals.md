@@ -80,7 +80,10 @@ pub fn open_deal(ctx: Context<OpenDeal>, subject_hash: [u8; 32], settle_slot: u6
 ```
 
 `require_certificate` fails unless the certificate is live, unexpired, of that asset and at least that tier. It does not
-know who is calling, so always compare `controller` with the signer. A check at open time can go stale: re-check at
+know who is calling, so always compare `controller` with the signer. And **pin POF's program id**: declare
+`pof_program` as `Program<'info, pof::program::Pof>` (which checks the id) or compare it with
+`pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT` yourself. A program that calls whatever program its caller passes would
+accept a fake POF that says yes to everything. A check at open time can go stale: re-check at
 settlement, or let anyone close a deal whose certificate died, the way `pof_gate` lets anyone `evict`. The full CPI
 reference, the accounts and the SDK helper are in [Developers](../developers).
 

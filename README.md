@@ -108,7 +108,7 @@ Environment for the functions (Vercel, or a local `.env` you do not commit): `SO
 | [`reports/zk.md`](reports/zk.md) | phase 2: circuit parity, constraints, the development setup, the browser prover |
 | [`reports/audit.md`](reports/audit.md) | the internal security review: scope, method, findings with status and failing tests |
 | [`reports/audit2.md`](reports/audit2.md) | the second internal review, with failing tests in `audit2/test/` |
-| fuzz and property tests | the programs under random and hostile instruction sequences: `fuzz/` (report `reports/fuzz.md` when published) |
+| [`reports/fuzz.md`](reports/fuzz.md) | the programs under random and hostile instruction sequences (an independent reviewer), with repro files in `fuzz/` |
 
 Other parts publish their reports in `reports/` as they land; the [changelog](CHANGELOG.md) lists each one.
 

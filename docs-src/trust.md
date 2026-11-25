@@ -63,6 +63,9 @@ The program accepts attestations signed by one ed25519 key at a time, stored in 
   stops passing `require_certificate` and Rooms, and anyone can mark each one voided (`void_by_key`). This is the remedy
   for a leaked key; it also means the admin can end every certificate one key signed, in one transaction.
 
+The fee exemption for $POF holders reads the payer's balance at the moment of `certify`, so it can be borrowed for one
+transaction. That only costs the protocol its fee ([Fees](fees)).
+
 The admin cannot sign attestations. The `pof` program is deployed with the upgradeable loader, and its upgrade
 authority is the admin key: whoever holds it can change the program. Check the current authority on chain
 (`solana program show pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`); any change to it is recorded in the

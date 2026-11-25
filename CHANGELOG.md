@@ -219,7 +219,8 @@ the first release of each will move its section under a version heading with its
   Critical, ZK-02 to ZK-04 High) and the witness (`889cc50`); round 4, blind credits and the relayed revoke (`fb1ab58`).
 - The second internal review, `reports/audit2.md`: 11 findings (2 Medium, 4 Low, 5 Info), failing tests in
   `audit2/test/` (`da61cb1`).
-- Test reports: program (`ad07261`), verifier (`3033364`), Rings client round 2 (`b992105`).
+- Test reports: program (`ad07261`), verifier (`3033364`), Rings client round 2 (`b992105`), the on-chain fuzz and
+  property report: 41,459 cases, 17 findings (`7b313c5`).
 - The protocol paper in `docs-src/` and the litepaper (`c0fd4df`, `0218cba`); `README.md`, `SECURITY.md`, `LICENSE`
   (Apache-2.0), this changelog.
 - User guides in `docs-src/guides/` and a FAQ section for non-developers (`0296c1f`); the vault isolates the nullifier
