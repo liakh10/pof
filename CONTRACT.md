@@ -214,7 +214,12 @@ path and falls back to path (b) when the PDA is gone; one note backs one live ce
   remaining account (writable) and mark it `spent`: a spent lock is never released outside the wind-down, so no certify_zk uses
   that tag again, and a remake must carry a new nonce. Audit ZK-11: `register_zk_owner` makes one `ZkOwner` record
   `["zkowner", owner]` per owner (accounts: owner, payer, config, treasury, registry, owner_record, system), paid rent plus the
-  certify fee to the treasury; the registry keeps its last 20 roots.
+  certify fee to the treasury; the registry keeps its last 20 roots. `ZkOwner` = owner, payer, index, commitment, slot, bump;
+  fuzz FZ-19: `close_owner_record` (anyone, only while closing) returns its rent to its payer, and the wind-down runs it.
+  Transaction size: a 4-note certify_zk with the site's lookup table and two signers is 1,230 of 1,232 bytes (no room for a
+  compute-unit price): clients cap zk certify at 3 notes by default.
+2026-11-25 (program, audit RK-01 re-check): a full revoked-key list reuses only an entry older than VALIDITY_MAX whose key is
+neither `verifier` nor `next_verifier`; revoking the active key itself is always allowed while such an entry or a free one exists.
 - `PathBuffer` PDA `["path", revoker, certificate]` (zero-copy): revoker, certificate, nullifier [32], next_value [32],
   leaf_index u64, path [[32]; 40], levels u8, bump u8, padding [6].
 

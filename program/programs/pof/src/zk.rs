@@ -134,6 +134,8 @@ pub struct ZkRegistry {
 #[derive(InitSpace)]
 pub struct ZkOwner {
     pub owner: Pubkey,
+    /// Paid the rent (gets it back at close_owner_record in the wind-down).
+    pub payer: Pubkey,
     pub index: u64,
     pub commitment: [u8; 32],
     pub slot: u64,
@@ -443,6 +445,7 @@ pub fn handle_register_zk_owner(ctx: Context<RegisterZkOwner>, commitment: [u8; 
     r.next_index = index + 1;
     let o = &mut ctx.accounts.owner_record;
     o.owner = owner;
+    o.payer = ctx.accounts.payer.key();
     o.index = index;
     o.commitment = commitment;
     o.slot = Clock::get()?.slot;
@@ -631,6 +634,12 @@ pub fn handle_certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkA
     Ok(())
 }
 
+/// Wind-down only (fuzz FZ-19): anyone closes an owner record, its rent back to whoever paid it.
+pub fn handle_close_owner_record(ctx: Context<CloseOwnerRecord>) -> Result<()> {
+    require!(ctx.accounts.config.closing, PofError::NotClosing);
+    Ok(())
+}
+
 /// Anyone: close a note lock whose certificate is gone, no longer live, or no longer carries the tag. Rent back to its payer.
 pub fn handle_release_note_lock(ctx: Context<ReleaseNoteLock>) -> Result<()> {
     let slot = Clock::get()?.slot;
@@ -716,6 +725,17 @@ pub struct CertifyZk<'info> {
     pub tree: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
     // remaining accounts: the note locks ["znote", tag], writable, one per tag in the tags' order
+}
+
+#[derive(Accounts)]
+pub struct CloseOwnerRecord<'info> {
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, close = payer, seeds = [OWNER_SEED, owner_record.owner.as_ref()], bump = owner_record.bump)]
+    pub owner_record: Box<Account<'info, ZkOwner>>,
+    /// CHECK: gets the record's rent back
+    #[account(mut, address = owner_record.payer)]
+    pub payer: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]

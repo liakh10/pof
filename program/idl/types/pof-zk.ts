@@ -476,6 +476,72 @@ export type Pof = {
       "args": []
     },
     {
+      "name": "closeOwnerRecord",
+      "docs": [
+        "Wind-down only (fuzz FZ-19): an owner record closes, its rent back to its payer. Anyone."
+      ],
+      "discriminator": [
+        225,
+        155,
+        98,
+        216,
+        132,
+        47,
+        212,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownerRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  107,
+                  111,
+                  119,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "ownerRecord.owner",
+                "account": "zkOwner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "closePath",
       "docs": [
         "The revoker drops its staged buffer (rent back); during the wind-down anyone may."
@@ -4430,6 +4496,13 @@ export type Pof = {
         "fields": [
           {
             "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "payer",
+            "docs": [
+              "Paid the rent (gets it back at close_owner_record in the wind-down)."
+            ],
             "type": "pubkey"
           },
           {

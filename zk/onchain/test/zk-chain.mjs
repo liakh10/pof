@@ -345,6 +345,16 @@ await check('the CPI gate reads a settled zk certificate like any other (require
   ok(sim2.value.err, 'tier 2 refused for a tier 1 certificate');
 });
 
+await check('wind-down of phase 2 (FZ-19): owner records close only while closing, each rent back to its payer', async () => {
+  const recs = (await conn.getProgramAccounts(q.PID, { commitment: 'confirmed' })).map(x => { try { return { address: x.pubkey, ...q.P.decodeAccount('ZkOwner', x.account.data) }; } catch { return null; } }).filter(Boolean);
+  ok(recs.length >= 3, 'owner records exist');
+  const cl = r => send([q.P.ix('close_owner_record', {}, { owner_record: r.address, payer: new PublicKey(r.payer) })], [w1], 200_000);
+  await refuses(cl(recs[0]), /NotClosing/);
+  await send([q.P.ix('close_begin', {}, { admin: admin.publicKey })], [admin], 100_000);
+  for (const r of recs) { const b0 = BigInt(await conn.getBalance(new PublicKey(r.payer), 'confirmed')); const rent = BigInt((await info(r.address)).lamports); await cl(r); const fee = new PublicKey(r.payer).equals(w1.publicKey) ? 5000n : 0n; ok(BigInt(await conn.getBalance(new PublicKey(r.payer), 'confirmed')) - b0 === rent - fee, 'rent back'); }
+  ok(!(await info(recs[0].address)), 'closed');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log('certify_zk measured:', JSON.stringify(units));
 fs.writeFileSync(path.join(ZK, 'onchain/test/last-run.json'), JSON.stringify({ date: new Date().toISOString(), pass, fail, results, certify_zk: units }, null, 1));

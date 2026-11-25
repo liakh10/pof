@@ -214,16 +214,18 @@ pub struct Config {
 }
 
 impl Config {
-    /// Where `revoke_verifier_key` records `key`: a free entry, else one revoked more than VALIDITY_MAX slots ago (every
-    /// certificate that key signed has expired by then). Audit RK-01: a reused entry never takes the key signing now.
-    pub fn revoked_entry_for(&self, key: &Pubkey, slot: u64) -> Option<usize> {
+    /// Where `revoke_verifier_key` records a newly revoked key (any key, the active one included: that is the emergency): a
+    /// free entry, else one revoked more than VALIDITY_MAX slots ago (every certificate its key signed has expired by then).
+    /// Audit RK-01: an entry is never freed while its key is still `verifier` or `next_verifier`, so evicting it could not let
+    /// that key sign again.
+    pub fn revoked_entry_for(&self, slot: u64) -> Option<usize> {
         if let Some(i) = self.revoked_keys.iter().position(|k| *k == Pubkey::default()) {
             return Some(i);
         }
-        if *key == self.active_verifier(slot) {
-            return None;
-        }
-        (0..MAX_REVOKED_KEYS).find(|&i| slot > self.revoked_at[i].saturating_add(VALIDITY_MAX))
+        (0..MAX_REVOKED_KEYS).find(|&i| {
+            let k = self.revoked_keys[i];
+            slot > self.revoked_at[i].saturating_add(VALIDITY_MAX) && k != self.verifier && k != self.next_verifier
+        })
     }
     pub fn is_revoked_key(&self, key: &Pubkey) -> bool {
         *key != Pubkey::default() && self.revoked_keys.iter().any(|k| k == key)
@@ -999,7 +1001,7 @@ macro_rules! pof_program {
         let slot = Clock::get()?.slot;
         let c = &mut ctx.accounts.config;
         if !c.is_revoked_key(&key) {
-            let free = c.revoked_entry_for(&key, slot).ok_or(error!(PofError::BadParams))?;
+            let free = c.revoked_entry_for(slot).ok_or(error!(PofError::BadParams))?;
             c.revoked_keys[free] = key;
             c.revoked_at[free] = slot;
         }
@@ -1057,6 +1059,11 @@ macro_rules! pof_program {
 
 #[cfg(feature = "zk")]
 pof_program! {
+    /// Wind-down only (fuzz FZ-19): an owner record closes, its rent back to its payer. Anyone.
+    pub fn close_owner_record(ctx: Context<CloseOwnerRecord>) -> Result<()> {
+        zk::handle_close_owner_record(ctx)
+    }
+
     /// Phase 2: certify from a Groth16 proof of funds (pof/zk) instead of the Verifier's signature. See zk.rs.
     pub fn certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkArgs) -> Result<()> {
         zk::handle_certify_zk(ctx, args)
@@ -1531,17 +1538,30 @@ mod tests {
             bump: 0,
             treasury_bump: 0,
         };
-        // revoked-key entries (FZ-09, RK-01): free first; full: an entry older than VALIDITY_MAX, never for the active key
+        // revoked-key entries (FZ-09, RK-01): a free entry first; when full, an entry older than VALIDITY_MAX whose key is not
+        // verifier or next_verifier; the key being revoked may be any key, the active one included
         let k = |b: u8| Pubkey::new_from_array([b; 32]);
-        assert_eq!(c.revoked_entry_for(&k(9), 10), Some(0));
+        assert_eq!(c.revoked_entry_for(10), Some(0));
         for i in 0..MAX_REVOKED_KEYS {
             c.revoked_keys[i] = k(10 + i as u8);
             c.revoked_at[i] = 100 + i as u64;
         }
-        assert_eq!(c.revoked_entry_for(&k(9), 200), None);
-        assert_eq!(c.revoked_entry_for(&k(9), 101 + VALIDITY_MAX), Some(0));
-        assert_eq!(c.revoked_entry_for(&c.active_verifier(101 + VALIDITY_MAX), 101 + VALIDITY_MAX), None);
+        assert_eq!(c.revoked_entry_for(200), None, "all recent: nothing to reuse");
+        let later = 108 + VALIDITY_MAX;
+        assert_eq!(c.revoked_entry_for(later), Some(0), "the oldest expired entry");
+        // the oldest entries' keys are still in use as verifier / next_verifier: they are skipped, never freed
+        c.verifier = k(10);
+        c.next_verifier = k(11);
+        assert_eq!(c.revoked_entry_for(later), Some(2));
+        // revoking the ACTIVE key with a full list still finds an entry (the emergency works)
+        let active = c.active_verifier(later);
+        assert!(active == k(10) || active == k(11));
+        let i = c.revoked_entry_for(later).unwrap();
+        c.revoked_keys[i] = active;
+        assert!(c.is_revoked_key(&active));
         c.revoked_keys = [Pubkey::default(); MAX_REVOKED_KEYS];
+        c.verifier = Pubkey::new_from_array([1; 32]);
+        c.next_verifier = Pubkey::new_from_array([2; 32]);
         assert_eq!(c.active_verifier(99), Pubkey::new_from_array([1; 32]));
         assert_eq!(c.active_verifier(100), Pubkey::new_from_array([2; 32]));
         c.next_verifier = Pubkey::default();

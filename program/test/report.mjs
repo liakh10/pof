@@ -113,6 +113,8 @@ ${list(oc)}
   - \`renew\` refuses an expired certificate (audit POF-22).
 - **Verifier keys (fuzz):** a revoked key signs nothing more. Its certificates then fail \`require_certificate\` and Rooms, their
   members can be evicted, and anyone can void them. A certificate signed by the current key stays live.
+- **Revoked-key list (audit RK-01, unit-tested):** a full list reuses only an entry older than \`VALIDITY_MAX\` whose key is
+  neither \`verifier\` nor \`next_verifier\`, and revoking the active key itself stays possible.
 - **Admin inputs (fuzz):**
   - \`anchor_log\` refuses a size of 2^64 − 1, and any step over 10,000,000 entries;
   - \`set_roles\` refuses a token account given as the mint.
@@ -139,6 +141,7 @@ ${sizes.map(([n, b]) => `| ${n} | ${b ? b.toLocaleString('en-US') : '?'} | ${b ?
       the spent note is refused too, because its note lock is marked spent and never released.
     - **ZK-11:** owner registration is one paid record per owner (rent plus the certify fee). A second registration of the same
       owner is refused. The registry keeps 20 roots.
+    - **FZ-19:** owner records close in the wind-down (only while closing), each rent back to its payer.
   - **The 4-note transaction is 1,230 bytes**, 2 bytes under the 1,232-byte limit. The plan: at most 3 notes per proof in the client,
     or 4 only through a lookup table, which removes about 400 bytes of account keys.
 
