@@ -615,7 +615,7 @@ The programs' own suites were not re-run by this reviewer; the program report st
 
 **Edge rate limits (POF-14, A2-04).** The active Vercel Firewall config of project `pof` was read with the Vercel CLI, read-only, at 2026-11-25. It holds two active rules. The first is "POF heavy endpoints per IP": path `^/(api/(attest|relay|link|keeper|spr|spr-prover|card|share)|mcp)(/|$)`, deny over 30 per 60 s per IP. The second is "POF read API per IP": `^/(v1|api/(rpc|status|v1|witness)|c)(/|$)`, deny over 120 per 60 s. No burst test was run; the rules were read from the config instead. Three single GET requests showed paths outside both rules that answer: `/api/mcp` (405, the hosted MCP function, the same handler as `/mcp`), `/api/bots/link` and `/link` (200; `/link` takes a public POST that checks a signature, reads the chain and writes Blob). Extend the heavy rule to `^/(api/(attest|relay|link|keeper|spr|spr-prover|card|share|mcp)|mcp|link)(/|$)`, and give `/api/bots/` its own rule. **Applied by the lead and re-read from the active config (version 2): all three paths are covered now, so POF-14 is closed.**
 
-**Admin power documented.** `docs-src/trust.md` (§ admin powers) now says that `revoke_verifier_key` ends every certificate a key signed at once, that `void_by_key` lets anyone mark them, and that the admin can do this in one transaction. That closes the docs item. One wording fix is left: the page says "up to 4 keys", while the program keeps `MAX_REVOKED_KEYS = 8` (`cd51f22`).
+**Admin power documented.** `docs-src/trust.md` (§ admin powers) now says that `revoke_verifier_key` ends every certificate a key signed at once, that `void_by_key` lets anyone mark them, and that the admin can do this in one transaction. That closes the docs item. The wording fix from "up to 4 keys" to 8 landed in `10bea31` (trust.md and revocation.md, with the reuse rule). Closed.
 
 **Verifier and client.**
 - The internal header (`x-pof-internal`) is compared in constant time (sha256 then `timingSafeEqual`), needs at least 16 characters, skips only the log's public rate limit, and is sent only to `POF_LOG_URL` and the status origin from env. Fine.
@@ -658,7 +658,7 @@ Off the launch build: ZK-08 (accepted), ZK-11, and the development ceremony.
 
 ## 7. Changes
 - 2026-11-25 · audit · round 1: 25 findings, 9 failing proof tests (`cf763b5`). High findings posted on `_x/pof/BOARD.md` and sent to the lead.
-- 2026-11-25 · audit · POF-14 closed: firewall config version 2 re-read (heavy rule widened to `/api/mcp` and `/link`; `/api/bots` at 120 a minute). The docs fix from 4 to 8 revoked keys is pending with the docs agent.
+- 2026-11-25 · audit · POF-14 closed: firewall config version 2 re-read (heavy rule widened to `/api/mcp` and `/link`; `/api/bots` at 120 a minute). The docs fix from 4 to 8 revoked keys landed in `10bea31`.
 - 2026-11-25 · audit · round 5 addendum: edge firewall rules verified from the active config (POF-14 mostly fixed; `/api/mcp`, `/api/bots/*`, `/link` uncovered); trust.md admin-power wording checked (says 4 keys, the program keeps 8).
 - 2026-11-25 · audit · round 5: final statuses for the launch build `1c02f89` (no zk); every suite green; ZK-01 to ZK-07, ZK-09, ZK-10 and CR-01 to CR-04 fixed and re-tested; new ZK-11 (zk build only) and RK-01.
 - 2026-11-25 · audit · round 4: blind relay credits and the relayed revoke reviewed (CR-01 to CR-05, RV-01), W-04, LW-01; POF-27, POF-30 and W-01 to W-03 fixed; zk fixes not yet re-reviewed.
