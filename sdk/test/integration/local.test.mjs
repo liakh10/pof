@@ -83,6 +83,9 @@ test("the SDK's program ids, PDAs and Config read match the deployed programs", 
   assert.equal((await sdk.treasuryAddress())[0], X.K.treasury.toBase58());
   const c = await client.getConfig();
   assert.equal(c.activeVerifier, verifier.publicKey.toBase58());
+  // the launch build has no zk path: no zk config PDA, no zk instructions in the IDL the SDK decodes with
+  assert.equal(await client.zkEnabled(), false);
+  assert.equal(sdk.POF_IDL.instructions.some((i) => i.name.includes("zk")), false);
   assert.equal(c.relayer, relayer.publicKey.toBase58());
   assert.equal(c.feeLamports, 10_000_000);
   for (const a of [0, 1]) for (let t = 1; t <= 5; t++)

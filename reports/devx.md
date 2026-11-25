@@ -1,6 +1,6 @@
 # Test report: developer surfaces (API, SDK, MCP, bots)
 
-Scope: `sdk/` (`@pof/sdk` 0.3.0), `api/v1/` and `api/openapi.json`, `mcp/` and `api/mcp.js`, `bots/` and `api/bots.js`,
+Scope: `sdk/` (`@pof/sdk` 0.3.1), `api/v1/` and `api/openapi.json`, `mcp/` and `api/mcp.js`, `bots/` and `api/bots.js`,
 `witness/` and `api/witness.js`, `cli/`, `embed/`, `examples/`. Every suite below runs from a clean checkout with the
 commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0 programs built from `program/` at the time of the run
 (the IDL with `revoked_keys`, status 4 voided, zk certificates, and the Config account in `require_certificate`, `join`
@@ -10,7 +10,7 @@ and `evict`). Headless Chromium (playwright-core 1.63) for the browser suites.
 
 | suite | command | tests | result |
 |---|---|---|---|
-| SDK unit | `cd sdk && npm test` | 22 | pass |
+| SDK unit | `cd sdk && npm test` | 24 | pass |
 | SDK on a local validator | `cd sdk && npm run test:local` | 8 | pass |
 | OTC desk example on a local validator | `zsh examples/otc-desk/test/run.sh` | 3 | pass |
 | HTTP API | `cd api/v1 && node --test _test/` | 21 | pass |
@@ -35,6 +35,11 @@ and `evict`). Headless Chromium (playwright-core 1.63) for the browser suites.
   read `voided` at once through the SDK, the program refuses it (`KeyRevoked`), and `void_by_key` writes status 4; the
   revoked key is dropped from the trusted set. The OTC desk example passes the Config to its CPI and to `pof::gate`
   (3/3). zk certificates read `settling` until their settle slot (unit test).
+- **The launch build** (no zk feature): the SDK decodes from `program/idl/pof.json` (no zk instructions); the zk build's
+  IDL ships as `POF_ZK_IDL` and `zkEnabled()` reads whether the zk config PDA exists; "settling" applies only to zk
+  certificates. The local-validator suite runs on the launch build (8/8, including `zkEnabled() === false`).
+- **FZ-17**: the SDK pins POF's program id by default; `PofClient` and the CPI builders refuse another id without
+  `allowOtherDeployment: true`, and an account owned by another program never reads as a certificate (unit test).
 - **Performance**: see `reports/performance.md` (one RPC per read, a log mirror for proofs, single-flight caches).
 
 ## Audit findings fixed in these parts (reports/audit.md, round 1)

@@ -115,75 +115,6 @@ export declare const POF_IDL: {
             readonly type: "u64";
         }];
     }, {
-        readonly name: "certify_zk";
-        readonly docs: readonly ["Phase 2: certify from a Groth16 proof of funds (pof/zk) instead of the Verifier's signature. See zk.rs."];
-        readonly discriminator: readonly [96, 7, 247, 175, 189, 16, 188, 111];
-        readonly accounts: readonly [{
-            readonly name: "payer";
-            readonly writable: true;
-            readonly signer: true;
-        }, {
-            readonly name: "controller";
-            readonly docs: readonly ["The subject key (wallet or badge): it consents by signing; may be the payer."];
-            readonly signer: true;
-        }, {
-            readonly name: "config";
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [99, 111, 110, 102, 105, 103];
-                }];
-            };
-        }, {
-            readonly name: "zk";
-            readonly writable: true;
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [122, 107];
-                }];
-            };
-        }, {
-            readonly name: "registry";
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [122, 107, 114, 101, 103];
-                }];
-            };
-        }, {
-            readonly name: "treasury";
-            readonly writable: true;
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [116, 114, 101, 97, 115, 117, 114, 121];
-                }];
-            };
-        }, {
-            readonly name: "certificate";
-            readonly writable: true;
-        }, {
-            readonly name: "prior_payer";
-            readonly writable: true;
-            readonly optional: true;
-        }, {
-            readonly name: "holder_token";
-        }, {
-            readonly name: "tree";
-        }, {
-            readonly name: "system_program";
-            readonly address: "11111111111111111111111111111111";
-        }];
-        readonly args: readonly [{
-            readonly name: "args";
-            readonly type: {
-                readonly defined: {
-                    readonly name: "ZkArgs";
-                };
-            };
-        }];
-    }, {
         readonly name: "close_begin";
         readonly docs: readonly ["One way: no certify or renew; anyone may `expire` any certificate (rent back to its payer). See wind-down.mjs."];
         readonly discriminator: readonly [161, 49, 64, 17, 104, 205, 191, 182];
@@ -261,43 +192,6 @@ export declare const POF_IDL: {
         }, {
             readonly name: "revoker";
             readonly writable: true;
-        }];
-        readonly args: readonly [];
-    }, {
-        readonly name: "close_zk";
-        readonly docs: readonly ["Wind-down only (audit LW-01): the ZkConfig [\"zk\"] and the owner registry [\"zkreg\"] close, their rent to the admin. Run", "after every certificate expired and every note lock was released, before close_config."];
-        readonly discriminator: readonly [186, 191, 205, 32, 107, 130, 198, 60];
-        readonly accounts: readonly [{
-            readonly name: "admin";
-            readonly writable: true;
-            readonly signer: true;
-            readonly relations: readonly ["config"];
-        }, {
-            readonly name: "config";
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [99, 111, 110, 102, 105, 103];
-                }];
-            };
-        }, {
-            readonly name: "zk";
-            readonly writable: true;
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [122, 107];
-                }];
-            };
-        }, {
-            readonly name: "registry";
-            readonly writable: true;
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [122, 107, 114, 101, 103];
-                }];
-            };
         }];
         readonly args: readonly [];
     }, {
@@ -434,54 +328,6 @@ export declare const POF_IDL: {
                 };
             };
         }];
-    }, {
-        readonly name: "register_zk_owner";
-        readonly docs: readonly ["The ring owner registers its zk owner commitment (the consent certify_zk proves)."];
-        readonly discriminator: readonly [202, 209, 9, 250, 182, 12, 179, 171];
-        readonly accounts: readonly [{
-            readonly name: "owner";
-            readonly docs: readonly ["The ring owner (the vault key): its signature is the consent the circuit later proves."];
-            readonly signer: true;
-        }, {
-            readonly name: "registry";
-            readonly writable: true;
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [122, 107, 114, 101, 103];
-                }];
-            };
-        }];
-        readonly args: readonly [{
-            readonly name: "commitment";
-            readonly type: {
-                readonly array: readonly ["u8", 32];
-            };
-        }];
-    }, {
-        readonly name: "release_note_lock";
-        readonly docs: readonly ["Anyone: close a note lock whose certificate is no longer live."];
-        readonly discriminator: readonly [199, 220, 11, 102, 53, 157, 182, 199];
-        readonly accounts: readonly [{
-            readonly name: "lock";
-            readonly writable: true;
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [122, 110, 111, 116, 101];
-                }, {
-                    readonly kind: "account";
-                    readonly path: "lock.tag";
-                    readonly account: "NoteLock";
-                }];
-            };
-        }, {
-            readonly name: "certificate";
-        }, {
-            readonly name: "payer";
-            readonly writable: true;
-        }];
-        readonly args: readonly [];
     }, {
         readonly name: "renew";
         readonly docs: readonly ["A fresh attestation on the same notes (same salted hashes), subject, asset and controller: new root, slots and tier."];
@@ -910,56 +756,6 @@ export declare const POF_IDL: {
             readonly type: "pubkey";
         }];
     }, {
-        readonly name: "set_zk";
-        readonly docs: readonly ["Admin: turn certify_zk on or off and set the revocation (escrow) key; records the build's verifying key hash."];
-        readonly discriminator: readonly [226, 103, 224, 87, 119, 167, 193, 186];
-        readonly accounts: readonly [{
-            readonly name: "admin";
-            readonly writable: true;
-            readonly signer: true;
-            readonly relations: readonly ["config"];
-        }, {
-            readonly name: "config";
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [99, 111, 110, 102, 105, 103];
-                }];
-            };
-        }, {
-            readonly name: "zk";
-            readonly writable: true;
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [122, 107];
-                }];
-            };
-        }, {
-            readonly name: "registry";
-            readonly writable: true;
-            readonly pda: {
-                readonly seeds: readonly [{
-                    readonly kind: "const";
-                    readonly value: readonly [122, 107, 114, 101, 103];
-                }];
-            };
-        }, {
-            readonly name: "system_program";
-            readonly address: "11111111111111111111111111111111";
-        }];
-        readonly args: readonly [{
-            readonly name: "enabled";
-            readonly type: "bool";
-        }, {
-            readonly name: "escrow";
-            readonly type: {
-                readonly array: readonly [{
-                    readonly array: readonly ["u8", 32];
-                }, 2];
-            };
-        }];
-    }, {
         readonly name: "stage_path";
         readonly docs: readonly ["Write `siblings` at levels offset.. of the revoker's open buffer (no gap above what is written; a level may be rewritten)."];
         readonly discriminator: readonly [68, 97, 146, 218, 201, 81, 33, 62];
@@ -1053,20 +849,11 @@ export declare const POF_IDL: {
         readonly name: "Config";
         readonly discriminator: readonly [155, 12, 170, 224, 30, 250, 204, 130];
     }, {
-        readonly name: "NoteLock";
-        readonly discriminator: readonly [189, 43, 98, 15, 18, 238, 104, 64];
-    }, {
         readonly name: "PathBuffer";
         readonly discriminator: readonly [15, 240, 22, 62, 212, 197, 226, 181];
     }, {
         readonly name: "Treasury";
         readonly discriminator: readonly [238, 239, 123, 238, 89, 1, 168, 253];
-    }, {
-        readonly name: "ZkConfig";
-        readonly discriminator: readonly [181, 176, 242, 167, 108, 219, 13, 202];
-    }, {
-        readonly name: "ZkRegistry";
-        readonly discriminator: readonly [179, 149, 101, 22, 34, 133, 223, 52];
     }];
     readonly events: readonly [{
         readonly name: "AssetSet";
@@ -1090,9 +877,6 @@ export declare const POF_IDL: {
         readonly name: "LogAnchored";
         readonly discriminator: readonly [63, 53, 65, 90, 183, 145, 180, 157];
     }, {
-        readonly name: "NoteReleased";
-        readonly discriminator: readonly [147, 68, 218, 190, 7, 90, 172, 64];
-    }, {
         readonly name: "PausedSet";
         readonly discriminator: readonly [171, 125, 127, 156, 233, 81, 68, 66];
     }, {
@@ -1107,15 +891,6 @@ export declare const POF_IDL: {
     }, {
         readonly name: "VerifierSet";
         readonly discriminator: readonly [127, 200, 69, 52, 190, 16, 199, 53];
-    }, {
-        readonly name: "ZkCertified";
-        readonly discriminator: readonly [196, 133, 181, 152, 252, 22, 235, 172];
-    }, {
-        readonly name: "ZkConfigSet";
-        readonly discriminator: readonly [223, 67, 224, 100, 156, 174, 146, 215];
-    }, {
-        readonly name: "ZkOwnerRegistered";
-        readonly discriminator: readonly [170, 98, 201, 235, 61, 29, 165, 46];
     }];
     readonly errors: readonly [{
         readonly code: 6000;
@@ -1822,60 +1597,6 @@ export declare const POF_IDL: {
             }];
         };
     }, {
-        readonly name: "NoteLock";
-        readonly docs: readonly ["One note behind one live certificate, with what the keeper needs to open the escrow."];
-        readonly type: {
-            readonly kind: "struct";
-            readonly fields: readonly [{
-                readonly name: "certificate";
-                readonly type: "pubkey";
-            }, {
-                readonly name: "tag";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "payer";
-                readonly docs: readonly ["Paid the lock's rent (gets it back at release)."];
-                readonly type: "pubkey";
-            }, {
-                readonly name: "eph";
-                readonly type: {
-                    readonly array: readonly [{
-                        readonly array: readonly ["u8", 32];
-                    }, 2];
-                };
-            }, {
-                readonly name: "ct";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "escrow_epoch";
-                readonly type: "u32";
-            }, {
-                readonly name: "locked_slot";
-                readonly type: "u64";
-            }, {
-                readonly name: "bump";
-                readonly type: "u8";
-            }];
-        };
-    }, {
-        readonly name: "NoteReleased";
-        readonly type: {
-            readonly kind: "struct";
-            readonly fields: readonly [{
-                readonly name: "tag";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "certificate";
-                readonly type: "pubkey";
-            }];
-        };
-    }, {
         readonly name: "Params";
         readonly type: {
             readonly kind: "struct";
@@ -2138,251 +1859,6 @@ export declare const POF_IDL: {
             }, {
                 readonly name: "next_verifier_slot";
                 readonly type: "u64";
-            }];
-        };
-    }, {
-        readonly name: "ZkArgs";
-        readonly type: {
-            readonly kind: "struct";
-            readonly fields: readonly [{
-                readonly name: "subject_kind";
-                readonly docs: readonly ["0 wallet or 2 badge: the controller is that key and signs (an X handle needs the linker's proof: not in this version)."];
-                readonly type: "u8";
-            }, {
-                readonly name: "asset";
-                readonly type: "u8";
-            }, {
-                readonly name: "tier";
-                readonly type: "u8";
-            }, {
-                readonly name: "nonce";
-                readonly type: {
-                    readonly array: readonly ["u8", 16];
-                };
-            }, {
-                readonly name: "proof";
-                readonly docs: readonly ["-A ‖ B ‖ C, big-endian (js/zk.js proofBytes)."];
-                readonly type: {
-                    readonly array: readonly ["u8", 256];
-                };
-            }, {
-                readonly name: "state_root";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "null_root";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "registry_root";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "eph";
-                readonly type: {
-                    readonly array: readonly [{
-                        readonly array: readonly ["u8", 32];
-                    }, 2];
-                };
-            }, {
-                readonly name: "tags";
-                readonly docs: readonly ["One per used note, strictly ascending (distinct notes), 1..=4."];
-                readonly type: {
-                    readonly vec: {
-                        readonly array: readonly ["u8", 32];
-                    };
-                };
-            }, {
-                readonly name: "cts";
-                readonly type: {
-                    readonly vec: {
-                        readonly array: readonly ["u8", 32];
-                    };
-                };
-            }];
-        };
-    }, {
-        readonly name: "ZkCertified";
-        readonly type: {
-            readonly kind: "struct";
-            readonly fields: readonly [{
-                readonly name: "certificate";
-                readonly type: "pubkey";
-            }, {
-                readonly name: "subject_hash";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "asset";
-                readonly type: "u8";
-            }, {
-                readonly name: "tier";
-                readonly type: "u8";
-            }, {
-                readonly name: "settles_slot";
-                readonly type: "u64";
-            }, {
-                readonly name: "tags";
-                readonly type: {
-                    readonly vec: {
-                        readonly array: readonly ["u8", 32];
-                    };
-                };
-            }, {
-                readonly name: "eph";
-                readonly type: {
-                    readonly array: readonly [{
-                        readonly array: readonly ["u8", 32];
-                    }, 2];
-                };
-            }, {
-                readonly name: "cts";
-                readonly type: {
-                    readonly vec: {
-                        readonly array: readonly ["u8", 32];
-                    };
-                };
-            }, {
-                readonly name: "escrow_epoch";
-                readonly type: "u32";
-            }, {
-                readonly name: "state_root";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "null_root";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }];
-        };
-    }, {
-        readonly name: "ZkConfig";
-        readonly type: {
-            readonly kind: "struct";
-            readonly fields: readonly [{
-                readonly name: "enabled";
-                readonly docs: readonly ["certify_zk refuses while false. Turning it on, or changing the key, waits Config.params.rotation_delay (ZK-09);", "turning it off is immediate."];
-                readonly type: "bool";
-            }, {
-                readonly name: "escrow";
-                readonly docs: readonly ["The revocation key K = k·B8 on Baby Jubjub (x, y, 32-byte big-endian): the keeper holds k. On the curve (checked)."];
-                readonly type: {
-                    readonly array: readonly [{
-                        readonly array: readonly ["u8", 32];
-                    }, 2];
-                };
-            }, {
-                readonly name: "escrow_epoch";
-                readonly docs: readonly ["Counts key changes; each note lock records the epoch it was encrypted under, so the keeper knows which k opens it."];
-                readonly type: "u32";
-            }, {
-                readonly name: "next_enabled";
-                readonly docs: readonly ["A change waiting for next_slot (0: none). Takes over by itself at that slot (as the verifier key does)."];
-                readonly type: "bool";
-            }, {
-                readonly name: "next_escrow";
-                readonly type: {
-                    readonly array: readonly [{
-                        readonly array: readonly ["u8", 32];
-                    }, 2];
-                };
-            }, {
-                readonly name: "next_slot";
-                readonly type: "u64";
-            }, {
-                readonly name: "vk_hash";
-                readonly docs: readonly ["sha256 of the verifying key compiled into this build (vk::VK_HASH), to match against the ceremony transcript."];
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "certified";
-                readonly type: "u64";
-            }, {
-                readonly name: "bump";
-                readonly type: "u8";
-            }];
-        };
-    }, {
-        readonly name: "ZkConfigSet";
-        readonly type: {
-            readonly kind: "struct";
-            readonly fields: readonly [{
-                readonly name: "enabled";
-                readonly type: "bool";
-            }, {
-                readonly name: "escrow";
-                readonly type: {
-                    readonly array: readonly [{
-                        readonly array: readonly ["u8", 32];
-                    }, 2];
-                };
-            }, {
-                readonly name: "takes_over_slot";
-                readonly type: "u64";
-            }, {
-                readonly name: "vk_hash";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }];
-        };
-    }, {
-        readonly name: "ZkOwnerRegistered";
-        readonly type: {
-            readonly kind: "struct";
-            readonly fields: readonly [{
-                readonly name: "owner";
-                readonly type: "pubkey";
-            }, {
-                readonly name: "index";
-                readonly type: "u64";
-            }, {
-                readonly name: "leaf";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }, {
-                readonly name: "root";
-                readonly type: {
-                    readonly array: readonly ["u8", 32];
-                };
-            }];
-        };
-    }, {
-        readonly name: "ZkRegistry";
-        readonly docs: readonly ["The POF owner registry (ZK-04): an append-only Poseidon Merkle tree (height 20) of Poseidon(ownerId(owner), commitment), each", "appended by register_zk_owner under the ring owner's own signature, with its last 12 roots (Borsh decoding keeps it under the 4 KB frame)."];
-        readonly type: {
-            readonly kind: "struct";
-            readonly fields: readonly [{
-                readonly name: "next_index";
-                readonly type: "u64";
-            }, {
-                readonly name: "filled";
-                readonly type: {
-                    readonly array: readonly [{
-                        readonly array: readonly ["u8", 32];
-                    }, 20];
-                };
-            }, {
-                readonly name: "roots";
-                readonly type: {
-                    readonly array: readonly [{
-                        readonly array: readonly ["u8", 32];
-                    }, 12];
-                };
-            }, {
-                readonly name: "cursor";
-                readonly type: "u8";
-            }, {
-                readonly name: "bump";
-                readonly type: "u8";
             }];
         };
     }];
