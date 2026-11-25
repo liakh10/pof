@@ -11,9 +11,10 @@ Helius Rings indexer.
 | suite | command | checks | result |
 |---|---|---|---|
 | Contract bytes, RFC 9162 log, keys | `cd verifier && node --test test/contract.test.mjs` | 9 | pass |
-| The Verifier against SDK-built notes | `node --test test/verifier.test.mjs` | 13 | pass |
-| Relayer, keeper, escrow, credits, linker, revoke, HTTP | `node --test test/services.test.mjs` | 14 | pass |
-| The audit's proofs (rounds 1 to 4) | `node --test ../audit/test/` | 22 | pass |
+| The Verifier against SDK-built notes | `node --test test/verifier.test.mjs` | 14 | pass |
+| Relayer, keeper, escrow, credits, linker, revoke, HTTP, IDL coverage | `node --test test/services.test.mjs` | 20 | pass |
+| The key script (stub vercel, fresh home) | `node --test test/keys.test.mjs` | 1 | pass |
+| The audit's proofs (rounds 1 to 4) and audit2 (locks, config) | `node --test ../audit/test/ ../audit2/test/locks.test.mjs ../audit2/test/config.test.mjs` | 26 | pass |
 | Two local validators, Rings cloned from mainnet, this `pof` build | `node test/e2e/local-e2e.mjs` | 13 | pass |
 | Mainnet, read only | `node test/e2e/mainnet-read.mjs` | 7 | pass |
 | Reproducible bundle, no input outside verifier/, BUILD.json fresh | `node --test test/build.test.mjs` | 2 | pass |
@@ -74,13 +75,14 @@ distinct, gap-free indexes (appends are create-if-absent); a stale hash cache ca
 
 `test/e2e/local-e2e.mjs` runs its own validator (port 37899) with the Rings programs, tree 0, the protocol config and
 the SOL interface cloned from mainnet, and this build of `pof` as an upgradeable program. The holder side is the rings
-agent's client, unchanged. Output of the last run (`test/e2e/local-e2e.txt`):
+agent's client, unchanged. Output of the last run, on the launch build (`1c02f89`, no zk), `test/e2e/local-e2e.txt`:
 
 1. `init_config`: the Verifier and relayer keys are in Config (validity, max attest age read back).
 2. A vault ring registers and shields 2 SOL on the clone.
-3. The Verifier signs a 240-byte attestation for `@e2e_anon`, payer the relayer, link bound to the vault's controller.
-4. The relayer's `certify` lands: the certificate is live, tier 1, with the salted hashes.
-5. The certificate carries the controller key and the log index.
+3. The Verifier signs a 240-byte attestation for `@e2e_anon`, payer the relayer, link bound to the vault's controller;
+   nothing is public yet (the log publishes only certified attestations).
+4. The relayer's `certify` lands: the certificate is live, tier 1, with the salted hashes, and its attestation enters the log.
+5. The certificate carries the controller key (the log entry is found by its bytes; `log_index` is u64::MAX).
 6. The keeper holds the sealed kit and sees the certificate live, nothing spent.
 7. The same note is refused for a second handle (NOTE_IN_USE).
 8. `anchor_log`: the treasury holds the log's signed head.
