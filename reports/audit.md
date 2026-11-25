@@ -124,7 +124,7 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 | POF-11 | Medium | The vault spending key comes from a phishable signMessage, and is lost with a non-deterministic signer | `client/pof-client.js:19,60-62` | partly fixed `d9bec9f` (domain-separated message, double-sign determinism check, random key with a passphrase backup); residual: the domain is a constant string, so phishing the message stays possible; see POF-27 |
 | POF-12 | Medium | Privacy: wallet, vault and handle are linkable on chain and by the operator | `client/pof-client.js:126,291-296,301`; design | partly fixed: relay credits (blind RSA, bought by a private transfer) `432b0cd` + `b22ca29` remove the payment-next-to-certify link; open items: CR-01 (key not pinned), CR-05 (buy-to-spend timing), the vault funding link (docs `5e82f9f` now say so) |
 | POF-13 | Medium | `/v1` "verified" log answers trust the key the log itself names | `api/v1/_lib.js:180-182`, `sdk/src/log.ts:142,207` | **fixed** `39e02d9` (keys from Config and VerifierSet history, `keyTrusted`) |
-| POF-14 | Medium | Paid upstreams (Helius indexer and prover, RPC) behind open, unauthenticated endpoints | `client/server/spr-proxy.js`, `mcp/core.js:61`, `api/mcp.js` | partly fixed: MCP batch, size and IP caps `39e02d9`; `api/spr` per-instance window only `084ea11`; `/api/status` uncached query strings (round 2) |
+| POF-14 | Medium | Paid upstreams (Helius indexer and prover, RPC) behind open, unauthenticated endpoints | `client/server/spr-proxy.js`, `mcp/core.js:61`, `api/mcp.js` | mostly fixed: Vercel Firewall rate rules live on project `pof`, read from the active config (round 5): heavy paths (`/api/attest|relay|link|keeper|spr|spr-prover|card|share`, `/mcp`) are capped at 30 a minute per IP, the read API (`/v1`, `/api/rpc|status|v1|witness`, `/c`) at 120. The MCP batch and size caps are in place (`39e02d9`), and the status reads are shared (`fb1e902`). Residual: `/api/mcp` (the function path behind `/mcp`), `/api/bots/*` and `/link` (a public POST) match neither rule |
 | POF-15 | Low | Bot sweep re-checks only the first 500 grants and members | `bots/sweep.js:17,37` | **fixed** `39e02d9` (cursor), diff read |
 | POF-16 | Low | Relayer: an attestation can be replayed for 30 days, and payments are found in the last 60 signatures only | `verifier/src/relayer.ts:57`, `verifier/src/program.ts` `incoming` | mostly fixed `ef02393` + verifier (A2-03: a per-quote reference in a Memo); residual: no early `max_attest_age` check before the RPC reads |
 | POF-17 | Low | The verifier rotation delay can be cut to 9,000 slots without delay | `lib.rs:530-536,565-576` | **fixed** `73d71dd` |
@@ -613,6 +613,10 @@ The programs' own suites were not re-run by this reviewer; the program report st
 - A much longer root history, or accept any root registered within the last N slots.
 - A tree height sized to the expected users, with a migration path.
 
+**Edge rate limits (POF-14, A2-04).** The active Vercel Firewall config of project `pof` was read with the Vercel CLI, read-only, at 2026-11-25. It holds two active rules. The first is "POF heavy endpoints per IP": path `^/(api/(attest|relay|link|keeper|spr|spr-prover|card|share)|mcp)(/|$)`, deny over 30 per 60 s per IP. The second is "POF read API per IP": `^/(v1|api/(rpc|status|v1|witness)|c)(/|$)`, deny over 120 per 60 s. No burst test was run; the rules were read from the config instead. Three single GET requests showed paths outside both rules that answer: `/api/mcp` (405, the hosted MCP function, the same handler as `/mcp`), `/api/bots/link` and `/link` (200; `/link` takes a public POST that checks a signature, reads the chain and writes Blob). Extend the heavy rule to `^/(api/(attest|relay|link|keeper|spr|spr-prover|card|share|mcp)|mcp|link)(/|$)`, and give `/api/bots/` its own rule.
+
+**Admin power documented.** `docs-src/trust.md` (§ admin powers) now says that `revoke_verifier_key` ends every certificate a key signed at once, that `void_by_key` lets anyone mark them, and that the admin can do this in one transaction. That closes the docs item. One wording fix is left: the page says "up to 4 keys", while the program keeps `MAX_REVOKED_KEYS = 8` (`cd51f22`).
+
 **Verifier and client.**
 - The internal header (`x-pof-internal`) is compared in constant time (sha256 then `timingSafeEqual`), needs at least 16 characters, skips only the log's public rate limit, and is sent only to `POF_LOG_URL` and the status origin from env. Fine.
 - Parallel attest: the reads run in parallel, while the lock and the verdicts stay in a fixed order. The race tests still pass.
@@ -634,7 +638,7 @@ These were checked specifically and found sound at the reviewed commits:
 **Still open at round 5** (launch build):
 - POF-11: the vault message can still be phished.
 - POF-12, partly: vault funding, and timing (CR-05, A2-07).
-- POF-14 and A2-04: edge rate rules not verified.
+- POF-14 and A2-04, residual: the edge rules are live and were verified from the firewall config. `/api/mcp`, `/api/bots/*` and `/link` fall outside them: add them to the heavy rule, and put the authenticated Telegram and Discord webhooks in the 120 bucket so a busy group is not cut off.
 - POF-16 residual.
 - POF-19: non-inclusion at an older root; Verifier side.
 - POF-20 residual.
@@ -655,6 +659,7 @@ Off the launch build: ZK-08 (accepted), ZK-11, and the development ceremony.
 
 ## 7. Changes
 - 2026-11-25 · audit · round 1: 25 findings, 9 failing proof tests (`cf763b5`). High findings posted on `_x/pof/BOARD.md` and sent to the lead.
+- 2026-11-25 · audit · round 5 addendum: edge firewall rules verified from the active config (POF-14 mostly fixed; `/api/mcp`, `/api/bots/*`, `/link` uncovered); trust.md admin-power wording checked (says 4 keys, the program keeps 8).
 - 2026-11-25 · audit · round 5: final statuses for the launch build `1c02f89` (no zk); every suite green; ZK-01 to ZK-07, ZK-09, ZK-10 and CR-01 to CR-04 fixed and re-tested; new ZK-11 (zk build only) and RK-01.
 - 2026-11-25 · audit · round 4: blind relay credits and the relayed revoke reviewed (CR-01 to CR-05, RV-01), W-04, LW-01; POF-27, POF-30 and W-01 to W-03 fixed; zk fixes not yet re-reviewed.
 - 2026-11-25 · audit · round 3: zk path (1 Critical, 3 High, 3 Medium, 2 Low, 1 Info), witness (1 Medium, 2 Low), POF-30. The round 2 POF-26 test was corrected (controllerSigner: null; the verifier's claim was right). Round 1 and 2 statuses updated.
