@@ -109,8 +109,12 @@ names the certificate's own values, so it cannot revoke a renewed or remade cert
 is past <code>valid_until</code> (the client suggests the current slot plus 1,500), so a signed revoke cannot be held back and used
 later.</p>
 <h2 id="voidbykey-when-a-verifier-key-is-revoked">void_by_key: when a Verifier key is revoked<a class="anchor" href="#voidbykey-when-a-verifier-key-is-revoked" aria-label="Link to this section">#</a></h2>
-<p>If a Verifier key leaks, or is retired after a rotation, the admin calls <code>revoke_verifier_key(key)</code> (up to 4 revoked keys
-are kept in Config). From that slot the key signs nothing the program accepts, and <strong>every certificate it signed fails
+<p>If a Verifier key leaks, or is retired after a rotation, the admin calls <code>revoke_verifier_key(key)</code>. Config keeps 8 revoked keys;
+when the list is full, an entry is reused only once 1,512,000 slots (the validity cap) have passed since that key was
+revoked, so every certificate it signed has expired by then, and never an entry whose key is the current or the proposed
+Verifier key in Config. If all 8 entries are younger than that, a ninth <code>revoke_verifier_key</code> is refused (<code>BadParams</code>).
+The fallback is <code>set_paused</code>, which stops every <code>certify</code> and <code>renew</code> at once (revocation and expiry keep working), plus a
+Verifier key rotation; the unrevoked key's existing certificates then stay live until they expire or are revoked. From that slot the key signs nothing the program accepts, and <strong>every certificate it signed fails
 <code>require_certificate</code> and Rooms at once</strong>, whether or not anyone has touched it yet. Anyone may then call <code>void_by_key</code> on
 each such certificate to mark it voided (status 4) and update the Treasury's counters. A holder whose certificate was
 voided this way certifies again with the current key; the notes are unaffected.</p>
@@ -144,7 +148,7 @@ their sweep after launch.</p>
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">d36cb4c68f0317caeb66bb7b9b1fd83a0dd4258226a037e22732eaff7ad30757</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">1669327c7f333e63d29e959db7a0377ab0c3b9f1e065a99f4837ac329b766091</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

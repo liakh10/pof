@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Test report: developer surfaces (API, SDK, MCP, bots) · Proof of Funds</title>
-<meta name="description" content="Scope: sdk/ (@pof/sdk 0.3.1), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js,
+<meta name="description" content="Scope: sdk/ (@pof/sdk 0.3.2), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js,
 witness/ and api/witness.js, cli/, embed/, examples/. Every suite below runs from a clean checkout with the
 commands shown. Node 20, solana-cli 4.1.2 (Agave">
 <link rel="canonical" href="https://proofoffunds.vercel.app/reports/devx">
@@ -16,7 +16,7 @@ commands shown. Node 20, solana-cli 4.1.2 (Agave">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Proof of Funds">
 <meta property="og:title" content="Test report: developer surfaces (API, SDK, MCP, bots) · Proof of Funds">
-<meta property="og:description" content="Scope: sdk/ (@pof/sdk 0.3.1), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js,
+<meta property="og:description" content="Scope: sdk/ (@pof/sdk 0.3.2), api/v1/ and api/openapi.json, mcp/ and api/mcp.js, bots/ and api/bots.js,
 witness/ and api/witness.js, cli/, embed/, examples/. Every suite below runs from a clean checkout with the
 commands shown. Node 20, solana-cli 4.1.2 (Agave">
 <meta property="og:url" content="https://proofoffunds.vercel.app/reports/devx">
@@ -43,7 +43,7 @@ commands shown. Node 20, solana-cli 4.1.2 (Agave">
   <article class="prose" data-docs>
     
     <h1 id="test-report-developer-surfaces-api-sdk-mcp-bots">Test report: developer surfaces (API, SDK, MCP, bots)</h1>
-<p>Scope: <code>sdk/</code> (<code>@pof/sdk</code> 0.3.1), <code>api/v1/</code> and <code>api/openapi.json</code>, <code>mcp/</code> and <code>api/mcp.js</code>, <code>bots/</code> and <code>api/bots.js</code>,
+<p>Scope: <code>sdk/</code> (<code>@pof/sdk</code> 0.3.2), <code>api/v1/</code> and <code>api/openapi.json</code>, <code>mcp/</code> and <code>api/mcp.js</code>, <code>bots/</code> and <code>api/bots.js</code>,
 <code>witness/</code> and <code>api/witness.js</code>, <code>cli/</code>, <code>embed/</code>, <code>examples/</code>. Every suite below runs from a clean checkout with the
 commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0 programs built from <code>program/</code> at the time of the run
 (the IDL with <code>revoked_keys</code>, status 4 voided, zk certificates, and the Config account in <code>require_certificate</code>, <code>join</code>
@@ -61,7 +61,7 @@ with <code>pof_config</code> (the SDK's <code>evictMemberInstruction</code>), <c
 read <code>voided</code> at once through the SDK, the program refuses it (<code>KeyRevoked</code>), and <code>void_by_key</code> writes status 4; the
 revoked key is dropped from the trusted set. The OTC desk example passes the Config to its CPI and to <code>pof::gate</code>
 (3/3). zk certificates read <code>settling</code> until their settle slot (unit test).</li><li><strong>The launch build</strong> (no zk feature): the SDK decodes from <code>program/idl/pof.json</code> (no zk instructions); the zk build's
-IDL ships as <code>POF_ZK_IDL</code> and <code>zkEnabled()</code> reads whether the zk config PDA exists; &quot;settling&quot; applies only to zk
+IDL ships as <code>POF_ZK_IDL</code>; <code>getZkConfig()</code> decodes the ZkConfig and <code>zkEnabled()</code> is true only when it is enabled at the current slot (past its activation delay); &quot;settling&quot; applies only to zk
 certificates. The local-validator suite runs on the launch build (8/8, including <code>zkEnabled() === false</code>).</li><li><strong>FZ-17</strong>: the SDK pins POF's program id by default; <code>PofClient</code> and the CPI builders refuse another id without
 <code>allowOtherDeployment: true</code>, and an account owned by another program never reads as a certificate (unit test).</li><li><strong>Performance</strong>: see <code>reports/performance.md</code> (one RPC per read, a log mirror for proofs, single-flight caches).</li></ul>
 <h2 id="audit-findings-fixed-in-these-parts-reportsauditmd-round-1">Audit findings fixed in these parts (reports/audit.md, round 1)<a class="anchor" href="#audit-findings-fixed-in-these-parts-reportsauditmd-round-1" aria-label="Link to this section">#</a></h2>
@@ -177,7 +177,7 @@ each step's result) and Vercel Blob itself (the bots use the same private-store 
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">d36cb4c68f0317caeb66bb7b9b1fd83a0dd4258226a037e22732eaff7ad30757</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">1669327c7f333e63d29e959db7a0377ab0c3b9f1e065a99f4837ac329b766091</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>

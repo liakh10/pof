@@ -75,9 +75,11 @@ finding A2-06).</p>
 <ul><li><strong>pause</strong> certify and renew at once (<code>set_paused</code>), for a leaked key; revocation and expiry never pause;</li><li><strong>propose a new key</strong> (<code>set_verifier</code>), which takes over only after a delay counted in slots (216,000 slots at launch,
 never fewer than 9,000), so a key cannot be swapped in quietly; anyone can read the pending key and its slot in <code>Config</code>;</li><li><p>set the fee, up to a hard cap of 0.25 SOL per certify or renew; set the validity between 9,000 and 1,512,000 slots;
 enable or disable an asset. A tier table, once set,
-cannot be changed, so an issued tier never changes meaning.</p></li><li><strong>revoke a Verifier key at once</strong> (<code>revoke_verifier_key</code>, up to 4 keys): from that slot every certificate the key signed
+cannot be changed, so an issued tier never changes meaning.</p></li><li><strong>revoke a Verifier key at once</strong> (<code>revoke_verifier_key</code>; Config keeps 8 revoked keys): from that slot every certificate the key signed
 stops passing <code>require_certificate</code> and Rooms, and anyone can mark each one voided (<code>void_by_key</code>). This is the remedy
-for a leaked key; it also means the admin can end every certificate one key signed, in one transaction.</li></ul>
+for a leaked key; it also means the admin can end every certificate one key signed, in one transaction. Config keeps 8
+revoked keys; if all 8 were revoked within the last 1,512,000 slots, a ninth revoke is refused and the admin's only
+remedy is to pause certify and renew and rotate the key (<a href="/docs/revocation">Revocation</a>).</li></ul>
 <p>The fee exemption for $POF holders reads the payer's balance at the moment of <code>certify</code>, so it can be borrowed for one
 transaction. That only costs the protocol its fee (<a href="/docs/fees">Fees</a>).</p>
 <p>The admin cannot sign attestations. The <code>pof</code> program is deployed with the upgradeable loader, and its upgrade
@@ -155,7 +157,7 @@ with failing tests for each finding. A finding stays listed there, with its stat
   <dl class="foot-facts">
     <div><dt>Program</dt><dd><a class="mono" href="https://solscan.io/account/pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT" rel="noopener" target="_blank">pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT</a></dd></div>
     <div><dt>Gate program</dt><dd><a class="mono" href="https://solscan.io/account/gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU" rel="noopener" target="_blank">gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU</a></dd></div>
-    <div><dt>Verifier bundle sha256</dt><dd class="mono">d36cb4c68f0317caeb66bb7b9b1fd83a0dd4258226a037e22732eaff7ad30757</dd></div>
+    <div><dt>Verifier bundle sha256</dt><dd class="mono">1669327c7f333e63d29e959db7a0377ab0c3b9f1e065a99f4837ac329b766091</dd></div>
   </dl>
   <p class="foot-note">Built on Helius Privacy Rings. A certificate proves a minimum, never an amount, and it is only as private as the subject you choose.</p>
 </footer>
