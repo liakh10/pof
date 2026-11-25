@@ -12,7 +12,7 @@ import * as Z from '../../zk/js/zk.js';
 import { scenario, WASM, ONE_SOL } from '../../zk/test/fixtures.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const zkrs = fs.readFileSync(path.join(here, '../../zk/onchain/src/zk.rs'), 'utf8');
+const zkrs = fs.readFileSync(path.join(here, '../../program/programs/pof/src/zk.rs'), 'utf8');
 const witnessOk = async (input) => { try { await snarkjs.wtns.calculate(input, WASM, { type: 'mem' }); return true; } catch { return false; } };
 
 /* ZK-01 (Critical): certify_zk accepts any of the 100 nullifier roots the tree account keeps. The nullifier tree only grows,
