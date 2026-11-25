@@ -336,8 +336,10 @@ document.fonts?.ready.then(drawLeaders);
 WIDE.addEventListener('change', () => { drawOrbits(order.length ? (rings.get(order[order.length - 1])?.tr ?? Z0) + 6 : Z0); drawLeaders(); });
 
 /* ------------------------------------------------------------------ the live number and events */
+const mSlot = $('[data-m-slot]'), mSlotN = $('[data-m-slot-n]');
 addEventListener('pof:slot', e => {
   slot = e.detail;
+  if (mSlot) { mSlot.hidden = false; mSlotN.textContent = num(slot); const d = mSlot.querySelector('.dot'); d.classList.remove('tick'); void d.offsetWidth; d.classList.add('tick'); }
   if (mode === 'pre') liveNum.textContent = num(slot);
   else { const s = $('[data-live-slot]'); if (s) s.textContent = num(slot); }
 });

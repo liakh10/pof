@@ -208,3 +208,14 @@
 .page-home .live { display: block; max-width: none; }
 .page-home .live-sub { display: block; }
 .page-home .live-sub b { margin: 0 .15em; }
+
+/* phones: the live chain number in the first screen, right under the actions (the big live block sits lower) */
+.page-home .m-slot { display: none; }
+@media (max-width: 1080px) {
+  .page-home .m-slot:not([hidden]) { order: 2; display: flex; align-items: center; gap: 8px; margin-top: 14px; font: 500 12.5px/1.2 var(--face-mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .page-home .m-slot .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--signal); flex: none; }
+  .page-home .m-slot .dot.tick { animation: hs-tick .6s var(--ease); }
+  .page-home .m-slot-l { font: 650 10.5px/1.2 var(--face-text); font-stretch: 112%; letter-spacing: .08em; text-transform: uppercase; }
+  .page-home .m-slot-n { color: var(--ink); font-weight: 600; }
+}
+@keyframes hs-tick { from { transform: scale(1.8); } }
