@@ -151,12 +151,15 @@ subject message is gone), the X link takes a secret and binds the controller (`P
   exists, is owned by that program, is 11 bytes and data[0] == 8 (accounts: `tree`, `nullifier_account`);
   (b) `membership = { leaf_index u64, next_value [32], path [[32]] }`: leaf `Poseidon(nullifier, next_value)` at
   `leaf_index`, siblings from the leaf up (at most 40; levels left out are empty subtrees, so 16 levels while the tree has
-  under 65,536 nullifiers), hashes to one of the 100 nullifier roots at offset 17,232 of the tree account. About 35k CU.
+  under 65,536 nullifiers), hashes to one of the 100 nullifier roots at offset 17,232 of the tree account. About 64k CU in
+  one transaction (measured by fuzz; the trimmed path must fit the transaction).
   (b') staged, for the full 40-level path without a v1 transaction: `open_path(nullifier, next_value, leaf_index, siblings)`
   makes the revoker's buffer PDA `["path", revoker, certificate]` (zero-copy, 1,432 bytes, the revoker pays the rent),
   `stage_path(offset, siblings)` adds levels (only that revoker; no gap), and `revoke_spent_staged(index, salt)` hashes all 40
   levels to one of the tree's 100 nullifier roots AT THAT MOMENT, checks the salted hash, revokes and closes the buffer (rent
   back). `close_path` drops it (its revoker; anyone during the wind-down). Two transactions of 20 levels carry a full path.
+  Measured: `open_path` about 22.6k CU, `stage_path` about 5.3k, `revoke_spent_staged` about 68.4k. The keeper uses (a) while
+  the PDA exists and (b') once it is gone (`verifier/src/program.ts revokeSpent`).
   Every spent proof names Rings tree 0 (`777pvSGe5LaBd9nCczvE2FXEauiwtfGJ5XRpjKyniGor`) and nothing else.
   A Verifier-signed "spent" statement is not needed and not accepted.
 - The keeper holds `(salt, nullifier)` encrypted at rest; the holder holds a copy. After a revoke, salt and nullifier are public
@@ -267,6 +270,9 @@ offset size field
 
 2026-11-25 (verifier): §7 added: RFC 9162 hashing as devx proposed, 345-byte leaf, 80-byte signed head, memo anchor.
 2026-11-25 (verifier): the leaf is 377 bytes now (it embeds the 240-byte §3); offsets above updated; anchor_log takes the 80-byte STH.
+2026-11-25 (verifier, fuzz): there is no memo in certify (an 8-note certify with a memo and a CU price is 1,314–1,316 bytes and
+does not fit; the relayer sends certify alone, 1,141 bytes). The head is anchored only by `anchor_log` (keeper cron), and an
+entry enters the log when its certificate lands (relayer or keeper publish).
 
 ## §8 Log witnesses (owner: devx; consumers: site /log and /status, anyone running a witness)
 A witness is an independent monitor of the §7 log (`witness/`, run by anyone with `node witness/run.js`). Each step it:
