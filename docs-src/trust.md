@@ -61,7 +61,9 @@ The program accepts attestations signed by one ed25519 key at a time, stored in 
 
 - **revoke a Verifier key at once** (`revoke_verifier_key`; Config keeps 8 revoked keys): from that slot every certificate the key signed
   stops passing `require_certificate` and Rooms, and anyone can mark each one voided (`void_by_key`). This is the remedy
-  for a leaked key; it also means the admin can end every certificate one key signed, in one transaction.
+  for a leaked key; it also means the admin can end every certificate one key signed, in one transaction. Config keeps 8
+  revoked keys; if all 8 were revoked within the last 1,512,000 slots, a ninth revoke is refused and the admin's only
+  remedy is to pause certify and renew and rotate the key ([Revocation](revocation)).
 
 The fee exemption for $POF holders reads the payer's balance at the moment of `certify`, so it can be borrowed for one
 transaction. That only costs the protocol its fee ([Fees](fees)).

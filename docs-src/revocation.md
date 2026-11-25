@@ -113,7 +113,10 @@ later.
 
 If a Verifier key leaks, or is retired after a rotation, the admin calls `revoke_verifier_key(key)`. Config keeps 8 revoked keys;
 when the list is full, an entry is reused only once 1,512,000 slots (the validity cap) have passed since that key was
-revoked, so every certificate it signed has expired by then, and never for the key that is signing now. From that slot the key signs nothing the program accepts, and **every certificate it signed fails
+revoked, so every certificate it signed has expired by then, and never an entry whose key is the current or the proposed
+Verifier key in Config. If all 8 entries are younger than that, a ninth `revoke_verifier_key` is refused (`BadParams`).
+The fallback is `set_paused`, which stops every `certify` and `renew` at once (revocation and expiry keep working), plus a
+Verifier key rotation; the unrevoked key's existing certificates then stay live until they expire or are revoked. From that slot the key signs nothing the program accepts, and **every certificate it signed fails
 `require_certificate` and Rooms at once**, whether or not anyone has touched it yet. Anyone may then call `void_by_key` on
 each such certificate to mark it voided (status 4) and update the Treasury's counters. A holder whose certificate was
 voided this way certifies again with the current key; the notes are unaffected.
