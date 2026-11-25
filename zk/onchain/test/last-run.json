@@ -1,6 +1,6 @@
 {
- "date": "2026-11-24T23:32:21.525Z",
- "pass": 12,
+ "date": "2026-11-25T01:01:24.003Z",
+ "pass": 13,
  "fail": 0,
  "results": [
   [
@@ -45,6 +45,10 @@
   ],
   [
    "ok",
+   "owner registration (ZK-11): one record per owner, paid (rent + the certify fee to the treasury); a second registration of the same owner is refused"
+  ],
+  [
+   "ok",
    "settle window (ZK-02): a gate in the same transaction as certify_zk refuses; after the settle slots it passes"
   ],
   [
@@ -55,47 +59,47 @@
  "certify_zk": [
   {
    "ix": "set_zk",
-   "units": 390862
+   "units": 394659
   },
   {
    "ix": "register_zk_owner",
-   "units": 31448
+   "units": 60308
   },
   {
    "notes": 1,
-   "units": 248023,
+   "units": 249522,
    "size": 843,
-   "proveMs": 5457
+   "proveMs": 6366
   },
   {
    "notes": 4,
-   "units": 296464,
+   "units": 308472,
    "size": 1230,
-   "proveMs": 5271
+   "proveMs": 7140
   },
   {
    "notes": 1,
-   "units": 244548,
+   "units": 246989,
    "size": 843,
-   "proveMs": 5302
+   "proveMs": 7180
   },
   {
    "notes": 1,
-   "units": 239125,
+   "units": 246786,
    "size": 843,
-   "proveMs": 5325
+   "proveMs": 9228
   },
   {
    "notes": 1,
-   "units": 240373,
+   "units": 243534,
    "size": 843,
-   "proveMs": 5981
+   "proveMs": 7191
   },
   {
    "notes": 1,
-   "units": 240760,
+   "units": 244704,
    "size": 843,
-   "proveMs": 5294
+   "proveMs": 6760
   }
  ]
 }
