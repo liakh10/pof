@@ -65,6 +65,19 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
   const ATA = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
   const certPda = (sh: Uint8Array, asset: number) => pda([Buffer.from('cert'), Buffer.from(sh), Buffer.from([asset])]);
   const meta = (pubkey: any, isSigner = false, isWritable = false) => ({ pubkey, isSigner, isWritable });
+  /** the accounts of an instruction in the IDL's order, with the IDL's signer and writable flags, from a name → key map;
+   *  an optional account left out is passed as the program id (Anchor's None) */
+  const accountsOf = (name: string, named: Record<string, any>) => {
+    const ix = idl.instructions.find((i: any) => i.name === name);
+    if (!ix) throw new PofError('PROGRAM_NOT_READY', `the program has no ${name}`, 503);
+    return ix.accounts.map((a: any) => {
+      const k = named[a.name] ?? (a.address ? new PublicKey(a.address) : null);
+      if (!k) { if (a.optional) return meta(PID); throw new PofError('PROGRAM_NOT_READY', `${name} wants an account ${a.name} the relayer does not know`, 503); }
+      return meta(k, !!a.signer, !!a.writable);
+    });
+  };
+  const ixOf = (name: string, args: Record<string, any>, named: Record<string, any>) => new TransactionInstruction({ programId: PID, data: ixData(name, args), keys: accountsOf(name, named) });
+  const common = () => ({ config: CONFIG, treasury: TREASURY, instructions: SYSVAR_INSTRUCTIONS_PUBKEY, system_program: SystemProgram.programId });
 
   async function config() {
     const a = await conn.getAccountInfo(CONFIG);
@@ -119,10 +132,7 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
       const rootSet = cfg.root_mint !== SystemProgram.programId.toBase58();
       const holder = rootSet ? PublicKey.findProgramAddressSync([payer.publicKey.toBuffer(), new PublicKey(cfg.root_token_program).toBuffer(), new PublicKey(cfg.root_mint).toBuffer()], ATA)[0] : SystemProgram.programId;
       const att = { subject_kind: a.subjectKind, subject_hash: a.subjectHash, asset: a.asset, tier: a.tier, tree_root: a.treeRoot, root_slot: a.rootSlot, null_hashes: x.hashes, issued_slot: a.issuedSlot, expiry_slot: a.expirySlot, controller: a.controller, nonce: a.nonce };
-      const ix = new TransactionInstruction({ programId: PID, data: ixData('certify', { att, log_index: BigInt(x.logIndex) }), keys: [
-        meta(payer.publicKey, true, true), meta(CONFIG), meta(TREASURY, false, true), meta(cert, false, true),
-        prior ? meta(prior, false, true) : meta(PID), meta(holder), meta(SYSVAR_INSTRUCTIONS_PUBKEY), meta(SystemProgram.programId),
-      ] });
+      const ix = ixOf('certify', { att, log_index: BigInt(x.logIndex) }, { ...common(), payer: payer.publicKey, certificate: cert, ...(prior ? { prior_payer: prior } : {}), holder_token: holder });
       return send([edIx(x.attestation, x.signature), ix], 'certify');
     },
     async revokeSpent(x) {
@@ -132,8 +142,7 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
       const pdaLive = await conn.getAccountInfo(nfPda);
       // the fast path: the nullifier PDA is there, one transaction (CONTRACT §5 path (a))
       if (pdaLive) {
-        const ix = new TransactionInstruction({ programId: PID, data: ixData('revoke_spent', { index: x.index, salt: x.salt, nullifier: x.nullifier, membership: null }), keys: [
-          meta(payer.publicKey, true, false), meta(CONFIG), meta(TREASURY, false, true), meta(cert, false, true), meta(tree), meta(nfPda)] });
+        const ix = ixOf('revoke_spent', { index: x.index, salt: x.salt, nullifier: x.nullifier, membership: null }, { ...common(), caller: payer.publicKey, certificate: cert, tree, nullifier_account: nfPda });
         return send([ix], 'revoke_spent');
       }
       if (!o.rings || !(o.rings as any).nullifierMembership) throw new PofError('NO_SPEND_PROOF', 'the nullifier PDA is gone and no membership source is configured', 503);
@@ -143,26 +152,29 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
         const m = await (o.rings as any).nullifierMembership(x.tree, x.nullifier, { full: true });
         const buffer = pda([Buffer.from('path'), payer.publicKey.toBuffer(), cert.toBuffer()]);
         const cut = Math.min(20, m.path.length);
-        const open = new TransactionInstruction({ programId: PID, data: ixData('open_path', { nullifier: x.nullifier, next_value: m.next_value, leaf_index: m.leaf_index, siblings: m.path.slice(0, cut) }), keys: [
-          meta(payer.publicKey, true, true), meta(cert), meta(buffer, false, true), meta(SystemProgram.programId)] });
+        const named = { ...common(), revoker: payer.publicKey, caller: payer.publicKey, certificate: cert, tree, buffer };
+        const open = ixOf('open_path', { nullifier: x.nullifier, next_value: m.next_value, leaf_index: m.leaf_index, siblings: m.path.slice(0, cut) }, named);
         await send([open], 'open_path');
         const ixs: any[] = [];
-        if (m.path.length > cut) ixs.push(new TransactionInstruction({ programId: PID, data: ixData('stage_path', { offset: cut, siblings: m.path.slice(cut) }), keys: [meta(payer.publicKey, true, false), meta(buffer, false, true)] }));
-        ixs.push(new TransactionInstruction({ programId: PID, data: ixData('revoke_spent_staged', { index: x.index, salt: x.salt }), keys: [
-          meta(payer.publicKey, true, true), meta(CONFIG), meta(TREASURY, false, true), meta(cert, false, true), meta(tree), meta(buffer, false, true)] }));
+        if (m.path.length > cut) ixs.push(ixOf('stage_path', { offset: cut, siblings: m.path.slice(cut) }, named));
+        ixs.push(ixOf('revoke_spent_staged', { index: x.index, salt: x.salt }, named));
         try { return await send(ixs, 'revoke_spent_staged'); }
         finally {
           // give the buffer's rent back if the staged revoke left it open
           if (has('close_path') && await conn.getAccountInfo(buffer)) {
-            await send([new TransactionInstruction({ programId: PID, data: ixData('close_path', {}), keys: [meta(payer.publicKey, true, false), meta(CONFIG), meta(buffer, false, true), meta(payer.publicKey, false, true)] })], 'close_path').catch(() => {});
+            await send([ixOf('close_path', {}, named)], 'close_path').catch(() => {});
           }
         }
       }
       // the older single-transaction membership (a trimmed path; fits while the nullifier tree is small)
       const membership = await (o.rings as any).nullifierMembership(x.tree, x.nullifier);
-      const ix = new TransactionInstruction({ programId: PID, data: ixData('revoke_spent', { index: x.index, salt: x.salt, nullifier: x.nullifier, membership }), keys: [
-        meta(payer.publicKey, true, false), meta(CONFIG), meta(TREASURY, false, true), meta(cert, false, true), meta(tree), meta(PID)] });
+      const ix = ixOf('revoke_spent', { index: x.index, salt: x.salt, nullifier: x.nullifier, membership }, { ...common(), caller: payer.publicKey, certificate: cert, tree });
       return send([ix], 'revoke_spent');
+    },
+    async anchorLog(size, root) {
+      const msg = sthBytes(fromB58(o.programId), size, root);
+      const ix = ixOf('anchor_log', { size: BigInt(size), head: root }, { ...common(), caller: payer.publicKey });
+      return send([edIx(msg, o.verifier.sign(msg)), ix], 'anchor_log');
     },
     async relayerBalance() { return BigInt(await conn.getBalance(payer.publicKey)); },
     async incoming(sinceSlot, reference) {
@@ -228,9 +240,7 @@ export async function makeProgramChain(o: { web3: any; rpcUrl: string; programId
     const c = decodeAccount('Certificate', a.data);
     const msg = v2 ? revokeBytesV2(fromB58(o.programId), cert.toBytes(), subjectHash, asset, c.nullset_hash, c.issued_slot, validUntil ?? 0n)
                    : revokeBytes(fromB58(o.programId), cert.toBytes(), subjectHash, asset, c.nullset_hash, c.issued_slot);
-    const named: Record<string, any> = { caller: meta(payer.publicKey, true, false), payer: meta(payer.publicKey, true, true), config: meta(CONFIG), treasury: meta(TREASURY, false, true), certificate: meta(cert, false, true), instructions: meta(SYSVAR_INSTRUCTIONS_PUBKEY), system_program: meta(SystemProgram.programId) };
-    const keys = rs.accounts.map((x: any) => { const k = named[x.name]; if (!k) throw new PofError('PROGRAM_NOT_READY', `revoke_signed wants an account ${x.name} the relayer does not know`, 503); return { ...k, isWritable: !!x.writable, isSigner: !!x.signer }; });
-    const ix = new TransactionInstruction({ programId: PID, data: ixData('revoke_signed', v2 ? { valid_until: validUntil ?? 0n } : {}), keys });
+    const ix = ixOf('revoke_signed', v2 ? { valid_until: validUntil ?? 0n } : {}, { ...common(), caller: payer.publicKey, payer: payer.publicKey, certificate: cert });
     const ed = Ed25519Program.createInstructionWithPublicKey({ publicKey: new PublicKey(c.controller).toBuffer(), message: Buffer.from(msg), signature: Buffer.from(signature) });
     return send([ed, ix], 'revoke_signed');
   };

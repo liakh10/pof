@@ -414,3 +414,18 @@ test('log: internal callers skip the public bucket with the secret header (const
   assert.equal(r.treeSize, 40); assert.deepEqual(r.entries.map(e => e.index), Array.from({ length: 40 }, (_, i) => i));
   V.setContext(null);
 });
+
+test('the program client builds every instruction it sends from the vendored launch IDL (accounts by name, no gap)', async () => {
+  const web3 = await import('@solana/web3.js');
+  const relayer = V.signerFromSeed(new Uint8Array(32).fill(3)), verifier = V.signerFromSeed(new Uint8Array(32).fill(4));
+  const chain = await V.makeProgramChain({ web3, rpcUrl: 'http://127.0.0.1:1', programId: V.PROGRAM_ID, relayer, verifier, rings: null });
+  for (const m of ['certify', 'revokeSpent', 'anchorLog', 'revokeSigned', 'certificate', 'zkLocked', 'maxAttestAge', 'incoming', 'quoteLamports']) assert.equal(typeof chain[m], 'function', m);
+  assert.equal(chain.revokeVersion, 2);
+  const idl = JSON.parse((await import('node:fs')).readFileSync(new URL('../idl/pof.json', import.meta.url), 'utf8'));
+  for (const n of ['certify', 'revoke_spent', 'anchor_log', 'revoke_signed', 'open_path', 'stage_path', 'revoke_spent_staged', 'close_path']) {
+    const ix = idl.instructions.find(i => i.name === n);
+    assert.ok(ix, n);
+    const known = new Set(['payer', 'caller', 'revoker', 'config', 'treasury', 'certificate', 'prior_payer', 'holder_token', 'instructions', 'system_program', 'tree', 'nullifier_account', 'buffer']);
+    for (const a of ix.accounts) assert.ok(known.has(a.name) || a.address, `${n}: the client does not know the account ${a.name}`);
+  }
+});
