@@ -163,7 +163,7 @@ No finding lets anyone mint a certificate without real, unspent funds in a Priva
 | W-04 | Info | Gossip trusts the key a peer document names, and the monitor reads the whole log to index nonces | `witness/witness.js` `gossip`, `monitor` | open |
 | LW-01 | Info | When phase 2 ships, `wind-down.mjs` must close `ZkConfig` and every `["znote", tag]` lock before it closes the program | `program/wind-down.mjs` | **fixed** `cd51f22` (`close_zk`; the wind-down releases note locks and closes staged paths) |
 | ZK-11 | Medium (zk build only) | Anyone can append to the owner registry for a transaction fee, and a proof must use one of its last 12 roots: a few registrations a minute make every honest proof stale | `zk.rs` `handle_register_zk_owner`, `REG_ROOTS = 12` | **fixed** `a3b15d1` (one paid `["zkowner", owner]` record per owner: rent plus the certify fee; root history 20). Rolling 20 roots inside one proving window now costs about 0.23 SOL at launch fees; filling the tree, thousands of SOL |
-| RK-01 | Info | A revoked-key entry is reused after `VALIDITY_MAX` even when that key is still the verifier or the proposed one | `lib.rs` `revoke_verifier_key` | **still open, and a regression** after `a3b15d1`: `revoked_entry_for` refuses when the key being **added** is the active one, not when the key being **evicted** is still `verifier` or `next_verifier`; see §4e |
+| RK-01 | Info | A revoked-key entry is reused after `VALIDITY_MAX` even when that key is still the verifier or the proposed one | `lib.rs` `revoke_verifier_key` | **fixed** `73bcf04`: with a full list, only an entry older than `VALIDITY_MAX` whose key is neither `verifier` nor `next_verifier` is reused (the active key is always one of them), and revoking the active key is never refused for being active; unit-tested both ways. Residual (Info): when all 8 entries are younger than `VALIDITY_MAX`, a ninth revoke of any key is refused (`BadParams`), and the fallback is `set_paused` plus rotation. Document it |
 
 ### POF-01 · Medium · Spend-revocation is custodial in practice
 `revoke_spent` is permissionless on chain, but it needs a note's secret `salt` and its `nullifier`. Only two parties hold them:
@@ -633,6 +633,7 @@ The programs' own suites were not re-run by this reviewer; the program report st
   - That leaves the original problem unchanged: a reused entry still drops the protection of the *evicted* key, even if it is still `verifier` or `next_verifier`.
   - It also adds a regression: with all 8 entries full, the admin **cannot revoke the active key at all** (`BadParams`), which is the leaked-key emergency the instruction exists for.
   - **Fix:** choose an entry `i` whose key `revoked_keys[i]` is neither `active_verifier(slot)`, `verifier` nor `next_verifier`, and is older than `VALIDITY_MAX`. Never refuse to revoke the active key. Unit-test both cases.
+- **RK-01 re-check of `73bcf04`: fixed.** `revoked_entry_for(slot)` takes a free entry first. With a full list it reuses only an entry older than `VALIDITY_MAX` whose key is neither `verifier` nor `next_verifier`; `active_verifier` is always one of those two, so an evicted key can never be the one signing. Revoking the active key is no longer refused for being active. The unit tests cover both cases. FZ-19 (`close_owner_record`, wind-down only, rent to the recorded payer) is also fine.
 
 ## 5. What held up
 These were checked specifically and found sound at the reviewed commits:
@@ -670,6 +671,7 @@ Off the launch build: ZK-08 (accepted), ZK-11, and the development ceremony.
 
 ## 7. Changes
 - 2026-11-25 · audit · round 1: 25 findings, 9 failing proof tests (`cf763b5`). High findings posted on `_x/pof/BOARD.md` and sent to the lead.
+- 2026-11-25 · audit · re-check of `73bcf04`: RK-01 fixed (FZ-19 fine). Every round 1 to 5 finding on the launch build is now closed or listed in §6.
 - 2026-11-25 · audit · re-check of `a3b15d1`: ZK-11 and FZ-18 fixed; RK-01 still open and inverted (the active key cannot be revoked when the list is full).
 - 2026-11-25 · audit · POF-14 closed: firewall config version 2 re-read (heavy rule widened to `/api/mcp` and `/link`; `/api/bots` at 120 a minute). The docs fix from 4 to 8 revoked keys landed in `10bea31`.
 - 2026-11-25 · audit · round 5 addendum: edge firewall rules verified from the active config (POF-14 mostly fixed; `/api/mcp`, `/api/bots/*`, `/link` uncovered); trust.md admin-power wording checked (says 4 keys, the program keeps 8).
