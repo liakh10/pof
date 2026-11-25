@@ -36,8 +36,12 @@ use anchor_lang::system_program;
 
 pub mod errors;
 pub mod ext;
+/// Phase 2 (certify_zk), compiled only with the `zk` feature: the launch build leaves it out; it ships as an upgrade after the
+/// public ceremony.
+#[cfg(feature = "zk")]
 pub mod zk;
 
+#[cfg(feature = "zk")]
 pub use zk::*;
 
 use errors::PofError;
@@ -547,7 +551,10 @@ fn revoke_with_pair(c: &Config, t: &mut Treasury, cert: &mut Certificate, index:
     require!(cert.status == STATUS_LIVE, PofError::NotLive);
     require!(index < cert.note_count, PofError::BadIndex);
     // a zk certificate stores Poseidon(TAG_DOMAIN, nullifier) per note (no salt); a Verifier one the salted sha256
+    #[cfg(feature = "zk")]
     let h = if cert.verifier == zk::ZK_CONFIG { zk::tag_of(&nullifier)? } else { ext::salted_nullifier(&salt, &nullifier) };
+    #[cfg(not(feature = "zk"))]
+    let h = ext::salted_nullifier(&salt, &nullifier);
     require!(h == cert.null_hashes[index as usize], PofError::NullifierMismatch);
     revoke(c, t, cert, STATUS_REVOKED_SPENT, slot);
     cert.revealed_index = index;
@@ -560,8 +567,12 @@ fn revoke_with_pair(c: &Config, t: &mut Treasury, cert: &mut Certificate, index:
 // ------------------------------------------------------------------------------------------------------------
 // instructions
 
-#[program]
-pub mod pof {
+/// The program module, once with phase 2 (feature `zk`) and once without: Anchor's #[program] does not see a #[cfg] on one
+/// instruction, so the feature picks which expansion exists.
+macro_rules! pof_program {
+    ($($zk:item)*) => {
+        #[program]
+        pub mod pof {
     use super::*;
 
     /// Only the program's upgrade authority, who becomes the admin and pays the config and treasury rent. The Verifier and the
@@ -773,26 +784,6 @@ pub mod pof {
         Ok(())
     }
 
-    /// Phase 2: certify from a Groth16 proof of funds (pof/zk) instead of the Verifier's signature. See zk.rs.
-    pub fn certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkArgs) -> Result<()> {
-        zk::handle_certify_zk(ctx, args)
-    }
-
-    /// Admin: turn certify_zk on or off and set the revocation (escrow) key; records the build's verifying key hash.
-    pub fn set_zk(ctx: Context<SetZk>, enabled: bool, escrow: [[u8; 32]; 2]) -> Result<()> {
-        zk::handle_set_zk(ctx, enabled, escrow)
-    }
-
-    /// The ring owner registers its zk owner commitment (the consent certify_zk proves).
-    pub fn register_zk_owner(ctx: Context<RegisterZkOwner>, commitment: [u8; 32]) -> Result<()> {
-        zk::handle_register_zk_owner(ctx, commitment)
-    }
-
-    /// Anyone: close a note lock whose certificate is no longer live.
-    pub fn release_note_lock(ctx: Context<ReleaseNoteLock>) -> Result<()> {
-        zk::handle_release_note_lock(ctx)
-    }
-
     /// A fresh attestation on the same notes (same salted hashes), subject, asset and controller: new root, slots and tier.
     pub fn renew(ctx: Context<Renew>, att: Attestation) -> Result<()> {
         let slot = Clock::get()?.slot;
@@ -809,6 +800,7 @@ pub mod pof {
         require!(cert.status == STATUS_LIVE, PofError::NotLive);
         require!(slot <= cert.expiry_slot, PofError::CertificateExpired);
         // a zk certificate carries tags, not the Verifier's salted hashes: it is remade by certify_zk, never renewed
+        #[cfg(feature = "zk")]
         require_keys_neq!(cert.verifier, zk::ZK_CONFIG, PofError::RenewMismatch);
         let n = att.null_hashes.len();
         require!(
@@ -1031,20 +1023,50 @@ pub mod pof {
         Ok(())
     }
 
-    /// Wind-down only (audit LW-01): the ZkConfig ["zk"] and the owner registry ["zkreg"] close, their rent to the admin. Run
-    /// after every certificate expired and every note lock was released, before close_config.
-    pub fn close_zk(ctx: Context<CloseZk>) -> Result<()> {
-        require!(ctx.accounts.config.closing, PofError::NotClosing);
-        Ok(())
-    }
-
     /// The last step of the wind-down: no certificate account left. The treasury (fees and rent) and the config close to the admin.
     pub fn close_config(ctx: Context<CloseConfig>) -> Result<()> {
         require!(ctx.accounts.config.closing, PofError::NotClosing);
         require!(ctx.accounts.treasury.open == 0 && ctx.accounts.treasury.paths == 0, PofError::NotExpired);
         Ok(())
     }
+
+            $($zk)*
+        }
+    };
 }
+
+#[cfg(feature = "zk")]
+pof_program! {
+    /// Phase 2: certify from a Groth16 proof of funds (pof/zk) instead of the Verifier's signature. See zk.rs.
+    pub fn certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkArgs) -> Result<()> {
+        zk::handle_certify_zk(ctx, args)
+    }
+
+    /// Admin: turn certify_zk on or off and set the revocation (escrow) key; records the build's verifying key hash.
+    pub fn set_zk(ctx: Context<SetZk>, enabled: bool, escrow: [[u8; 32]; 2]) -> Result<()> {
+        zk::handle_set_zk(ctx, enabled, escrow)
+    }
+
+    /// The ring owner registers its zk owner commitment (the consent certify_zk proves).
+    pub fn register_zk_owner(ctx: Context<RegisterZkOwner>, commitment: [u8; 32]) -> Result<()> {
+        zk::handle_register_zk_owner(ctx, commitment)
+    }
+
+    /// Anyone: close a note lock whose certificate is no longer live.
+    pub fn release_note_lock(ctx: Context<ReleaseNoteLock>) -> Result<()> {
+        zk::handle_release_note_lock(ctx)
+    }
+
+    /// Wind-down only (audit LW-01): the ZkConfig ["zk"] and the owner registry ["zkreg"] close, their rent to the admin. Run
+    /// after every certificate expired and every note lock was released, before close_config.
+    pub fn close_zk(ctx: Context<CloseZk>) -> Result<()> {
+        require!(ctx.accounts.config.closing, PofError::NotClosing);
+        Ok(())
+    }
+}
+
+#[cfg(not(feature = "zk"))]
+pof_program! {}
 
 // ------------------------------------------------------------------------------------------------------------
 // account lists
@@ -1274,6 +1296,7 @@ pub struct WithdrawFees<'info> {
     pub dev: UncheckedAccount<'info>,
 }
 
+#[cfg(feature = "zk")]
 #[derive(Accounts)]
 pub struct CloseZk<'info> {
     #[account(mut)]

@@ -12,6 +12,7 @@ name = "pof_gate"
 [features]
 default = []
 quick = ["pof/quick"]
+zk = ["pof/zk"]
 cpi = ["no-entrypoint"]
 no-entrypoint = []
 no-log-ix-name = []

@@ -40,6 +40,7 @@ const SPENT = spentFile.spent.map(h => Buffer.from(h, 'hex'));
 const FAKES = spentFile.fakes.map(f => Buffer.from(f.nf, 'hex'));
 const MF = JSON.parse(fs.readFileSync(path.join(path.dirname(run), 'fixtures/membership.json'), 'utf8'));
 const TREE = q.K.TREE;
+const IDL_HAS_ZK = JSON.parse(fs.readFileSync(path.resolve(run, '../../idl/pof.json'), 'utf8')).instructions.some(x => /zk/.test(x.name));
 
 const params = { fee_lamports: FEE, holder_min: 1_000_000n * 1_000_000n, validity_slots: 3000n, max_attest_age: 150n, max_root_lag: 9000n, rotation_delay: 40n };
 const setP = (over = {}, s = admin) => send([q.P.ix('set_params', { params: { ...params, ...over } }, { admin: s.publicKey })], [s], 100_000);
@@ -680,22 +681,12 @@ await check('revoke_verifier_key (fuzz): the admin revokes the old key at once; 
   await send([q.P.ix('require_certificate', { subject_hash: a2.subject_hash, asset: 0, min_tier: 1 }, { certificate: q.certPda(a2.subject_hash, 0) })], [outsider], 100_000);
 });
 
-await check('phase 2 (certify_zk) is off by default: no ZkConfig, certify_zk refused; set_zk is the admin\'s, needs a Baby Jubjub key, and turning it on waits the rotation delay', async () => {
-  const zkAddr = q.pda([Buffer.from('zk')]), regAddr = q.pda([Buffer.from('zkreg')]);
-  ok(!(await k.exists(zkAddr)), 'no ZkConfig at launch');
-  const u = Keypair.generate(); await fund([u], 2);
-  const args = { subject_kind: 0, asset: 0, tier: 1, nonce: rand(16), proof: Buffer.alloc(256), state_root: rand(32), null_root: rand(32), registry_root: rand(32), eph: [Buffer.alloc(32), Buffer.alloc(32)], tags: [field()], cts: [field()] };
-  const czk = () => send([q.P.ix('certify_zk', { args }, { payer: u.publicKey, controller: u.publicKey, zk: zkAddr, registry: regAddr, certificate: q.certPda(subjectHash(0, u.publicKey.toBase58()), 0), holder_token: u.publicKey, tree: TREE })], [u], 600_000);
-  await refuses(czk());   // the ZkConfig does not exist: nothing to certify against
-  const B8 = [Buffer.from('0bb77a6ad63e739b4eacb2e09d6277c12ab8d8010534e0b62893f3f6bb957051', 'hex'), Buffer.from('25797203f7a0b24925572e1cd16bf9edfce0051fb9e133774b3c257a872d7d8b', 'hex')];
-  const sz = (s2, en, key) => send([q.P.ix('set_zk', { enabled: en, escrow: key }, { admin: s2.publicKey, zk: zkAddr, registry: regAddr })], [s2], 400_000);
-  await refuses(sz(outsider, true, B8), 'admin');
-  await refuses(sz(admin, false, [B8[0], rand(32)]), 'baby jubjub');
-  await sz(admin, true, B8);
-  unit('set_zk');
-  const z = await k.decode('ZkConfig', zkAddr);
-  ok(!z.enabled && z.next_enabled && z.next_slot > 0n, 'on only after the rotation delay');
-  await refuses(czk(), 'turned off');
+await check('the launch build has no phase 2: no certify_zk or set_zk in its IDL, no ZkConfig on chain, an instruction with set_zk\'s discriminator is refused (zk ships as an upgrade after the ceremony; test/zk.sh runs the zk build)', async () => {
+  ok(!IDL_HAS_ZK, 'the launch IDL carries no zk instruction');
+  ok(!(await k.exists(q.pda([Buffer.from('zk')]))), 'no ZkConfig');
+  const zkIdl = JSON.parse(fs.readFileSync(path.resolve(run, '../../idl/pof-zk.json'), 'utf8'));
+  const disc = Buffer.from(zkIdl.instructions.find(x => x.name === 'set_zk').discriminator);
+  await refuses(send([new web3.TransactionInstruction({ programId: q.PID, data: Buffer.concat([disc, Buffer.alloc(65)]), keys: [{ pubkey: admin.publicKey, isSigner: true, isWritable: true }] })], [admin], 100_000), 'fallback');
 });
 
 /* ------------------------------------------------------------------ counters */

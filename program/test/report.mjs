@@ -64,9 +64,10 @@ ${runs.map(r => '  - ' + r).join('\n') || '  - (no run recorded)'}
 | wind-down on the suite's live state | ${(runs[runs.length - 1] || '').match(/closing=(\S+)/)?.[1] || '?'} |
 | launch rehearsal (base58 dev key, both programs deployed through sol-ops, $ROOT on cloned pump.fun, day one, wind-down) | ${read('rehearse.txt').trim() || '?'} |
 | own-CA launch (the owner creates the coin while launch.mjs waits) | ${read('own-ca.txt').trim() || '?'} |
-| phase 2 merged: certify_zk through zk's own on-chain suite, real Groth16 proofs from the development setup, on this program's quick build | ${(() => { try { const j = JSON.parse(read('zk-last-run.json')); return `${j.pass}/${j.pass + j.fail}`; } catch { return '?'; } })()} |
+| phase 2 Rust unit tests (the \`zk\` feature: Baby Jubjub points, the empty registry root, the ZkConfig address, plus all of the above) | ${read('result-unit-zk.txt').trim() || '?'} |
+| phase 2 (the \`zk\` build, NOT in the launch binary): certify_zk through zk's own on-chain suite, real Groth16 proofs from the development setup | ${(() => { try { const j = JSON.parse(read('zk-last-run.json')); return `${j.pass}/${j.pass + j.fail}`; } catch { return '?'; } })()} |
 
-The rehearsal's launch from nothing cost the dev ${(Number(read('rh-launch-cost.txt') || 0) / 1e9).toFixed(4)} SOL on the local chain, at local rent and with no priority fees. Of that, 3.58 SOL is the programs' rent, which comes back at the close.
+The rehearsal's launch from nothing cost the dev ${(Number(read('rh-launch-cost.txt') || 0) / 1e9).toFixed(4)} SOL on the local chain, at local rent and with no priority fees. Of that, 3.97 SOL is the programs' rent, which comes back at the close.
 
 ### The suite, check by check
 ${list(suite)}
@@ -125,6 +126,16 @@ ${Object.entries(cu).map(([n, v]) => `| ${n} | ${v.max.toLocaleString('en-US')} 
 | program | .so bytes | rent on mainnet (ProgramData + program account) |
 | --- | ---: | ---: |
 ${sizes.map(([n, b]) => `| ${n} | ${b ? b.toLocaleString('en-US') : '?'} | ${b ? rent(b).toFixed(4) + ' SOL' : '?'} |`).join('\n')}
+
+## Phase 2 (certify_zk)
+- Merged from \`pof/zk\`, but behind the cargo feature \`zk\`, so the launch binary has none of it: no \`certify_zk\`, no \`set_zk\`,
+  no zk accounts. It ships as a program upgrade after the public ceremony.
+- The suite checks the launch build itself: no zk instruction in its IDL, no ZkConfig on chain, and an instruction carrying
+  \`set_zk\`'s discriminator is refused.
+- \`zsh test/zk.sh\` runs zk's own on-chain suite against this program built with the feature (IDL \`idl/pof-zk.json\`).
+  - \`certify_zk\` takes about 241,000 CU for one note and about 298,000 for four.
+  - **The 4-note transaction is 1,230 bytes**, 2 bytes under the 1,232-byte limit. The plan: at most 3 notes per proof in the client,
+    or 4 only through a lookup table, which removes about 400 bytes of account keys.
 
 ## What these tests do not cover
 - **No real spend on the clone.** A spend needs a Groth16 proof from the Helius prover, which cannot serve a local validator.

@@ -202,7 +202,9 @@ path and falls back to path (b) when the PDA is gone; one note backs one live ce
   subject_kind, tier, expiry_slot, controller }` (return data) or fails (NotLive, CertificateExpired, TierTooLow,
   AssetMismatch, BadCertificate, KeyRevoked). Rust consumers can read without CPI: `pof::read_certificate` + `pof::gate(cert,
   config, asset, min_tier, slot)` (crate feature `cpi`). `pof_gate` `join` and `evict` take `pof_config` too.
-- Phase 2 (merged from pof/zk, OFF until the admin runs `set_zk(true, key)` and the rotation delay passes; see docs-src/zk.md):
+- Phase 2 (merged from pof/zk behind the cargo feature `zk`: NOT in the launch binary or `program/idl/pof.json`; the zk build's IDL
+  is `program/idl/pof-zk.json`; it ships as an upgrade after the public ceremony, then stays OFF until `set_zk(true, key)` and the
+  rotation delay; see docs-src/zk.md):
   `ZkConfig` PDA `["zk"]` (`6q7PxLzgUtLHMfCDDHzkU4Ho54rC6b21VZmSFsD6Tsv1`), `ZkRegistry` `["zkreg"]` (the owner registry),
   `NoteLock` `["znote", tag]` (one note behind one live zk certificate). A zk certificate is an ordinary `Certificate` with
   `verifier` = the ZkConfig address, `null_hashes` = the per-note tags `Poseidon("pof:zk:tag:v1", nullifier)` (revoke_spent
