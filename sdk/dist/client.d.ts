@@ -107,10 +107,24 @@ export declare class PofClient {
         rpcCalls: number;
     }>;
     /**
-     * Whether this deployment runs the zk path: the zk config PDA exists under the pof program. The launch build has no zk
-     * instructions; zk certificates (and the "settling" state) only appear where this is true. The zk build's IDL is
-     * exported as POF_ZK_IDL when the repository carries one.
+     * The zk path's ZkConfig (zk build only), decoded with the zk build's IDL, or null when the account does not exist
+     * (the launch build) or the SDK ships without the zk IDL. `active` is what is in force at `slot`: a change waits for
+     * `nextSlot` (turning zk on waits the rotation delay; turning it off is immediate), as ZkConfig::active does on chain.
      */
+    getZkConfig(): Promise<{
+        slot: number;
+        enabled: boolean;
+        nextEnabled: boolean;
+        nextSlot: number;
+        escrowEpoch: number;
+        vkHash: string;
+        certified: number;
+        active: {
+            enabled: boolean;
+            escrowEpoch: number;
+        };
+    } | null>;
+    /** Whether zk certificates can be issued now: the ZkConfig exists, decodes, and is enabled at this slot (past any delay). */
     zkEnabled(): Promise<boolean>;
     /** The Treasury's public counters, and the transparency log head anchored on chain. */
     getTreasury(): Promise<(Treasury & {

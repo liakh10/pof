@@ -472,6 +472,72 @@ export const POF_ZK_IDL = {
             "args": []
         },
         {
+            "name": "close_owner_record",
+            "docs": [
+                "Wind-down only (fuzz FZ-19): an owner record closes, its rent back to its payer. Anyone."
+            ],
+            "discriminator": [
+                225,
+                155,
+                98,
+                216,
+                132,
+                47,
+                212,
+                235
+            ],
+            "accounts": [
+                {
+                    "name": "config",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    99,
+                                    111,
+                                    110,
+                                    102,
+                                    105,
+                                    103
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "owner_record",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    122,
+                                    107,
+                                    111,
+                                    119,
+                                    110,
+                                    101,
+                                    114
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "owner_record.owner",
+                                "account": "ZkOwner"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "payer",
+                    "writable": true
+                }
+            ],
+            "args": []
+        },
+        {
             "name": "close_path",
             "docs": [
                 "The revoker drops its staged buffer (rent back); during the wind-down anyone may."
@@ -912,6 +978,53 @@ export const POF_ZK_IDL = {
                     "signer": true
                 },
                 {
+                    "name": "payer",
+                    "docs": [
+                        "Pays the owner record's rent and the fee (the owner or a sponsor)."
+                    ],
+                    "writable": true,
+                    "signer": true
+                },
+                {
+                    "name": "config",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    99,
+                                    111,
+                                    110,
+                                    102,
+                                    105,
+                                    103
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "treasury",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
                     "name": "registry",
                     "writable": true,
                     "pda": {
@@ -928,6 +1041,34 @@ export const POF_ZK_IDL = {
                             }
                         ]
                     }
+                },
+                {
+                    "name": "owner_record",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    122,
+                                    107,
+                                    111,
+                                    119,
+                                    110,
+                                    101,
+                                    114
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "owner"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "system_program",
+                    "address": "11111111111111111111111111111111"
                 }
             ],
             "args": [
@@ -958,6 +1099,24 @@ export const POF_ZK_IDL = {
                 199
             ],
             "accounts": [
+                {
+                    "name": "config",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    99,
+                                    111,
+                                    110,
+                                    102,
+                                    105,
+                                    103
+                                ]
+                            }
+                        ]
+                    }
+                },
                 {
                     "name": "lock",
                     "writable": true,
@@ -2253,6 +2412,19 @@ export const POF_ZK_IDL = {
             ]
         },
         {
+            "name": "ZkOwner",
+            "discriminator": [
+                53,
+                206,
+                78,
+                0,
+                124,
+                164,
+                161,
+                109
+            ]
+        },
+        {
             "name": "ZkRegistry",
             "discriminator": [
                 179,
@@ -3542,6 +3714,14 @@ export const POF_ZK_IDL = {
                     {
                         "name": "bump",
                         "type": "u8"
+                    },
+                    {
+                        "name": "spent",
+                        "docs": [
+                            "Set by revoke_spent (audit FZ-18): this note is spent, so the lock is never released (except in the wind-down) and no",
+                            "certify_zk may use its tag again."
+                        ],
+                        "type": "bool"
                     }
                 ]
             }
@@ -4302,6 +4482,50 @@ export const POF_ZK_IDL = {
             }
         },
         {
+            "name": "ZkOwner",
+            "docs": [
+                "One registration per ring owner (audit ZK-11): [\"zkowner\", owner], paid by whoever submits (rent plus the certify fee to",
+                "the treasury), so registrations that roll the root history cost real SOL each and nobody registers twice."
+            ],
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "owner",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "payer",
+                        "docs": [
+                            "Paid the rent (gets it back at close_owner_record in the wind-down)."
+                        ],
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "index",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "commitment",
+                        "type": {
+                            "array": [
+                                "u8",
+                                32
+                            ]
+                        }
+                    },
+                    {
+                        "name": "slot",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "bump",
+                        "type": "u8"
+                    }
+                ]
+            }
+        },
+        {
             "name": "ZkOwnerRegistered",
             "type": {
                 "kind": "struct",
@@ -4372,7 +4596,7 @@ export const POF_ZK_IDL = {
                                         32
                                     ]
                                 },
-                                12
+                                20
                             ]
                         }
                     },

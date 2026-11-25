@@ -1,6 +1,8 @@
 /** PofClient: everything a reader needs, straight from chain. */
 import { Rpc, memcmp } from "./rpc.js";
 import { toHex, fromHex } from "./bytes.js";
+import { POF_ZK_IDL } from "./idl/index.js";
+import { decodeAccount } from "./borsh.js";
 import { toAddress, toAddressBytes } from "./base58.js";
 import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, ASSETS, tierMinimum, parseAsset, ZK_CONFIG, assertPinned } from "./constants.js";
 import { parseSubjectQuery, subjectHash } from "./subject.js";
@@ -199,13 +201,43 @@ export class PofClient {
         return { active, current: active, next: c?.nextVerifier ?? null, all: [...keys], revoked: [...revoked], fromHistory, rpcCalls: calls };
     }
     /**
-     * Whether this deployment runs the zk path: the zk config PDA exists under the pof program. The launch build has no zk
-     * instructions; zk certificates (and the "settling" state) only appear where this is true. The zk build's IDL is
-     * exported as POF_ZK_IDL when the repository carries one.
+     * The zk path's ZkConfig (zk build only), decoded with the zk build's IDL, or null when the account does not exist
+     * (the launch build) or the SDK ships without the zk IDL. `active` is what is in force at `slot`: a change waits for
+     * `nextSlot` (turning zk on waits the rotation delay; turning it off is immediate), as ZkConfig::active does on chain.
      */
+    async getZkConfig() {
+        const idl = POF_ZK_IDL;
+        if (!idl)
+            return null;
+        const { slot, accounts: [acc] } = await this.accountsAt([ZK_CONFIG]);
+        if (!acc || acc.owner !== this.programId)
+            return null;
+        let r;
+        try {
+            r = decodeAccount(idl, "ZkConfig", acc.data);
+        }
+        catch {
+            return null; // not a ZkConfig: never read as enabled
+        }
+        const nextSlot = Number(r.next_slot ?? 0);
+        const escrowEpoch = Number(r.escrow_epoch ?? 0);
+        const switched = nextSlot !== 0 && slot >= nextSlot;
+        const sameKey = toHex(Uint8Array.from((r.next_escrow ?? []).flatMap((x) => [...x]))) === toHex(Uint8Array.from((r.escrow ?? []).flatMap((x) => [...x])));
+        return {
+            slot,
+            enabled: !!r.enabled,
+            nextEnabled: !!r.next_enabled,
+            nextSlot,
+            escrowEpoch,
+            vkHash: toHex(r.vk_hash),
+            certified: Number(r.certified ?? 0),
+            active: switched ? { enabled: !!r.next_enabled, escrowEpoch: sameKey ? escrowEpoch : escrowEpoch + 1 } : { enabled: !!r.enabled, escrowEpoch },
+        };
+    }
+    /** Whether zk certificates can be issued now: the ZkConfig exists, decodes, and is enabled at this slot (past any delay). */
     async zkEnabled() {
-        const acc = await this.rpc.getAccount(ZK_CONFIG);
-        return !!acc && acc.owner === this.programId;
+        const z = await this.getZkConfig();
+        return !!z?.active.enabled;
     }
     /** The Treasury's public counters, and the transparency log head anchored on chain. */
     async getTreasury() {

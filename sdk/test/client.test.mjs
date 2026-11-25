@@ -233,14 +233,30 @@ test("status 4 voided, a certificate signed by a revoked verifier key, and a zk 
   assert.ok(e.keys.some((k) => k.pubkey === cfg));
 });
 
-test("zk support is optional: zkEnabled reads the zk config PDA; without zk, a certificate ahead of its issue slot is not 'settling'", async () => {
+test("zk support is optional: zkEnabled decodes ZkConfig and follows its activation delay; settling only for zk certificates", async () => {
   const { client, rpc } = await world();
-  assert.equal(await client.zkEnabled(), false);
-  rpc.put(sdk.ZK_CONFIG, sdk.POF_PROGRAM_ID, new Uint8Array(64));
-  assert.equal(await client.zkEnabled(), true);
-  assert.equal(sdk.effectiveStatus({ status: 0, expirySlot: 9000, issuedSlot: 6000, verifier: Keypair.generate().publicKey.toBase58() }, 5000), "live");
-  assert.equal(sdk.effectiveStatus({ status: 0, expirySlot: 9000, issuedSlot: 6000, verifier: sdk.ZK_CONFIG }, 5000), "settling");
-  assert.ok(sdk.POF_ZK_IDL === null || typeof sdk.POF_ZK_IDL === "object");
+  assert.equal(await client.zkEnabled(), false, "no ZkConfig (the launch build)");
+  assert.ok(sdk.POF_ZK_IDL, "the zk build's IDL ships with the SDK");
+  const put = (v) => rpc.put(sdk.ZK_CONFIG, sdk.POF_PROGRAM_ID, sdk.encodeAccountPartial(sdk.POF_ZK_IDL, "ZkConfig", v));
+  rpc.put(sdk.ZK_CONFIG, sdk.POF_PROGRAM_ID, new Uint8Array(200));
+  assert.equal(await client.zkEnabled(), false, "an account that is not a ZkConfig is never read as enabled");
+  put({ enabled: false });
+  assert.equal(await client.zkEnabled(), false, "exists but disabled");
+  put({ enabled: false, next_enabled: true, next_slot: 6000 });
+  assert.equal(await client.zkEnabled(), false, "turning on waits the rotation delay");
+  rpc.slot = 6000;
+  assert.equal(await client.zkEnabled(), true, "and takes over at next_slot by itself");
+  put({ enabled: true, escrow_epoch: 3, next_enabled: false, next_slot: 5500 });
+  assert.equal(await client.zkEnabled(), false, "turned off");
+  put({ enabled: true, escrow_epoch: 3, vk_hash: new Uint8Array(32).fill(9), certified: 12 });
+  const z = await client.getZkConfig();
+  assert.deepEqual({ ...z.active }, { enabled: true, escrowEpoch: 3 });
+  assert.equal(z.vkHash, "09".repeat(32));
+  assert.equal(z.certified, 12);
+  rpc.put(sdk.ZK_CONFIG, Keypair.generate().publicKey.toBase58(), sdk.encodeAccountPartial(sdk.POF_ZK_IDL, "ZkConfig", { enabled: true }));
+  assert.equal(await client.zkEnabled(), false, "owned by another program");
+  assert.equal(sdk.effectiveStatus({ status: 0, expirySlot: 9000, issuedSlot: 7000, verifier: Keypair.generate().publicKey.toBase58() }, 6000), "live");
+  assert.equal(sdk.effectiveStatus({ status: 0, expirySlot: 9000, issuedSlot: 7000, verifier: sdk.ZK_CONFIG }, 6000), "settling");
 });
 
 test("FZ-17: the program id is pinned to POF by default; another deployment needs an explicit allowOtherDeployment", async () => {

@@ -28,7 +28,7 @@ Verifier's transparency log, and builds the accounts for gating your own program
 The package is not on npm. Install the release tarball from the repository:
 
 ```sh
-npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.1.tgz
+npm install https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.2.tgz
 ```
 
 ## Check a subject in three lines
@@ -73,6 +73,13 @@ const stats = await pof.stats(); // live, revokedSpent, revokedByHolder, expired
 
 `effectiveStatus` follows the program's own rule: live means the status byte is live and `slot <= expiry_slot`. A live
 byte past its expiry reads `expired` before anyone calls `expire`.
+
+## The zk path (optional)
+
+The launch build has no zk instructions; the SDK decodes with the launch IDL. The zk build's IDL ships as `POF_ZK_IDL`.
+`await pof.getZkConfig()` decodes the zk config account (null when it does not exist), and `await pof.zkEnabled()` is true
+only when it is enabled at the current slot, past its activation delay. zk certificates read `settling` until their settle
+slot.
 
 ## Subject hashes (CONTRACT §1)
 

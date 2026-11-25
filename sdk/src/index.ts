@@ -15,4 +15,4 @@ export { sha256, toHex, fromHex, ed25519Verify } from "./bytes.js";
 export { decodeAccount, encodeAccount, encodeAccountPartial, encodeInstruction, fieldOffset, zeroValue } from "./borsh.js";
 export type { Idl } from "./borsh.js";
 export { POF_IDL, POF_GATE_IDL, POF_IDL_IS_DRAFT, POF_GATE_IDL_IS_DRAFT, POF_ZK_IDL } from "./idl/index.js";
-export const SDK_VERSION = "0.3.1";
+export const SDK_VERSION = "0.3.2";

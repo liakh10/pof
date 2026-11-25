@@ -232,6 +232,36 @@ export declare const POF_ZK_IDL: {
         }];
         readonly args: readonly [];
     }, {
+        readonly name: "close_owner_record";
+        readonly docs: readonly ["Wind-down only (fuzz FZ-19): an owner record closes, its rent back to its payer. Anyone."];
+        readonly discriminator: readonly [225, 155, 98, 216, 132, 47, 212, 235];
+        readonly accounts: readonly [{
+            readonly name: "config";
+            readonly pda: {
+                readonly seeds: readonly [{
+                    readonly kind: "const";
+                    readonly value: readonly [99, 111, 110, 102, 105, 103];
+                }];
+            };
+        }, {
+            readonly name: "owner_record";
+            readonly writable: true;
+            readonly pda: {
+                readonly seeds: readonly [{
+                    readonly kind: "const";
+                    readonly value: readonly [122, 107, 111, 119, 110, 101, 114];
+                }, {
+                    readonly kind: "account";
+                    readonly path: "owner_record.owner";
+                    readonly account: "ZkOwner";
+                }];
+            };
+        }, {
+            readonly name: "payer";
+            readonly writable: true;
+        }];
+        readonly args: readonly [];
+    }, {
         readonly name: "close_path";
         readonly docs: readonly ["The revoker drops its staged buffer (rent back); during the wind-down anyone may."];
         readonly discriminator: readonly [228, 246, 66, 195, 202, 252, 223, 199];
@@ -443,6 +473,28 @@ export declare const POF_ZK_IDL: {
             readonly docs: readonly ["The ring owner (the vault key): its signature is the consent the circuit later proves."];
             readonly signer: true;
         }, {
+            readonly name: "payer";
+            readonly docs: readonly ["Pays the owner record's rent and the fee (the owner or a sponsor)."];
+            readonly writable: true;
+            readonly signer: true;
+        }, {
+            readonly name: "config";
+            readonly pda: {
+                readonly seeds: readonly [{
+                    readonly kind: "const";
+                    readonly value: readonly [99, 111, 110, 102, 105, 103];
+                }];
+            };
+        }, {
+            readonly name: "treasury";
+            readonly writable: true;
+            readonly pda: {
+                readonly seeds: readonly [{
+                    readonly kind: "const";
+                    readonly value: readonly [116, 114, 101, 97, 115, 117, 114, 121];
+                }];
+            };
+        }, {
             readonly name: "registry";
             readonly writable: true;
             readonly pda: {
@@ -451,6 +503,21 @@ export declare const POF_ZK_IDL: {
                     readonly value: readonly [122, 107, 114, 101, 103];
                 }];
             };
+        }, {
+            readonly name: "owner_record";
+            readonly writable: true;
+            readonly pda: {
+                readonly seeds: readonly [{
+                    readonly kind: "const";
+                    readonly value: readonly [122, 107, 111, 119, 110, 101, 114];
+                }, {
+                    readonly kind: "account";
+                    readonly path: "owner";
+                }];
+            };
+        }, {
+            readonly name: "system_program";
+            readonly address: "11111111111111111111111111111111";
         }];
         readonly args: readonly [{
             readonly name: "commitment";
@@ -463,6 +530,14 @@ export declare const POF_ZK_IDL: {
         readonly docs: readonly ["Anyone: close a note lock whose certificate is no longer live."];
         readonly discriminator: readonly [199, 220, 11, 102, 53, 157, 182, 199];
         readonly accounts: readonly [{
+            readonly name: "config";
+            readonly pda: {
+                readonly seeds: readonly [{
+                    readonly kind: "const";
+                    readonly value: readonly [99, 111, 110, 102, 105, 103];
+                }];
+            };
+        }, {
             readonly name: "lock";
             readonly writable: true;
             readonly pda: {
@@ -1064,6 +1139,9 @@ export declare const POF_ZK_IDL: {
     }, {
         readonly name: "ZkConfig";
         readonly discriminator: readonly [181, 176, 242, 167, 108, 219, 13, 202];
+    }, {
+        readonly name: "ZkOwner";
+        readonly discriminator: readonly [53, 206, 78, 0, 124, 164, 161, 109];
     }, {
         readonly name: "ZkRegistry";
         readonly discriminator: readonly [179, 149, 101, 22, 34, 133, 223, 52];
@@ -1859,6 +1937,10 @@ export declare const POF_ZK_IDL: {
             }, {
                 readonly name: "bump";
                 readonly type: "u8";
+            }, {
+                readonly name: "spent";
+                readonly docs: readonly ["Set by revoke_spent (audit FZ-18): this note is spent, so the lock is never released (except in the wind-down) and no", "certify_zk may use its tag again."];
+                readonly type: "bool";
             }];
         };
     }, {
@@ -2334,6 +2416,34 @@ export declare const POF_ZK_IDL: {
             }];
         };
     }, {
+        readonly name: "ZkOwner";
+        readonly docs: readonly ["One registration per ring owner (audit ZK-11): [\"zkowner\", owner], paid by whoever submits (rent plus the certify fee to", "the treasury), so registrations that roll the root history cost real SOL each and nobody registers twice."];
+        readonly type: {
+            readonly kind: "struct";
+            readonly fields: readonly [{
+                readonly name: "owner";
+                readonly type: "pubkey";
+            }, {
+                readonly name: "payer";
+                readonly docs: readonly ["Paid the rent (gets it back at close_owner_record in the wind-down)."];
+                readonly type: "pubkey";
+            }, {
+                readonly name: "index";
+                readonly type: "u64";
+            }, {
+                readonly name: "commitment";
+                readonly type: {
+                    readonly array: readonly ["u8", 32];
+                };
+            }, {
+                readonly name: "slot";
+                readonly type: "u64";
+            }, {
+                readonly name: "bump";
+                readonly type: "u8";
+            }];
+        };
+    }, {
         readonly name: "ZkOwnerRegistered";
         readonly type: {
             readonly kind: "struct";
@@ -2375,7 +2485,7 @@ export declare const POF_ZK_IDL: {
                 readonly type: {
                     readonly array: readonly [{
                         readonly array: readonly ["u8", 32];
-                    }, 12];
+                    }, 20];
                 };
             }, {
                 readonly name: "cursor";

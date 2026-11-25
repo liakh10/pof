@@ -1,6 +1,6 @@
 # Test report: developer surfaces (API, SDK, MCP, bots)
 
-Scope: `sdk/` (`@pof/sdk` 0.3.1), `api/v1/` and `api/openapi.json`, `mcp/` and `api/mcp.js`, `bots/` and `api/bots.js`,
+Scope: `sdk/` (`@pof/sdk` 0.3.2), `api/v1/` and `api/openapi.json`, `mcp/` and `api/mcp.js`, `bots/` and `api/bots.js`,
 `witness/` and `api/witness.js`, `cli/`, `embed/`, `examples/`. Every suite below runs from a clean checkout with the
 commands shown. Node 20, solana-cli 4.1.2 (Agave), Anchor 1.2.0 programs built from `program/` at the time of the run
 (the IDL with `revoked_keys`, status 4 voided, zk certificates, and the Config account in `require_certificate`, `join`
@@ -36,7 +36,7 @@ and `evict`). Headless Chromium (playwright-core 1.63) for the browser suites.
   revoked key is dropped from the trusted set. The OTC desk example passes the Config to its CPI and to `pof::gate`
   (3/3). zk certificates read `settling` until their settle slot (unit test).
 - **The launch build** (no zk feature): the SDK decodes from `program/idl/pof.json` (no zk instructions); the zk build's
-  IDL ships as `POF_ZK_IDL` and `zkEnabled()` reads whether the zk config PDA exists; "settling" applies only to zk
+  IDL ships as `POF_ZK_IDL`; `getZkConfig()` decodes the ZkConfig and `zkEnabled()` is true only when it is enabled at the current slot (past its activation delay); "settling" applies only to zk
   certificates. The local-validator suite runs on the launch build (8/8, including `zkEnabled() === false`).
 - **FZ-17**: the SDK pins POF's program id by default; `PofClient` and the CPI builders refuse another id without
   `allowOtherDeployment: true`, and an account owned by another program never reads as a certificate (unit test).
