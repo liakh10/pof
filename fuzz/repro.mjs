@@ -139,9 +139,13 @@ await finding('FZ-08', 'close_config succeeds while a staged path buffer is open
 
 await finding('FZ-19', 'zk build: ZkOwner records ["zkowner", owner] have no close path: after the wind-down POF still owns them and their rent is stranded', async () => {
   if (!P.ixs.register_zk_owner || !P.ixs.register_zk_owner.accounts.some(a => a.name === 'owner_record')) return { reproduced: false, detail: 'no ZkOwner records in this build' };
-  const left = (await h.conn.getProgramAccounts(P.programId)).filter(x => P.decodeAccount('ZkOwner', x.account.data));
+  let left = (await h.conn.getProgramAccounts(P.programId)).filter(x => P.decodeAccount('ZkOwner', x.account.data));
   const closer = Object.keys(P.ixs).find(n => /owner/.test(n) && /close|release/.test(n));
-  return { reproduced: left.length > 0 && !closer, detail: `${left.length} ZkOwner records left after the wind-down attempt (${left.reduce((a, x) => a + x.account.lamports, 0)} lamports); a closing instruction ${closer ? 'exists: ' + closer : 'does not exist'}` };
+  if (closer && (await W.config())?.closing) {
+    for (const x of left) { const o = P.decodeAccount('ZkOwner', x.account.data); const b0 = await h.lam(o.payer); const r = await h.send([P.ix(closer, {}, { owner_record: x.pubkey, payer: new PublicKey(o.payer) })], [users[1]]); if (!r.ok) throw Error(closer + ': ' + r.why); if ((await h.lam(o.payer)) - b0 !== BigInt(x.account.lamports)) throw Error('rent not back to the payer'); }
+    left = (await h.conn.getProgramAccounts(P.programId)).filter(x => P.decodeAccount('ZkOwner', x.account.data));
+  }
+  return { reproduced: left.length > 0 && !closer, detail: `${left.length} ZkOwner records left after the wind-down (${left.reduce((a, x) => a + x.account.lamports, 0)} lamports); a closing instruction ${closer ? 'exists: ' + closer : 'does not exist'}` };
 });
 
 fs.writeFileSync(path.join(FUZZ, 'results', 'repro.json'), JSON.stringify({ at: new Date().toISOString(), snapshot: JSON.parse(fs.readFileSync(path.join(FUZZ, 'results/snapshot.json'), 'utf8')).sources['programs/pof/src/lib.rs'], findings: out }, null, 1));

@@ -1,0 +1,30 @@
+{
+ "built": "2026-11-25T01:17:03.309Z",
+ "ref": "73bcf04",
+ "feature": "quick,zk",
+ "sources": {
+  "programs/pof/src/lib.rs": "85b0cb7e4b20fc0c5c9f1c56ad39ac748b1ba67e030d47e85720d888b00c560f",
+  "programs/pof/src/ext.rs": "171210e764a09e25bd68b243decd5cc92df993add5e9991bbdbdee0314598005",
+  "programs/pof/src/errors.rs": "512910174a9cf25a2719a51e351ca523e07db2e470c6ceddd79aa518940e0e4b",
+  "programs/pof/src/zk.rs": "aa32229f03545024cd7fa4a877b202478ae8244615dae706a11519f1fe967341",
+  "programs/pof/src/groth16.rs": "66718555a435364c1e7ea75545cc6cbc7adb5697a234c15bd445d1c5f066d239",
+  "programs/pof/src/vk.rs": "689f099a8673494053b433eb167f8124d7210bf993f7f81a9c137a5a49dd3e3f",
+  "programs/pof_gate/src/lib.rs": "0ef0643e206bbf4bd9352f9b58412dbdfaa063587593045c951da96569f89bc7",
+  "programs/hostile/src/lib.rs": "7a510fb4d8630ae54d274e46c232ef7899630fe3cafb982cfbf28d4fa6bf523a",
+  "Cargo.lock": "32487c98b0daf217bc4285a219700b5a915ef239ac7fa64d8563a4209ad4300f"
+ },
+ "binaries": {
+  "hostile.so": {
+   "sha256": "c692d8752d22d1be6aea765c759e39e5eeae57692037c0d2e97d37fc40c980b1",
+   "bytes": 185536
+  },
+  "pof.so": {
+   "sha256": "791c39bfb9746167af24a1c07ea1fa712c81270ac693fe3f3147a40d1caf4b71",
+   "bytes": 546592
+  },
+  "pof_gate.so": {
+   "sha256": "32063b9d374fa4c4e506a708a4c861e1ef6ec831fe17b6c818122902d1a73d98",
+   "bytes": 244528
+  }
+ }
+}

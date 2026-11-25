@@ -107,6 +107,13 @@ await run('winddown', async () => {
     const accs = await h.conn.getProgramAccounts(P.programId);
     for (const x of accs) { const l = P.decodeAccount('NoteLock', x.account.data); if (!l) continue; expect('release a note lock during the wind-down', 'release_note_lock', await h.send([P.ix('release_note_lock', {}, { lock: x.pubkey, certificate: new PublicKey(l.certificate), payer: new PublicKey(l.payer) })], [users[1]]), null); }
     const zkp = P.pda([Buffer.from('zk')]);
+    if (P.ixs.close_owner_record) {
+      // FZ-19: a registration made while POF is winding down must not outlive it
+      const late = W.kp(); await h.fund([late], 2);
+      const reg = await h.send([P.ix('register_zk_owner', { commitment: Buffer.concat([Buffer.alloc(31), Buffer.from([7])]) }, { owner: late.publicKey, registry: P.pda([Buffer.from('zkreg')]), payer: late.publicKey, owner_record: P.pda([Buffer.from('zkowner'), late.publicKey.toBuffer()]) })], [late]);
+      W.note(`register_zk_owner while closing: ${reg.ok ? 'accepted (its record must be closed like the others)' : 'refused: ' + reg.why}`);
+      for (const x of await h.conn.getProgramAccounts(P.programId)) { const o = P.decodeAccount('ZkOwner', x.account.data); if (!o) continue; expect('close_owner_record during the wind-down', 'close_owner_record', await h.send([P.ix('close_owner_record', {}, { owner_record: x.pubkey, payer: new PublicKey(o.payer) })], [users[1]]), null); }
+    }
     if (await h.info(zkp)) expect('close_zk', 'close_zk', await h.send([P.ix('close_zk', {}, { admin: admin.publicKey, zk: zkp, registry: P.pda([Buffer.from('zkreg')]) })], [admin]), null);
   }
   const inv2 = await W.invariants('all expired');

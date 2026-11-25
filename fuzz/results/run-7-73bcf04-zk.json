@@ -1,0 +1,1074 @@
+{
+ "seed": "7",
+ "suites": {
+  "setup": {
+   "cases": 0,
+   "unexpected": 0,
+   "notes": []
+  },
+  "attest": {
+   "cases": 1196,
+   "unexpected": 0,
+   "notes": [
+    "A1: 720 mutations of the signed bytes (every offset 0..239)",
+    "A2: 25 field mutations with the original signature",
+    "A3: 450/450 random attestations agree with the model of check_attestation (evaluated at the simulation's own bank slot)"
+   ]
+  },
+  "ed25519": {
+   "cases": 146,
+   "unexpected": 0,
+   "notes": [
+    "two certifies, each with its own signature, do not fit one transaction even with one note each",
+    "corrupt signature, valid layout: simulation refused: Ed25519:InvalidSignature",
+    "  sent: refused: Ed25519:InvalidSignature",
+    "random header fuzz: 120 cases, 0 landed"
+   ]
+  },
+  "revoke": {
+   "cases": 283,
+   "unexpected": 0,
+   "notes": [
+    "tree 0 is pinned: a forged tree and the protocol config are refused as `tree`",
+    "deep leaves (index >= 2^30) need a path of 39-40 levels: 2 of them could not be submitted at all on this validator (a v1 transaction over 1,232 bytes is refused by its RPC)",
+    "the real 40-level path in a v1 transaction: TxTooLarge(v1) (1714 bytes)",
+    "(b) 84 path-length cases, 160 single-bit path and index mutations; 69 cases needed a version 1 transaction"
+   ]
+  },
+  "revsig": {
+   "cases": 330,
+   "unexpected": 0,
+   "notes": []
+  },
+  "accounts": {
+   "cases": 2389,
+   "unexpected": 0,
+   "notes": [
+    "2389 account mutations over 22 canonical calls; 152 succeeded in a free position or as a read-only account made writable"
+   ]
+  },
+  "data": {
+   "cases": 2377,
+   "unexpected": 0,
+   "notes": [
+    "certify: trailing bytes after the arguments are ignored",
+    "certify (remake, prior payer): trailing bytes after the arguments are ignored",
+    "renew: trailing bytes after the arguments are ignored",
+    "revoke_spent: trailing bytes after the arguments are ignored",
+    "revoke_by_holder: trailing bytes after the arguments are ignored",
+    "expire: trailing bytes after the arguments are ignored",
+    "anchor_log: trailing bytes after the arguments are ignored",
+    "require_certificate: trailing bytes after the arguments are ignored",
+    "set_params: trailing bytes after the arguments are ignored",
+    "set_fee: trailing bytes after the arguments are ignored",
+    "set_paused: trailing bytes after the arguments are ignored",
+    "set_asset: trailing bytes after the arguments are ignored",
+    "set_verifier: trailing bytes after the arguments are ignored",
+    "set_roles: trailing bytes after the arguments are ignored",
+    "withdraw_fees: trailing bytes after the arguments are ignored",
+    "close_begin: trailing bytes after the arguments are ignored",
+    "create_room: trailing bytes after the arguments are ignored",
+    "set_room: trailing bytes after the arguments are ignored",
+    "join: trailing bytes after the arguments are ignored",
+    "evict: trailing bytes after the arguments are ignored",
+    "leave: trailing bytes after the arguments are ignored",
+    "close_room: trailing bytes after the arguments are ignored",
+    "2377 instruction-data mutations"
+   ]
+  },
+  "orderings": {
+   "cases": 31,
+   "unexpected": 0,
+   "notes": [
+    "two certify instructions (each with its Ed25519 instruction) do not fit one 1,232-byte transaction even with one note each: same-transaction double certify is covered through the hostile CPI router instead"
+   ]
+  },
+  "donations": {
+   "cases": 23,
+   "unexpected": 0,
+   "notes": [
+    "same-payer remake: the payer's own 1000000000 donated lamports moved to the treasury as fees (fees_in +1010000000)",
+    "pre-funded certificate address: the payer paid 10010000 (fee 10000000 + signatures; no rent, the donation covered it)",
+    "  at expire the payer received 2000000000 (rent it never paid + the donation): a donation to an empty address is a gift to whoever certifies there",
+    "treasury donation of 7 SOL: the dev received 261450000001; fees_out 261450000001 vs fees_in 254450000001 (fees_out may exceed fees_in by donations)"
+   ]
+  },
+  "gate": {
+   "cases": 47,
+   "unexpected": 0,
+   "notes": [
+    "a member whose certificate was revoked and re-issued (same controller) before anyone evicted keeps the seat: the room checks the certificate now, not its history",
+    "a consumer that does not pin POF (hostile naive_gate) asked the FAKE POF about a random subject: it answered yes, tier 5. pof_gate pins POF (Program<Pof>) and is not exposed; integrators must pin it too",
+    "certify through a CPI works with a program PDA as payer: POF reads the signature before the TOP-LEVEL instruction, so a router cannot reuse one signature for two certificates (the second fails), and the payer is still the one the Verifier signed"
+   ]
+  },
+  "admin": {
+   "cases": 20,
+   "unexpected": 0,
+   "notes": []
+  },
+  "rotation": {
+   "cases": 2531,
+   "unexpected": 0,
+   "notes": [
+    "R1: 2276 simulations before the switch, 236 after, 116 at the slot before or the switch slot itself",
+    "after rotation (and while paused) a certificate signed by the old key still passes require_certificate until that key is revoked (revoke_verifier_key; the \"void\" suite tests it)",
+    "R3: 12 random steps, 4 proposals, 12 observations: 0 model mismatches, 0 broken delay promises"
+   ]
+  },
+  "machine": {
+   "cases": 59,
+   "unexpected": 0,
+   "notes": [
+    "90 random steps over 6 subjects: {\"wait\":10,\"expire\":18,\"certify\":16,\"join\":9,\"revoke_spent\":7,\"leave\":9,\"renew\":5,\"revoke_holder\":7,\"donate\":5,\"evict\":4}"
+   ]
+  },
+  "staged": {
+   "cases": 32,
+   "unexpected": 0,
+   "notes": [
+    "staged revoke: 4 transactions of at most 941 bytes; the revoker paid 20000 lamports net (fees only: the buffer rent came back)",
+    "close_path returned 10857600 lamports of buffer rent"
+   ]
+  },
+  "zk": {
+   "cases": 158,
+   "unexpected": 0,
+   "notes": [
+    "settle window: 65 gate simulations refused before slot 993, 3 passed from it",
+    "revoke_verifier_key(ZkConfig) is not run here: it would end phase 2 for the rest of the run; it is checked by simulation only",
+    "8 real Groth16 proofs, 4645 ms each on average"
+   ]
+  },
+  "void": {
+   "cases": 22,
+   "unexpected": 0,
+   "notes": [
+    "a certificate signed by a revoked key and not yet voided can be renewed by the new key (a fresh attestation of the same notes): renew does not refuse a revoked cert.verifier",
+    "revoked_keys is full after 9 keys; an entry is reused once VALIDITY_MAX slots have passed since its revocation (revoked_at)"
+   ]
+  },
+  "cu": {
+   "cases": 7,
+   "unexpected": 0,
+   "notes": [
+    "worst-case subject: certificate PDA bump 249 (6 extra find_program_address tries)",
+    "v1 simulation of the 40-level path: rpc: JSON-RPC error: Invalid method parameter(s) (base64 encoded solana_transaction::versioned::VersionedTransaction too large: 2288 bytes (max: encoded/raw 1644/1232)), 1714 bytes",
+    "v1 send: TxTooLarge(v1)",
+    "transaction sizes: revoke_spent membership, real path 16 levels (v0, 1 signer): 976; certify_zk, 4 notes, ALT, 2 signers (v0): 1230; certify_zk, 4 notes, no ALT: > 1232; revoke_spent membership, 0 levels (v0, 1 signer, CU limit ix): 463; revoke_spent membership, 8 levels (v0, 1 signer, CU limit ix): 720; revoke_spent membership, 16 levels (v0, 1 signer, CU limit ix): 976; revoke_spent membership, 20 levels (v0, 1 signer, CU limit ix): 1104; revoke_spent membership, 24 levels (v0, 1 signer, CU limit ix): 1232; revoke_spent membership, 28 levels (v0, 1 signer, CU limit ix): > 1232 (does not serialize); revoke_spent membership, 32 levels (v0, 1 signer, CU limit ix): > 1232 (does not serialize); revoke_spent membership, 36 levels (v0, 1 signer, CU limit ix): > 1232 (does not serialize); revoke_spent membership, 40 levels (v0, 1 signer, CU limit ix): > 1232 (does not serialize); revoke_spent membership, 40 levels (v1, 1 signer): 1714; certify relayed as verifier/src/program.ts sends it: legacy, Ed25519 + certify only, 8 notes: 1141; certify relayed, 8 notes, memo, CU limit+price (v0, 1 signer): 1316; certify relayed, 8 notes, memo, CU limit+price (legacy, 1 signer): 1314; certify self-paid by the holder, relayer as fee payer, 8 notes, memo, CU limit+price (v0, 2 signers): 1412; certify, every optional account, 8 notes, memo, CU limit+price (v0, 2 signers): 1476",
+    "OVER 1,232 bytes: certify_zk, 4 notes, no ALT; revoke_spent membership, 28 levels (v0, 1 signer, CU limit ix); revoke_spent membership, 32 levels (v0, 1 signer, CU limit ix); revoke_spent membership, 36 levels (v0, 1 signer, CU limit ix); revoke_spent membership, 40 levels (v0, 1 signer, CU limit ix); certify relayed, 8 notes, memo, CU limit+price (v0, 1 signer); certify relayed, 8 notes, memo, CU limit+price (legacy, 1 signer); certify self-paid by the holder, relayer as fee payer, 8 notes, memo, CU limit+price (v0, 2 signers); certify, every optional account, 8 notes, memo, CU limit+price (v0, 2 signers)"
+   ]
+  },
+  "holder": {
+   "cases": 7,
+   "unexpected": 0,
+   "notes": [
+    "the $ROOT exemption is checked at the instant of certify: a balance borrowed (or flash-swapped) inside the same transaction makes any payer exempt"
+   ]
+  },
+  "winddown": {
+   "cases": 106,
+   "unexpected": 0,
+   "notes": [
+    "register_zk_owner while closing: accepted (its record must be closed like the others)"
+   ]
+  }
+ },
+ "coverage": {
+  "certify": {
+   "ok": 1336,
+   "AttestationMismatch": 974,
+   "BadSubjectKind": 79,
+   "SubjectMismatch": 88,
+   "BadAsset": 80,
+   "BadTier": 62,
+   "NotController": 21,
+   "BadNoteCount": 18,
+   "BadExpiry": 49,
+   "IssuedInFuture": 50,
+   "RootStale": 33,
+   "TxTooLarge": 37,
+   "NullHashesUnsorted": 13,
+   "Expired": 15,
+   "BadSignatureLayout": 7,
+   "Ed25519:InvalidDataOffsets": 91,
+   "Ed25519:InvalidPublicKey": 4,
+   "InvalidInstructionData": 1,
+   "NoSignature": 5,
+   "WrongVerifier": 1257,
+   "Ed25519:InvalidSignature": 19,
+   "ConstraintAddress": 57,
+   "Ed25519:InvalidInstructionDataSize": 8,
+   "AccountNotSigner": 52,
+   "PrivilegeEscalation": 2,
+   "AccountDiscriminatorMismatch": 22,
+   "AccountOwnedByWrongProgram": 84,
+   "AccountNotInitialized": 6,
+   "ok (read-only made writable)": 9,
+   "ConstraintMut": 33,
+   "ConstraintSeeds": 123,
+   "ok (free position)": 45,
+   "InvalidProgramId": 56,
+   "PriorPayerMissing": 24,
+   "InstructionFallbackNotFound": 32,
+   "InstructionDidNotDeserialize": 442,
+   "ok (+1 trailing bytes)": 2,
+   "ok (+8 trailing bytes)": 2,
+   "ok (+64 trailing bytes)": 2,
+   "Replayed": 1,
+   "AlreadyLive": 5,
+   "Paused": 1,
+   "AttestationStale": 2,
+   "KeyRevoked": 1,
+   "BadHolderAccount": 1,
+   "Closing": 1
+  },
+  "revoke_spent": {
+   "ok": 50,
+   "NotSpent": 156,
+   "BadRingsAccounts": 94,
+   "NullifierMismatch": 34,
+   "BadIndex": 4,
+   "TxTooLarge(v1)": 70,
+   "TxTooLarge": 1,
+   "AccountNotSigner": 24,
+   "ok (free position)": 3,
+   "ok (read-only made writable)": 4,
+   "AccountDiscriminatorMismatch": 16,
+   "AccountOwnedByWrongProgram": 57,
+   "AccountNotInitialized": 3,
+   "ConstraintMut": 2,
+   "NotLive": 4,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 73,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ZkLockMissing": 2
+  },
+  "revoke_signed": {
+   "ok": 4,
+   "AttestationMismatch": 315,
+   "Expired": 1,
+   "BadExpiry": 2,
+   "NotController": 3,
+   "NoSignature": 1,
+   "BadSignatureLayout": 1,
+   "NotLive": 1
+  },
+  "renew": {
+   "ok": 7,
+   "AccountNotSigner": 25,
+   "AttestationMismatch": 147,
+   "ConstraintMut": 3,
+   "AccountDiscriminatorMismatch": 16,
+   "AccountOwnedByWrongProgram": 60,
+   "AccountNotInitialized": 3,
+   "ok (read-only made writable)": 4,
+   "ConstraintSeeds": 35,
+   "ok (free position)": 21,
+   "ConstraintAddress": 27,
+   "InvalidProgramId": 27,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 242,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "BadSubjectKind": 1,
+   "BadTier": 1,
+   "RootStale": 9,
+   "SubjectMismatch": 33,
+   "IssuedInFuture": 7,
+   "BadExpiry": 7,
+   "NotLive": 2,
+   "RenewMismatch": 2,
+   "Replayed": 1,
+   "CertificateExpired": 1,
+   "Paused": 1
+  },
+  "revoke_by_holder": {
+   "AccountNotSigner": 23,
+   "NotController": 4,
+   "ok (read-only made writable)": 2,
+   "AccountDiscriminatorMismatch": 16,
+   "AccountOwnedByWrongProgram": 51,
+   "AccountNotInitialized": 3,
+   "ConstraintMut": 2,
+   "InstructionFallbackNotFound": 16,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "NotLive": 2,
+   "ok": 4
+  },
+  "expire": {
+   "AccountNotSigner": 23,
+   "ok (free position)": 3,
+   "ok (read-only made writable)": 2,
+   "AccountDiscriminatorMismatch": 16,
+   "AccountOwnedByWrongProgram": 54,
+   "AccountNotInitialized": 13,
+   "ConstraintMut": 7,
+   "NotPayer": 22,
+   "ConstraintClose": 2,
+   "InstructionFallbackNotFound": 16,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "NotExpired": 6,
+   "ok": 74
+  },
+  "anchor_log": {
+   "AccountNotSigner": 22,
+   "ok (free position)": 3,
+   "ok (read-only made writable)": 3,
+   "AccountDiscriminatorMismatch": 10,
+   "AccountOwnedByWrongProgram": 36,
+   "AccountNotInitialized": 2,
+   "ConstraintMut": 1,
+   "ConstraintAddress": 24,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 40,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "AttestationMismatch": 40,
+   "ok": 3,
+   "LogNotGrowing": 5,
+   "WrongVerifier": 1,
+   "KeyRevoked": 1
+  },
+  "require_certificate": {
+   "BadCertificate": 56,
+   "ok (read-only made writable)": 2,
+   "AccountDiscriminatorMismatch": 5,
+   "AccountOwnedByWrongProgram": 16,
+   "AccountNotInitialized": 1,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 34,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ok": 8,
+   "TierTooLow": 1,
+   "InvalidProgramId": 1,
+   "NotLive": 2,
+   "ZkSettling": 65,
+   "KeyRevoked": 2
+  },
+  "set_params": {
+   "AccountNotSigner": 21,
+   "NotAdmin": 2,
+   "ok (read-only made writable)": 1,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountOwnedByWrongProgram": 17,
+   "AccountNotInitialized": 1,
+   "ConstraintMut": 1,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 48,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "FeeAboveCap": 1,
+   "BadParams": 8,
+   "ok": 1
+  },
+  "set_fee": {
+   "AccountNotSigner": 21,
+   "NotAdmin": 2,
+   "ok (read-only made writable)": 1,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountOwnedByWrongProgram": 17,
+   "AccountNotInitialized": 1,
+   "ConstraintMut": 1,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 8,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1
+  },
+  "set_paused": {
+   "AccountNotSigner": 21,
+   "NotAdmin": 3,
+   "ok (read-only made writable)": 1,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountOwnedByWrongProgram": 17,
+   "AccountNotInitialized": 1,
+   "ConstraintMut": 1,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 1,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1
+  },
+  "set_asset": {
+   "AccountNotSigner": 21,
+   "NotAdmin": 2,
+   "ok (read-only made writable)": 1,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountOwnedByWrongProgram": 17,
+   "AccountNotInitialized": 1,
+   "ConstraintMut": 1,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 75,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1
+  },
+  "set_verifier": {
+   "AccountNotSigner": 21,
+   "NotAdmin": 2,
+   "ok (read-only made writable)": 1,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountOwnedByWrongProgram": 17,
+   "AccountNotInitialized": 1,
+   "ConstraintMut": 1,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 32,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ok": 11
+  },
+  "set_roles": {
+   "AccountNotSigner": 22,
+   "NotAdmin": 2,
+   "ok (read-only made writable)": 2,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountOwnedByWrongProgram": 18,
+   "AccountNotInitialized": 1,
+   "ConstraintMut": 1,
+   "BadMint": 24,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 34,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ok": 1,
+   "RootSet": 1
+  },
+  "withdraw_fees": {
+   "AccountNotSigner": 23,
+   "NotAdmin": 28,
+   "ok (read-only made writable)": 2,
+   "AccountDiscriminatorMismatch": 10,
+   "AccountOwnedByWrongProgram": 36,
+   "AccountNotInitialized": 2,
+   "ConstraintMut": 2,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 8,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ok": 1,
+   "TreasuryShort": 1
+  },
+  "close_begin": {
+   "AccountNotSigner": 21,
+   "NotAdmin": 2,
+   "ok (read-only made writable)": 1,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountOwnedByWrongProgram": 17,
+   "AccountNotInitialized": 1,
+   "ConstraintMut": 1,
+   "InstructionFallbackNotFound": 16,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1
+  },
+  "create_room": {
+   "AccountNotSigner": 23,
+   "ConstraintSeeds": 28,
+   "PrivilegeEscalation": 2,
+   "BadPofConfig": 24,
+   "ok (read-only made writable)": 2,
+   "InvalidProgramId": 24,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 42,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ok": 2,
+   "BadTier": 4
+  },
+  "set_room": {
+   "AccountNotSigner": 22,
+   "NotCreator": 4,
+   "ok (read-only made writable)": 2,
+   "AccountOwnedByWrongProgram": 21,
+   "AccountDiscriminatorMismatch": 1,
+   "AccountNotInitialized": 1,
+   "ConstraintMut": 1,
+   "BadPofConfig": 24,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 34,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "BadTier": 3,
+   "ok": 2
+  },
+  "join": {
+   "AccountNotSigner": 51,
+   "NotController": 4,
+   "ok (read-only made writable)": 5,
+   "ok (free position)": 3,
+   "PrivilegeEscalation": 2,
+   "AccountOwnedByWrongProgram": 47,
+   "ConstraintSeeds": 62,
+   "AccountDiscriminatorMismatch": 6,
+   "AccountNotInitialized": 3,
+   "ConstraintMut": 1,
+   "BadCertificate": 35,
+   "InvalidProgramId": 57,
+   "InstructionFallbackNotFound": 16,
+   "InstructionDidNotDeserialize": 32,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ok": 7,
+   "TierTooLow": 1,
+   "NotLive": 2,
+   "CertificateExpired": 5,
+   "RoomShut": 1,
+   "KeyRevoked": 1
+  },
+  "evict": {
+   "AccountNotSigner": 24,
+   "ok (free position)": 3,
+   "ok (read-only made writable)": 3,
+   "AccountOwnedByWrongProgram": 46,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountNotInitialized": 3,
+   "ConstraintMut": 7,
+   "ConstraintAddress": 23,
+   "ConstraintClose": 1,
+   "BadCertificate": 26,
+   "BadPofConfig": 26,
+   "InstructionFallbackNotFound": 16,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ok": 10,
+   "StillValid": 2
+  },
+  "leave": {
+   "AccountNotSigner": 22,
+   "NotController": 2,
+   "ok (read-only made writable)": 1,
+   "AccountOwnedByWrongProgram": 42,
+   "AccountDiscriminatorMismatch": 4,
+   "AccountNotInitialized": 3,
+   "ConstraintMut": 7,
+   "ConstraintAddress": 17,
+   "ConstraintClose": 2,
+   "InstructionFallbackNotFound": 16,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1,
+   "ok": 1
+  },
+  "close_room": {
+   "AccountNotSigner": 21,
+   "NotCreator": 3,
+   "ConstraintMut": 2,
+   "AccountOwnedByWrongProgram": 20,
+   "MembersLeft": 2,
+   "AccountDiscriminatorMismatch": 1,
+   "AccountNotInitialized": 1,
+   "InstructionFallbackNotFound": 16,
+   "ok (+1 trailing bytes)": 1,
+   "ok (+8 trailing bytes)": 1,
+   "ok (+64 trailing bytes)": 1
+  },
+  "release_room": {
+   "NotClosing": 1,
+   "ok": 9
+  },
+  "init_config": {
+   "Custom0": 1
+  },
+  "close_config": {
+   "NotClosing": 1,
+   "NotExpired": 2,
+   "ok": 2
+  },
+  "apply_verifier": {
+   "ok": 1,
+   "NoRotationDue": 1
+  },
+  "open_path": {
+   "ok": 1,
+   "NotLive": 1,
+   "TxTooLarge": 1
+  },
+  "stage_path": {
+   "ok": 2,
+   "BadIndex": 3,
+   "NotPayer": 1
+  },
+  "revoke_spent_staged": {
+   "ConstraintSeeds": 2,
+   "NullifierMismatch": 4,
+   "BadRingsAccounts": 1,
+   "ok": 6,
+   "NotSpent": 3,
+   "NotLive": 1
+  },
+  "close_path": {
+   "NotPayer": 2,
+   "ok": 2
+  },
+  "set_zk": {
+   "ZkBadEscrowKey": 1,
+   "NotAdmin": 1,
+   "ok": 2
+  },
+  "register_zk_owner": {
+   "BadParams": 1,
+   "Custom0": 1
+  },
+  "certify_zk": {
+   "ok": 6,
+   "ZkProofInvalid": 44,
+   "ConstraintSeeds": 1,
+   "BadTier": 2,
+   "ZkStateRootUnknown": 1,
+   "ZkNullRootNotNewest": 2,
+   "ZkRegistryRootUnknown": 2,
+   "ZkInputNotInField": 1,
+   "BadNoteCount": 1,
+   "NullHashesUnsorted": 2,
+   "ZkLockMissing": 4,
+   "BadRingsAccounts": 1,
+   "AlreadyLive": 1,
+   "ZkNoteLocked": 3,
+   "Replayed": 1,
+   "ZkDisabled": 1
+  },
+  "release_note_lock": {
+   "ZkNoteStillLive": 2,
+   "ok": 7
+  },
+  "void_by_key": {
+   "KeyNotRevoked": 1,
+   "ok": 2,
+   "NotLive": 1
+  },
+  "revoke_verifier_key": {
+   "NotAdmin": 1,
+   "BadParams": 2,
+   "ok": 2
+  },
+  "close_owner_record": {
+   "ok": 4
+  },
+  "close_zk": {
+   "ok": 1
+  }
+ },
+ "unexpected": [],
+ "cu": {
+  "certify (kind 0, 3 notes, fee)": {
+   "max": 68121,
+   "min": 68121,
+   "n": 1,
+   "maxSize": 1023
+  },
+  "revoke_spent (PDA)": {
+   "max": 29680,
+   "min": 29680,
+   "n": 1,
+   "maxSize": 451
+  },
+  "revoke_spent (membership, 7 levels)": {
+   "max": 64914,
+   "min": 64910,
+   "n": 5,
+   "maxSize": 688
+  },
+  "revoke_spent (membership, 13 levels)": {
+   "max": 68074,
+   "min": 68074,
+   "n": 1,
+   "maxSize": 880
+  },
+  "revoke_spent (membership, 16 levels)": {
+   "max": 65985,
+   "min": 65981,
+   "n": 2,
+   "maxSize": 976
+  },
+  "revoke_signed": {
+   "max": 37214,
+   "min": 37214,
+   "n": 1,
+   "maxSize": 664
+  },
+  "open_path (16 siblings)": {
+   "max": 24860,
+   "min": 24860,
+   "n": 1,
+   "maxSize": 941
+  },
+  "stage_path (12 siblings)": {
+   "max": 4424,
+   "min": 4424,
+   "n": 1,
+   "maxSize": 643
+  },
+  "revoke_spent_staged (40 levels)": {
+   "max": 66198,
+   "min": 66198,
+   "n": 1,
+   "maxSize": 418
+  },
+  "set_zk (first: creates ZkConfig + registry)": {
+   "max": 395570,
+   "min": 395570,
+   "n": 1,
+   "maxSize": 417
+  },
+  "register_zk_owner": {
+   "max": 64555,
+   "min": 61567,
+   "n": 3,
+   "maxSize": 514
+  },
+  "certify_zk (1 note, ALT)": {
+   "max": 249282,
+   "min": 249282,
+   "n": 1,
+   "maxSize": 843
+  },
+  "certify_zk (4 notes, ALT, 2 signers)": {
+   "max": 301575,
+   "min": 301575,
+   "n": 1,
+   "maxSize": 1230
+  },
+  "certify (kind 0, 8 notes, new, fee, low bump)": {
+   "max": 77173,
+   "min": 77173,
+   "n": 1,
+   "maxSize": 1183
+  },
+  "renew (8 notes, fee)": {
+   "max": 60123,
+   "min": 60123,
+   "n": 1,
+   "maxSize": 1174
+  },
+  "certify (remake: prior payer + surplus + fee, 8 notes)": {
+   "max": 75936,
+   "min": 75936,
+   "n": 1,
+   "maxSize": 1215
+  },
+  "anchor_log": {
+   "max": 29558,
+   "min": 29558,
+   "n": 1,
+   "maxSize": 587
+  },
+  "revoke_by_holder": {
+   "max": 25775,
+   "min": 25775,
+   "n": 1,
+   "maxSize": 319
+  },
+  "create_room": {
+   "max": 30150,
+   "min": 30150,
+   "n": 1,
+   "maxSize": 361
+  },
+  "set_room": {
+   "max": 24986,
+   "min": 24986,
+   "n": 1,
+   "maxSize": 320
+  },
+  "join (incl. the require_certificate CPI)": {
+   "max": 40819,
+   "min": 40819,
+   "n": 1,
+   "maxSize": 451
+  },
+  "require_certificate (CPI from join)": {
+   "max": 16569,
+   "min": 16569,
+   "n": 1,
+   "maxSize": 0
+  },
+  "evict (expired certificate)": {
+   "max": 34065,
+   "min": 34065,
+   "n": 1,
+   "maxSize": 385
+  },
+  "expire": {
+   "max": 24485,
+   "min": 24485,
+   "n": 1,
+   "maxSize": 352
+  },
+  "leave": {
+   "max": 11553,
+   "min": 11553,
+   "n": 1,
+   "maxSize": 287
+  },
+  "close_room": {
+   "max": 6367,
+   "min": 6367,
+   "n": 1,
+   "maxSize": 253
+  },
+  "set_params": {
+   "max": 16896,
+   "min": 16896,
+   "n": 1,
+   "maxSize": 301
+  },
+  "set_fee": {
+   "max": 16315,
+   "min": 16315,
+   "n": 1,
+   "maxSize": 261
+  },
+  "set_paused": {
+   "max": 15772,
+   "min": 15772,
+   "n": 1,
+   "maxSize": 254
+  },
+  "set_verifier (cancel)": {
+   "max": 16227,
+   "min": 16227,
+   "n": 1,
+   "maxSize": 285
+  },
+  "withdraw_fees": {
+   "max": 19693,
+   "min": 19693,
+   "n": 1,
+   "maxSize": 327
+  },
+  "set_roles (root mint)": {
+   "max": 16974,
+   "min": 16974,
+   "n": 1,
+   "maxSize": 288
+  },
+  "certify (kind 0, 8 notes, $ROOT holder: ATA derivation + token read)": {
+   "max": 70427,
+   "min": 70427,
+   "n": 1,
+   "maxSize": 1215
+  }
+ },
+ "sizes": {
+  "revoke_spent membership, real path 16 levels (v0, 1 signer)": 976,
+  "certify_zk, 4 notes, ALT, 2 signers (v0)": 1230,
+  "certify_zk, 4 notes, no ALT": "> 1232",
+  "revoke_spent membership, 0 levels (v0, 1 signer, CU limit ix)": 463,
+  "revoke_spent membership, 8 levels (v0, 1 signer, CU limit ix)": 720,
+  "revoke_spent membership, 16 levels (v0, 1 signer, CU limit ix)": 976,
+  "revoke_spent membership, 20 levels (v0, 1 signer, CU limit ix)": 1104,
+  "revoke_spent membership, 24 levels (v0, 1 signer, CU limit ix)": 1232,
+  "revoke_spent membership, 28 levels (v0, 1 signer, CU limit ix)": "> 1232 (does not serialize)",
+  "revoke_spent membership, 32 levels (v0, 1 signer, CU limit ix)": "> 1232 (does not serialize)",
+  "revoke_spent membership, 36 levels (v0, 1 signer, CU limit ix)": "> 1232 (does not serialize)",
+  "revoke_spent membership, 40 levels (v0, 1 signer, CU limit ix)": "> 1232 (does not serialize)",
+  "revoke_spent membership, 40 levels (v1, 1 signer)": 1714,
+  "certify relayed as verifier/src/program.ts sends it: legacy, Ed25519 + certify only, 8 notes": 1141,
+  "certify relayed, 8 notes, memo, CU limit+price (v0, 1 signer)": 1316,
+  "certify relayed, 8 notes, memo, CU limit+price (legacy, 1 signer)": 1314,
+  "certify self-paid by the holder, relayer as fee payer, 8 notes, memo, CU limit+price (v0, 2 signers)": 1412,
+  "certify, every optional account, 8 notes, memo, CU limit+price (v0, 2 signers)": 1476
+ },
+ "invariantChecks": 24,
+ "errorCoverage": {
+  "pof": {
+   "reached": [
+    "NotAdmin",
+    "BadParams",
+    "FeeAboveCap",
+    "RootSet",
+    "BadMint",
+    "BadHolderAccount",
+    "Paused",
+    "Closing",
+    "NotClosing",
+    "NoSignature",
+    "BadSignatureLayout",
+    "WrongVerifier",
+    "AttestationMismatch",
+    "BadSubjectKind",
+    "SubjectMismatch",
+    "BadAsset",
+    "BadTier",
+    "BadNoteCount",
+    "NullHashesUnsorted",
+    "IssuedInFuture",
+    "AttestationStale",
+    "RootStale",
+    "BadExpiry",
+    "Expired",
+    "AlreadyLive",
+    "PriorPayerMissing",
+    "Replayed",
+    "NotLive",
+    "CertificateExpired",
+    "TierTooLow",
+    "BadCertificate",
+    "RenewMismatch",
+    "BadIndex",
+    "NullifierMismatch",
+    "NotSpent",
+    "BadRingsAccounts",
+    "NotController",
+    "NotExpired",
+    "NotPayer",
+    "LogNotGrowing",
+    "TreasuryShort",
+    "NoRotationDue",
+    "KeyRevoked",
+    "KeyNotRevoked",
+    "ZkDisabled",
+    "ZkLockMissing",
+    "ZkStateRootUnknown",
+    "ZkNullRootNotNewest",
+    "ZkRegistryRootUnknown",
+    "ZkBadEscrowKey",
+    "ZkSettling",
+    "ZkInputNotInField",
+    "ZkProofInvalid",
+    "ZkNoteLocked",
+    "ZkNoteStillLive"
+   ],
+   "never": [
+    "NotUpgradeAuthority",
+    "NoVerifier",
+    "PayerMismatch",
+    "AssetMismatch",
+    "Overflow",
+    "ZkSubjectKind",
+    "ZkRegistryFull",
+    "ZkNoVerifyingKey"
+   ]
+  },
+  "pof_gate": {
+   "reached": [
+    "NotCreator",
+    "RoomShut",
+    "BadTier",
+    "NotController",
+    "StillValid",
+    "MembersLeft",
+    "BadPofConfig",
+    "NotClosing",
+    "BadCertificate"
+   ],
+   "never": []
+  }
+ },
+ "instructions": {
+  "pof": [
+   "anchor_log",
+   "apply_verifier",
+   "certify",
+   "certify_zk",
+   "close_begin",
+   "close_config",
+   "close_owner_record",
+   "close_path",
+   "close_zk",
+   "expire",
+   "init_config",
+   "open_path",
+   "register_zk_owner",
+   "release_note_lock",
+   "renew",
+   "require_certificate",
+   "revoke_by_holder",
+   "revoke_signed",
+   "revoke_spent",
+   "revoke_spent_staged",
+   "revoke_verifier_key",
+   "set_asset",
+   "set_fee",
+   "set_params",
+   "set_paused",
+   "set_roles",
+   "set_verifier",
+   "set_zk",
+   "stage_path",
+   "void_by_key",
+   "withdraw_fees"
+  ],
+  "pof_gate": [
+   "close_room",
+   "create_room",
+   "evict",
+   "join",
+   "leave",
+   "release_room",
+   "set_room"
+  ]
+ },
+ "instructionsCovered": [
+  "certify",
+  "revoke_spent",
+  "revoke_signed",
+  "renew",
+  "revoke_by_holder",
+  "expire",
+  "anchor_log",
+  "require_certificate",
+  "set_params",
+  "set_fee",
+  "set_paused",
+  "set_asset",
+  "set_verifier",
+  "set_roles",
+  "withdraw_fees",
+  "close_begin",
+  "create_room",
+  "set_room",
+  "join",
+  "evict",
+  "leave",
+  "close_room",
+  "release_room",
+  "init_config",
+  "close_config",
+  "apply_verifier",
+  "open_path",
+  "stage_path",
+  "revoke_spent_staged",
+  "close_path",
+  "set_zk",
+  "register_zk_owner",
+  "certify_zk",
+  "release_note_lock",
+  "void_by_key",
+  "revoke_verifier_key",
+  "close_owner_record",
+  "close_zk"
+ ],
+ "seconds": 238,
+ "snapshot": {
+  "programs/pof/src/lib.rs": "85b0cb7e4b20fc0c5c9f1c56ad39ac748b1ba67e030d47e85720d888b00c560f",
+  "programs/pof/src/ext.rs": "171210e764a09e25bd68b243decd5cc92df993add5e9991bbdbdee0314598005",
+  "programs/pof/src/errors.rs": "512910174a9cf25a2719a51e351ca523e07db2e470c6ceddd79aa518940e0e4b",
+  "programs/pof/src/zk.rs": "aa32229f03545024cd7fa4a877b202478ae8244615dae706a11519f1fe967341",
+  "programs/pof/src/groth16.rs": "66718555a435364c1e7ea75545cc6cbc7adb5697a234c15bd445d1c5f066d239",
+  "programs/pof/src/vk.rs": "689f099a8673494053b433eb167f8124d7210bf993f7f81a9c137a5a49dd3e3f",
+  "programs/pof_gate/src/lib.rs": "0ef0643e206bbf4bd9352f9b58412dbdfaa063587593045c951da96569f89bc7",
+  "programs/hostile/src/lib.rs": "7a510fb4d8630ae54d274e46c232ef7899630fe3cafb982cfbf28d4fa6bf523a",
+  "Cargo.lock": "32487c98b0daf217bc4285a219700b5a915ef239ac7fa64d8563a4209ad4300f"
+ },
+ "total": 9764
+}

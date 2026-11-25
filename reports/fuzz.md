@@ -1,6 +1,6 @@
 # Proof of Funds: on-chain fuzz and property testing
 
-Status: **round 1 complete on `a3b15d1`**, both the launch build (no phase 2) and the zk build (`certify_zk`, cargo feature `zk`); open items in §5. Reviewer: the POF `fuzz` agent, a second reviewer independent of
+Status: **round 1 complete on `73bcf04`** (zk build) and `a3b15d1`, both the launch build (no phase 2) and the zk build (`certify_zk`, cargo feature `zk`); open items in §5. Reviewer: the POF `fuzz` agent, a second reviewer independent of
 the `audit` agent, working only on the on-chain programs `pof` and `pof_gate`. It wrote none of the program code and changed none of
 it: every finding below went to the program owner, who fixed it in their own commits. Everything here can be re-run from `pof/fuzz/`
 (§8).
@@ -21,6 +21,7 @@ snapshot of one commit in the scratchpad, never in `pof/program`, and records th
 | 5 | `1c02f89` launch build | phase 2 behind the cargo feature `zk` (off at launch) | 5 | 10,868 | 36 | 0 |
 | 5 | `a3b15d1` zk build | fixes for FZ-18 (spent note lock, new nonce), ZK-11 (paid owner records), RK-01 | 5 | 11,441 | 37 | 1 (finding FZ-19) |
 | 6 | `a3b15d1` launch build | the same commit without `zk`, a short pass (SCALE 0.3) | 6 | 9,273 | 22 | 0 |
+| 7 | `73bcf04` zk build | FZ-19 fix (`close_owner_record`), RK-01 | 7 | 9,764 | 24 | 0 |
 
 Note on run 1: 24 of the 27 were the harness's own fault (a signer or writable flag removed from an account that was also the fee
 payer does not change the message; fixed by a separate fee payer). The other 3 were findings. Every "unexpected" row is kept in
@@ -195,11 +196,11 @@ compute-unit limit (FZ-21). A membership revoke costs about 64k CU, not
 | FZ-16 | Info | The program suite at `73d71dd` could not finish (its rotation test waited out the POF-17 hold) | `73d71dd` test/test.mjs | **fixed** in `b605c03` |
 | FZ-17 | Info | A consumer that does not pin POF's program id accepts a fake POF | integrators (pof_gate is fine) | open (docs) |
 | FZ-18 | Medium | zk build: a zk certificate revoked as spent is remade by replaying its own proof and passes the gates after the settle window | `cd51f22` zk.rs:451..514 (remake path) | **fixed** in `a3b15d1` (spent note lock, new nonce, zk.rs:504, :574); repro FIXED |
-| FZ-19 | Low | zk build: the paid ZkOwner records have no close path; after the wind-down POF still owns them and their rent is stranded | `a3b15d1` zk.rs:670..683, lib.rs:1082 `close_zk` | open |
+| FZ-19 | Low | zk build: the paid ZkOwner records have no close path; after the wind-down POF still owns them and their rent is stranded | `a3b15d1` zk.rs:670..683, lib.rs:1082 `close_zk` | **fixed** in `73bcf04` (`close_owner_record` while closing, rent to the recorded payer); repro FIXED |
 | FZ-20 | Info | One note can back a Verifier certificate and a zk certificate at the same time (two lock schemes) | design: Verifier note index vs ["znote", tag] | open |
 | FZ-21 | Info | zk build compute and size margins: certify_zk up to 302k CU and the first set_zk 396k CU (over the 200k default); 4 notes fit 1,230 of 1,232 bytes only with the lookup table and no compute-unit price | `a3b15d1` | open (client/docs) |
 
-Critical: 0. High: 0. Medium: 2 (both fixed). Low: 8 (7 fixed). Info: 11 (2 fixed).
+Critical: 0. High: 0. Medium: 2 (both fixed). Low: 8 (all fixed). Info: 11 (2 fixed).
 
 ### FZ-01 · Medium · fixed · Certificates of a leaked Verifier key outlive the incident
 At `73d71dd`, the response to a leaked Verifier key was "pause, then rotate". Pause stops new certifies, but every certificate the
@@ -285,13 +286,18 @@ settle window. A fresh proof of the same queued spend worked too.
 - **Left by design:** the nonce check compares with the replaced certificate's nonce only, so proof A can come back after a proof B
   remake. That matters only for a note that is not spent (a spent one is locked for good), and the holder could prove it again anyway.
 
-### FZ-19 · Low · open · ZkOwner records are never closed
+### FZ-19 · Low · fixed in `73bcf04` · ZkOwner records were never closed
 `register_zk_owner` (ZK-11, `a3b15d1`) creates a paid record `["zkowner", owner]` per ring owner. No instruction closes it: not
 `close_zk`, not the wind-down. After `close_config` the program still owns every record and their payers' rent is stranded (the
 wind-down suite on the zk build: 3 accounts left after everything else closed). `close_config` does not count them, so the wind-down
 "owns nothing afterwards" promise fails silently.
 - **Fix:** close the records during the wind-down (`close_zk` taking them as remaining accounts, or a `close_owner_record` allowed
   while `config.closing`, rent back to the payer recorded in the record), and count them like staged paths.
+- **Done in `73bcf04`:** `close_owner_record` (anyone, while closing) closes a record to the payer it records. Verified (seed 7 and
+  repro): every record closed during the wind-down, each payer got exactly the record's lamports back, nothing left owned by POF.
+- **Residual (Info):** `register_zk_owner` is still accepted while POF is winding down, and `close_config` does not count owner
+  records. A registration made after the wind-down's sweep and before `close_config` would be stranded again (the shape FZ-08 had):
+  refuse `register_zk_owner` while `config.closing`, or count the records in the treasury and require 0 in `close_config`.
 
 ### FZ-20 · Info · One note, two kinds of lock
 A Verifier certificate stores salted hashes and the Verifier keeps its own keyed note index off chain; a zk certificate stores tags
@@ -395,3 +401,5 @@ zsh fuzz/suite.sh 2                   # the program's own suites on the snapshot
 - 2026-11-25 · fuzz · final seeds on `1c02f89` (launch build) and `a3b15d1` (zk and launch builds): 31,582 more cases, 95 more invariant
   checks; FZ-05, FZ-07, FZ-08, FZ-09 confirmed fixed (`cd51f22`); new FZ-18 (Medium, fixed in `a3b15d1`), FZ-19 (Low, open), FZ-20,
   FZ-21 (Info). Totals: 73,041 cases, 225 invariant checks, 21 findings.
+- 2026-11-25 · fuzz · `73bcf04` zk build, seed 7 (9,764 cases, 24 invariant checks, 0 unexpected): FZ-19 confirmed fixed; residual note
+  (register_zk_owner accepted while closing). Totals: 82,805 cases, 249 invariant checks; all Medium and Low findings fixed.
