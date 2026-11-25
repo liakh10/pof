@@ -2,6 +2,7 @@
    waiting on anyone; a second run says nothing to do:
      1. close_begin: no certify or renew from now on (revocations still work)
      2. every certificate account expired at once (expire is open to anyone during the wind-down): each rent back to its payer
+     2a. phase 2: every note lock released (rent back to its payer), the ZkConfig and the owner registry closed (rent to the dev)
      2b. every staged revoke path left behind closed (rent back to its revoker)
      3. every Room member evicted (their certificates are gone): each rent back to whoever paid it
      4. every Room released: each rent back to its creator
@@ -48,6 +49,12 @@ if (cfg) {
   const certs = await list(q.PID, q.P, 'Certificate');
   if (certs.length) console.log(`  ${certs.length} certificate account(s) to close`);
   for (const c of certs) await run([q.P.ix('expire', {}, { caller: dev, certificate: c.address, payer: new PublicKey(c.payer) })], `expire ${c.address.toBase58().slice(0, 8)}… (${['live', 'revoked spent', 'revoked by holder'][c.status] || c.status}, tier ${c.tier}): rent back to ${c.payer.slice(0, 8)}…`);
+}
+/* 2a: phase 2 (audit LW-01): every note lock released (their certificates are gone), then the ZkConfig and the owner registry closed */
+if (cfg) {
+  for (const l of await list(q.PID, q.P, 'NoteLock')) await run([q.P.ix('release_note_lock', {}, { lock: l.address, certificate: new PublicKey(l.certificate), payer: new PublicKey(l.payer) })], `release note lock ${l.address.toBase58().slice(0, 8)}…: rent back to ${l.payer.slice(0, 8)}…`);
+  const zkAddr = q.pda([Buffer.from('zk')]), regAddr = q.pda([Buffer.from('zkreg')]);
+  if (await conn.getAccountInfo(zkAddr)) await run([q.P.ix('close_zk', {}, { admin: dev, zk: zkAddr, registry: regAddr })], 'close_zk: the ZkConfig and the owner registry closed, their rent to the dev');
 }
 /* 2b: staged revoke paths left behind (each rent back to its revoker) */
 if (cfg) for (const b of await list(q.PID, q.P, 'PathBuffer')) await run([q.P.ix('close_path', {}, { caller: dev, buffer: b.address, revoker: new PublicKey(b.revoker) })], `close a staged revoke path ${b.address.toBase58().slice(0, 8)}…: rent back to ${b.revoker.slice(0, 8)}…`);

@@ -29,6 +29,7 @@ const desc = {
   'revoke_signed': 'the controller\'s 156-byte POF-REVOKE1 signature from the instructions sysvar',
   'revoke_verifier_key': 'admin: a leaked or retired Verifier key revoked at once',
   'void_by_key': 'anyone: a certificate by a revoked key voided',
+  'set_zk': 'admin: makes the ZkConfig and the owner registry (phase 2 stays off until the rotation delay passes)',
   'join (CPI)': 'pof_gate join: CPI into require_certificate, member written',
   'evict': 'direct read of the certificate, member closed',
 };
@@ -63,6 +64,7 @@ ${runs.map(r => '  - ' + r).join('\n') || '  - (no run recorded)'}
 | wind-down on the suite's live state | ${(runs[runs.length - 1] || '').match(/closing=(\S+)/)?.[1] || '?'} |
 | launch rehearsal (base58 dev key, both programs deployed through sol-ops, $ROOT on cloned pump.fun, day one, wind-down) | ${read('rehearse.txt').trim() || '?'} |
 | own-CA launch (the owner creates the coin while launch.mjs waits) | ${read('own-ca.txt').trim() || '?'} |
+| phase 2 merged: certify_zk through zk's own on-chain suite, real Groth16 proofs from the development setup, on this program's quick build | ${(() => { try { const j = JSON.parse(read('zk-last-run.json')); return `${j.pass}/${j.pass + j.fail}`; } catch { return '?'; } })()} |
 
 The rehearsal's launch from nothing cost the dev ${(Number(read('rh-launch-cost.txt') || 0) / 1e9).toFixed(4)} SOL on the local chain, at local rent and with no priority fees. Of that, 3.58 SOL is the programs' rent, which comes back at the close.
 

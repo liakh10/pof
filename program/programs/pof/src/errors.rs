@@ -100,4 +100,32 @@ pub enum PofError {
     KeyNotRevoked,
     #[msg("arithmetic overflow")]
     Overflow,
+    #[msg("certify_zk is turned off")]
+    ZkDisabled,
+    #[msg("certify_zk takes a wallet or badge subject (its key signs)")]
+    ZkSubjectKind,
+    #[msg("pass one writable note lock [\"znote\", tag] per tag, in order")]
+    ZkLockMissing,
+    #[msg("the state root is not in the Rings tree's root history")]
+    ZkStateRootUnknown,
+    #[msg("the nullifier root is not the Rings tree's newest nullifier root (prove again against it)")]
+    ZkNullRootNotNewest,
+    #[msg("the owner registry root is not in its recent history")]
+    ZkRegistryRootUnknown,
+    #[msg("the owner registry is full")]
+    ZkRegistryFull,
+    #[msg("the revocation key is not a Baby Jubjub point")]
+    ZkBadEscrowKey,
+    #[msg("this build has no verifying key")]
+    ZkNoVerifyingKey,
+    #[msg("the zk certificate is still settling (its nullifiers may be queued spends)")]
+    ZkSettling,
+    #[msg("a public input is not a canonical field element")]
+    ZkInputNotInField,
+    #[msg("the proof does not verify for this certificate")]
+    ZkProofInvalid,
+    #[msg("a note is already behind another certificate")]
+    ZkNoteLocked,
+    #[msg("the lock's certificate is still live with this note")]
+    ZkNoteStillLive,
 }

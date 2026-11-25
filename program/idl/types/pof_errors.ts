@@ -48,7 +48,21 @@ export const PofErrorCode = {
   NoRotationDue: 6045,
   KeyRevoked: 6046,
   KeyNotRevoked: 6047,
-  Overflow: 6048
+  Overflow: 6048,
+  ZkDisabled: 6049,
+  ZkSubjectKind: 6050,
+  ZkLockMissing: 6051,
+  ZkStateRootUnknown: 6052,
+  ZkNullRootNotNewest: 6053,
+  ZkRegistryRootUnknown: 6054,
+  ZkRegistryFull: 6055,
+  ZkBadEscrowKey: 6056,
+  ZkNoVerifyingKey: 6057,
+  ZkSettling: 6058,
+  ZkInputNotInField: 6059,
+  ZkProofInvalid: 6060,
+  ZkNoteLocked: 6061,
+  ZkNoteStillLive: 6062
 };
 
 export type PofErrorName = keyof typeof PofErrorCode;

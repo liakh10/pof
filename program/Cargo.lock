@@ -1132,6 +1132,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "bytemuck",
+ "solana-bn254",
  "solana-poseidon",
  "solana-sha256-hasher",
 ]
@@ -1423,6 +1424,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "085db4906d89324cef2a30840d59eaecf3d4231c560ec7c9f6614a93c652f501"
 dependencies = [
  "parking_lot",
+]
+
+[[package]]
+name = "solana-bn254"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62ff13a8867fcc7b0f1114764e1bf6191b4551dcaf93729ddc676cd4ec6abc9f"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "bytemuck",
+ "solana-define-syscall 5.4.0",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

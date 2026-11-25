@@ -24,6 +24,7 @@ custom-panic = []
 anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
 solana-sha256-hasher = "3"
 solana-poseidon = "3"
+solana-bn254 = "3.2.1"
 bytemuck = { version = "1", features = ["derive", "min_const_generics"] }
 
 [lints.rust]

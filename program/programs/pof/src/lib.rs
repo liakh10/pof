@@ -36,6 +36,9 @@ use anchor_lang::system_program;
 
 pub mod errors;
 pub mod ext;
+pub mod zk;
+
+pub use zk::*;
 
 use errors::PofError;
 
@@ -61,7 +64,9 @@ pub const STATUS_REVOKED_HOLDER: u8 = 2;
 pub const STATUS_EXPIRED: u8 = 3;
 /// Voided: signed by a Verifier key the admin has since revoked (`revoke_verifier_key`, then anyone's `void_by_key`).
 pub const STATUS_VOIDED: u8 = 4;
-pub const MAX_REVOKED_KEYS: usize = 4;
+pub const MAX_REVOKED_KEYS: usize = 8;
+/// A signed revoke may be valid at most this many slots ahead (about an hour).
+pub const REVOKE_WINDOW_MAX: u64 = 9_000;
 /// anchor_log may grow the anchored log by at most this many entries at once.
 pub const MAX_LOG_STEP: u64 = 10_000_000;
 
@@ -197,6 +202,9 @@ pub struct Config {
     /// Verifier keys revoked by the admin (leaked or retired): they sign nothing more, and every certificate they signed is dead
     /// for require_certificate and Rooms at once, and can be voided by anyone.
     pub revoked_keys: [Pubkey; MAX_REVOKED_KEYS],
+    /// The slot each was revoked at. A full list reuses an entry once VALIDITY_MAX slots have passed since its revocation: by then
+    /// every certificate that key signed has expired.
+    pub revoked_at: [u64; MAX_REVOKED_KEYS],
     pub bump: u8,
     pub treasury_bump: u8,
 }
@@ -237,6 +245,8 @@ pub struct Treasury {
     pub exempt: u64,
     /// Certificates voided because their Verifier key was revoked.
     pub voided: u64,
+    /// Staged revoke buffers open now (close_config waits for 0, so no buffer's rent is ever stranded).
+    pub paths: u64,
     /// The transparency log's latest signed head anchored on chain: its size, its root hash, the slot.
     pub log_size: u64,
     pub log_head: [u8; 32],
@@ -384,14 +394,17 @@ pub fn log_bytes(program_id: &Pubkey, size: u64, head: &[u8; 32]) -> [u8; 80] {
 /// (32) ‖ issued_slot u64 LE (8) ‖ valid_until u64 LE (8). Bound to the certificate's current attestation (a renew or remake
 /// needs a new signature) and refused after valid_until, so a signed revoke cannot be held back for later.
 pub fn revoke_bytes(program_id: &Pubkey, certificate: &Pubkey, cert: &Certificate, valid_until: u64) -> [u8; 156] {
+    revoke_bytes_of(program_id, certificate, &cert.subject_hash, cert.asset, &cert.nullset_hash, cert.issued_slot, valid_until)
+}
+pub fn revoke_bytes_of(program_id: &Pubkey, certificate: &Pubkey, subject_hash: &[u8; 32], asset: u8, nullset_hash: &[u8; 32], issued_slot: u64, valid_until: u64) -> [u8; 156] {
     let mut b = [0u8; 156];
     b[0..11].copy_from_slice(DOMAIN_REVOKE);
     b[11..43].copy_from_slice(program_id.as_ref());
     b[43..75].copy_from_slice(certificate.as_ref());
-    b[75..107].copy_from_slice(&cert.subject_hash);
-    b[107] = cert.asset;
-    b[108..140].copy_from_slice(&cert.nullset_hash);
-    b[140..148].copy_from_slice(&cert.issued_slot.to_le_bytes());
+    b[75..107].copy_from_slice(subject_hash);
+    b[107] = asset;
+    b[108..140].copy_from_slice(nullset_hash);
+    b[140..148].copy_from_slice(&issued_slot.to_le_bytes());
     b[148..156].copy_from_slice(&valid_until.to_le_bytes());
     b
 }
@@ -425,6 +438,7 @@ fn check_signed(ix: &AccountInfo, c: &Config, slot: u64, want: &[u8]) -> Result<
 
 /// Everything about an attestation the chain can check by itself.
 fn check_attestation(c: &Config, a: &Attestation, slot: u64) -> Result<()> {
+    require_keys_neq!(a.controller, Pubkey::default(), PofError::NotController);
     match a.subject_kind {
         ext::KIND_WALLET | ext::KIND_BADGE => {
             // the controller of a wallet or badge certificate is that key itself
@@ -510,6 +524,8 @@ pub fn gate(cert: &Certificate, config: &Config, asset: u8, min_tier: u8, slot: 
     require!(cert.asset == asset, PofError::AssetMismatch);
     require!(cert.status == STATUS_LIVE, PofError::NotLive);
     require!(!config.is_revoked_key(&cert.verifier), PofError::KeyRevoked);
+    // a zk certificate settles first (its issued_slot is ahead): refused until then (audit ZK-02); signed ones issue in the past
+    require!(slot >= cert.issued_slot, PofError::ZkSettling);
     require!(slot <= cert.expiry_slot, PofError::CertificateExpired);
     require!(cert.tier >= min_tier, PofError::TierTooLow);
     Ok(CertView { subject_kind: cert.subject_kind, tier: cert.tier, expiry_slot: cert.expiry_slot, controller: cert.controller })
@@ -530,7 +546,9 @@ fn revoke(c: &Config, t: &mut Treasury, cert: &mut Certificate, status: u8, slot
 fn revoke_with_pair(c: &Config, t: &mut Treasury, cert: &mut Certificate, index: u8, salt: [u8; 32], nullifier: [u8; 32], slot: u64, by: Pubkey, path: u8) -> Result<()> {
     require!(cert.status == STATUS_LIVE, PofError::NotLive);
     require!(index < cert.note_count, PofError::BadIndex);
-    require!(ext::salted_nullifier(&salt, &nullifier) == cert.null_hashes[index as usize], PofError::NullifierMismatch);
+    // a zk certificate stores Poseidon(TAG_DOMAIN, nullifier) per note (no salt); a Verifier one the salted sha256
+    let h = if cert.verifier == zk::ZK_CONFIG { zk::tag_of(&nullifier)? } else { ext::salted_nullifier(&salt, &nullifier) };
+    require!(h == cert.null_hashes[index as usize], PofError::NullifierMismatch);
     revoke(c, t, cert, STATUS_REVOKED_SPENT, slot);
     cert.revealed_index = index;
     cert.revealed_salt = salt;
@@ -755,6 +773,26 @@ pub mod pof {
         Ok(())
     }
 
+    /// Phase 2: certify from a Groth16 proof of funds (pof/zk) instead of the Verifier's signature. See zk.rs.
+    pub fn certify_zk<'info>(ctx: Context<'info, CertifyZk<'info>>, args: ZkArgs) -> Result<()> {
+        zk::handle_certify_zk(ctx, args)
+    }
+
+    /// Admin: turn certify_zk on or off and set the revocation (escrow) key; records the build's verifying key hash.
+    pub fn set_zk(ctx: Context<SetZk>, enabled: bool, escrow: [[u8; 32]; 2]) -> Result<()> {
+        zk::handle_set_zk(ctx, enabled, escrow)
+    }
+
+    /// The ring owner registers its zk owner commitment (the consent certify_zk proves).
+    pub fn register_zk_owner(ctx: Context<RegisterZkOwner>, commitment: [u8; 32]) -> Result<()> {
+        zk::handle_register_zk_owner(ctx, commitment)
+    }
+
+    /// Anyone: close a note lock whose certificate is no longer live.
+    pub fn release_note_lock(ctx: Context<ReleaseNoteLock>) -> Result<()> {
+        zk::handle_release_note_lock(ctx)
+    }
+
     /// A fresh attestation on the same notes (same salted hashes), subject, asset and controller: new root, slots and tier.
     pub fn renew(ctx: Context<Renew>, att: Attestation) -> Result<()> {
         let slot = Clock::get()?.slot;
@@ -770,6 +808,8 @@ pub mod pof {
         let cert = &mut a.certificate;
         require!(cert.status == STATUS_LIVE, PofError::NotLive);
         require!(slot <= cert.expiry_slot, PofError::CertificateExpired);
+        // a zk certificate carries tags, not the Verifier's salted hashes: it is remade by certify_zk, never renewed
+        require_keys_neq!(cert.verifier, zk::ZK_CONFIG, PofError::RenewMismatch);
         let n = att.null_hashes.len();
         require!(
             cert.subject_kind == att.subject_kind && cert.controller == att.controller && n == cert.note_count as usize && cert.null_hashes[..n] == att.null_hashes[..],
@@ -825,6 +865,7 @@ pub mod pof {
         b.path[..siblings.len()].copy_from_slice(&siblings);
         b.levels = siblings.len() as u8;
         b.bump = ctx.bumps.buffer;
+        a.treasury.paths = add(a.treasury.paths, 1)?;
         Ok(())
     }
 
@@ -851,6 +892,7 @@ pub mod pof {
             require!(spent, PofError::NotSpent);
             b.nullifier
         };
+        a.treasury.paths = a.treasury.paths.saturating_sub(1);
         revoke_with_pair(&a.config, &mut a.treasury, &mut a.certificate, index, salt, nullifier, slot, a.revoker.key(), 1)
     }
 
@@ -859,6 +901,7 @@ pub mod pof {
         let revoker = ctx.accounts.buffer.load()?.revoker;
         require_keys_eq!(revoker, ctx.accounts.revoker.key(), PofError::NotPayer);
         require!(ctx.accounts.caller.key() == revoker || ctx.accounts.config.closing, PofError::NotPayer);
+        ctx.accounts.treasury.paths = ctx.accounts.treasury.paths.saturating_sub(1);
         Ok(())
     }
 
@@ -884,6 +927,7 @@ pub mod pof {
         let cert = &mut a.certificate;
         require!(cert.status == STATUS_LIVE, PofError::NotLive);
         require!(slot <= valid_until, PofError::Expired);
+        require!(valid_until <= slot.saturating_add(REVOKE_WINDOW_MAX), PofError::BadExpiry);
         let (signer, msg) = ext::signed_before(&a.instructions)?;
         require_keys_eq!(signer, cert.controller, PofError::NotController);
         require!(msg.as_slice() == revoke_bytes(&crate::ID, &key, cert, valid_until), PofError::AttestationMismatch);
@@ -934,10 +978,18 @@ pub mod pof {
     /// certificate it signed fails require_certificate and Rooms from now on; `void_by_key` marks each of them. At most 4 keys.
     pub fn revoke_verifier_key(ctx: Context<AdminOnly>, key: Pubkey) -> Result<()> {
         require_keys_neq!(key, Pubkey::default(), PofError::BadParams);
+        let slot = Clock::get()?.slot;
         let c = &mut ctx.accounts.config;
         if !c.is_revoked_key(&key) {
-            let free = c.revoked_keys.iter().position(|k| *k == Pubkey::default()).ok_or(error!(PofError::BadParams))?;
+            // a free entry, else one revoked long enough ago that all its certificates have expired
+            let free = c
+                .revoked_keys
+                .iter()
+                .position(|k| *k == Pubkey::default())
+                .or_else(|| (0..MAX_REVOKED_KEYS).find(|&i| slot > c.revoked_at[i].saturating_add(VALIDITY_MAX)))
+                .ok_or(error!(PofError::BadParams))?;
             c.revoked_keys[free] = key;
+            c.revoked_at[free] = slot;
         }
         emit!(VerifierKeyRevoked { key, slot: Clock::get()?.slot });
         Ok(())
@@ -979,10 +1031,17 @@ pub mod pof {
         Ok(())
     }
 
+    /// Wind-down only (audit LW-01): the ZkConfig ["zk"] and the owner registry ["zkreg"] close, their rent to the admin. Run
+    /// after every certificate expired and every note lock was released, before close_config.
+    pub fn close_zk(ctx: Context<CloseZk>) -> Result<()> {
+        require!(ctx.accounts.config.closing, PofError::NotClosing);
+        Ok(())
+    }
+
     /// The last step of the wind-down: no certificate account left. The treasury (fees and rent) and the config close to the admin.
     pub fn close_config(ctx: Context<CloseConfig>) -> Result<()> {
         require!(ctx.accounts.config.closing, PofError::NotClosing);
-        require!(ctx.accounts.treasury.open == 0, PofError::NotExpired);
+        require!(ctx.accounts.treasury.open == 0 && ctx.accounts.treasury.paths == 0, PofError::NotExpired);
         Ok(())
     }
 }
@@ -1087,6 +1146,8 @@ pub struct RevokeSpent<'info> {
 pub struct OpenPath<'info> {
     #[account(mut)]
     pub revoker: Signer<'info>,
+    #[account(mut, seeds = [TREASURY_SEED], bump = treasury.bump)]
+    pub treasury: Box<Account<'info, Treasury>>,
     #[account(seeds = [CERT_SEED, certificate.subject_hash.as_ref(), &[certificate.asset]], bump = certificate.bump)]
     pub certificate: Box<Account<'info, Certificate>>,
     #[account(init, payer = revoker, space = 8 + std::mem::size_of::<PathBuffer>(), seeds = [PATH_SEED, revoker.key().as_ref(), certificate.key().as_ref()], bump)]
@@ -1122,6 +1183,8 @@ pub struct ClosePath<'info> {
     pub caller: Signer<'info>,
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Box<Account<'info, Config>>,
+    #[account(mut, seeds = [TREASURY_SEED], bump = treasury.bump)]
+    pub treasury: Box<Account<'info, Treasury>>,
     #[account(mut, close = revoker)]
     pub buffer: AccountLoader<'info, PathBuffer>,
     /// CHECK: the buffer's revoker (checked against the buffer in close_path), who gets the rent back
@@ -1209,6 +1272,18 @@ pub struct WithdrawFees<'info> {
     /// CHECK: config.dev
     #[account(mut)]
     pub dev: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CloseZk<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = admin @ PofError::NotAdmin)]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, close = admin, seeds = [zk::ZK_SEED], bump = zk.bump)]
+    pub zk: Box<Account<'info, zk::ZkConfig>>,
+    #[account(mut, close = admin, seeds = [zk::REGISTRY_SEED], bump = registry.bump)]
+    pub registry: Box<Account<'info, zk::ZkRegistry>>,
 }
 
 #[derive(Accounts)]
@@ -1354,6 +1429,30 @@ mod tests {
         assert_eq!(&b[224..240], &[0xAB; 16]);
     }
 
+    /// The shared vector of rings and verifier (client/test/vectors/revoke-v2.json, copied to test/fixtures): the on-chain message
+    /// bytes equal it.
+    #[test]
+    fn the_revoke_message_matches_the_shared_vector() {
+        let f = include_str!("../../../test/fixtures/revoke-v2.json");
+        let get = |k: &str| -> String {
+            let at = f.find(&format!("\"{}\": ", k)).unwrap() + k.len() + 4;
+            let rest = &f[at..];
+            let rest = rest.trim_start_matches('"');
+            rest[..rest.find(|c: char| c == '"' || c == ',' || c == '\n').unwrap()].to_string()
+        };
+        let hx = |h: &str| -> Vec<u8> { (0..h.len() / 2).map(|i| u8::from_str_radix(&h[2 * i..2 * i + 2], 16).unwrap()).collect() };
+        let b58 = |s: &str| -> Pubkey { s.parse().unwrap() };
+        let program = b58(&get("program"));
+        assert_eq!(program, crate::ID);
+        let cert = b58(&get("certificate"));
+        let sh: [u8; 32] = hx(&get("subjectHash")).try_into().unwrap();
+        let asset: u8 = get("asset").parse().unwrap();
+        assert_eq!(Pubkey::find_program_address(&[CERT_SEED, &sh, &[asset]], &crate::ID).0, cert);
+        let ns: [u8; 32] = hx(&get("nullsetHash")).try_into().unwrap();
+        let b = revoke_bytes_of(&program, &cert, &sh, asset, &ns, get("issuedSlot").parse().unwrap(), get("validUntil").parse().unwrap());
+        assert_eq!(b.to_vec(), hx(&get("bytes")));
+    }
+
     #[test]
     fn tier_tables() {
         assert_eq!(sol_tiers().tiers(), 5);
@@ -1385,6 +1484,7 @@ mod tests {
             held_delay: 0,
             held_until: 0,
             revoked_keys: [Pubkey::default(); MAX_REVOKED_KEYS],
+            revoked_at: [0; MAX_REVOKED_KEYS],
             bump: 0,
             treasury_bump: 0,
         };

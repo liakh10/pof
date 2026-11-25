@@ -26,9 +26,12 @@ for (const c of certs) owe(c.payer, c.lamports);
 for (const m of members) owe(m.payer, m.lamports);
 for (const r of rooms) owe(r.creator, r.lamports);
 for (const b of decodeAll(pofAccs, q.P, 'PathBuffer')) owe(b.revoker, b.lamports);
+for (const l of decodeAll(pofAccs, q.P, 'NoteLock')) owe(l.payer, l.lamports);
 const before = new Map();
 for (const w of owed.keys()) before.set(w, BigInt(await conn.getBalance(new PublicKey(w), 'confirmed')));
 const ti = await k.info(q.K.treasury), ci = await k.info(q.K.config);
+const zkRent = [q.pda([Buffer.from('zk')]), q.pda([Buffer.from('zkreg')])];
+let zkBack = 0n; for (const z of zkRent) { const i = await k.info(z); if (i) zkBack += BigInt(i.lamports); }
 const fees = BigInt(ti.lamports) - await k.rentOf(ti.data.length);
 const dev0 = BigInt(await conn.getBalance(new PublicKey(cfg.dev), 'confirmed'));
 const progRent = BigInt((await k.info(q.K.programData)).lamports) + BigInt((await k.info(q.K.gateData)).lamports);
@@ -50,10 +53,10 @@ await check('every payer got exactly its rents back (certificates to their payer
     eq(BigInt(await conn.getBalance(new PublicKey(w), 'confirmed')) - before.get(w), l, `payer ${w.slice(0, 8)}`);
   }
 });
-await check('the dev wallet got every fee; the admin got the config and treasury rent and both programs\' rent (less its fees)', async () => {
+await check('the dev wallet got every fee; the admin got the config, treasury, ZkConfig and registry rent and both programs\' rent (less its fees)', async () => {
   eq(BigInt(await conn.getBalance(new PublicKey(cfg.dev), 'confirmed')) - dev0, fees, 'fees to the dev');
   const back = BigInt(await conn.getBalance(admin.publicKey, 'confirmed')) - a0;
-  const want = BigInt(ci.lamports) + (await k.rentOf(ti.data.length)) + progRent;
+  const want = BigInt(ci.lamports) + (await k.rentOf(ti.data.length)) + progRent + zkBack;   // zkBack: the ZkConfig and registry close to the admin (LW-01)
   if (back > want || back < want - 200_000n) throw Error(`admin got ${back}, want about ${want} less fees`);
 });
 await check('both programs are closed', async () => {

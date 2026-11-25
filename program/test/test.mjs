@@ -180,6 +180,8 @@ await check('an X-handle subject through the relayer: no on-chain fee (paid priv
   eq(c.subject_kind, 1); eq(c.controller, ctl.publicKey.toBase58()); eq(c.payer, relayer.publicKey.toBase58());
   eq((await k.treasury()).relayed, 1n);
   await refuses(doCertify(relayer, await k.attestation({ kind: 1, handle: 'x' + rand(3).toString('hex'), controller: PublicKey.default })), 'controller');
+  await refuses(doCertify(relayer, await k.attestation({ kind: 0, controller: PublicKey.default })), 'controller');   // fuzz FZ-07
+  await refuses(doCertify(relayer, await k.attestation({ kind: 2, controller: PublicKey.default })), 'controller');
   live.x = { a, ctl };
 });
 await check('a badge subject: the badge key is the controller; its hash is checked on chain', async () => {
@@ -317,6 +319,7 @@ await check('revoke_spent_staged: the FULL 40-level mainnet path staged in two t
   await send([q.P.ix('close_path', {}, { caller: rev.publicKey, buffer: buf(rev.publicKey, B.cp), revoker: rev.publicKey })], [rev], 100_000);
   ok(!(await k.exists(buf(rev.publicKey, B.cp))), 'dropped');
   await open(rev, B.cp, full.slice(0, 3));   // left behind: the wind-down must close it
+  eq((await k.treasury()).paths, 1n, 'fuzz FZ-08: one staged buffer open, counted (close_config waits for 0)');
   live.staged = { cp: B.cp };
 });
 
@@ -349,12 +352,18 @@ await check('revoke_signed: the controller signs the 156 POF-REVOKE1 bytes, the 
   const rv = (signer, msg, vu = until, cert = cp) => send([q.signIx(signer, msg), q.P.ix('revoke_signed', { valid_until: vu }, { caller: relayer.publicKey, certificate: cert })], [relayer], 100_000);
   const good = q.revokeBytes(cp, c, until);
   eq(good.length, 156, 'POF-REVOKE1 bytes');
+  // the shared vector of rings and verifier (test/fixtures/revoke-v2.json = client/test/vectors/revoke-v2.json)
+  const V2 = JSON.parse(fs.readFileSync(path.join(path.dirname(run), 'fixtures/revoke-v2.json'), 'utf8'));
+  eq(q.revokeBytes(V2.certificate, { subject_hash: Buffer.from(V2.subjectHash, 'hex'), asset: V2.asset, nullset_hash: Buffer.from(V2.nullsetHash, 'hex'), issued_slot: BigInt(V2.issuedSlot) }, BigInt(V2.validUntil)).toString('hex'), V2.bytes, 'the shared POF-REVOKE1 vector');
   await refuses(rv(relayer, good), 'controller');
   await refuses(rv(ctl, good, until + 1n), 'differ');
   await refuses(rv(ctl, q.revokeBytes(cp, { ...c, issued_slot: c.issued_slot - 1n }, until)), 'differ');
   await refuses(rv(ctl, q.revokeBytes(cp, { ...c, nullset_hash: rand(32) }, until)), 'differ');
   await refuses(rv(ctl, q.revokeBytes(cp, c, until, Keypair.generate().publicKey)), 'differ');
   // a signed revoke whose valid_until has passed: refused, it cannot be held back for later
+  // fuzz FZ-05: a signed revoke valid further than 9,000 slots ahead is refused
+  const far = BigInt(await k.slotNow()) + 9_100n;
+  await refuses(rv(ctl, q.revokeBytes(cp, c, far), far), 'expiry');
   const lapsed = BigInt(await k.slotNow()) - 1n;
   await refuses(rv(ctl, q.revokeBytes(cp, c, lapsed), lapsed), 'expired');
   // the same controller holds a second certificate: a signature for one never revokes the other
@@ -663,7 +672,30 @@ await check('revoke_verifier_key (fuzz): the admin revokes the old key at once; 
   const a2 = await k.attestation({ kind: 0, controller: byV2.publicKey, tier: 3 }); await certifyNow(byV2, a2);
   await join(byV2, byV2, room, a2.subject_hash);
   await refuses(send([q.P.ix('void_by_key', {}, { caller: outsider.publicKey, certificate: q.certPda(a2.subject_hash, 0) })], [outsider], 100_000), 'not revoked');
+  // fuzz FZ-09: eight entries; a ninth key while every entry is recent is refused (an entry is reused only after VALIDITY_MAX slots)
+  for (let i = 0; i < 7; i++) await send([q.P.ix('revoke_verifier_key', { key: Keypair.generate().publicKey }, { admin: admin.publicKey })], [admin], 100_000);
+  await send([q.P.ix('revoke_verifier_key', { key: V.publicKey }, { admin: admin.publicKey })], [admin], 100_000);   // already in: no new entry
+  await refuses(send([q.P.ix('revoke_verifier_key', { key: Keypair.generate().publicKey }, { admin: admin.publicKey })], [admin], 100_000), 'bounds');
+  ok((await k.config()).revoked_keys.every(x => x !== PublicKey.default.toBase58()), 'eight entries');
   await send([q.P.ix('require_certificate', { subject_hash: a2.subject_hash, asset: 0, min_tier: 1 }, { certificate: q.certPda(a2.subject_hash, 0) })], [outsider], 100_000);
+});
+
+await check('phase 2 (certify_zk) is off by default: no ZkConfig, certify_zk refused; set_zk is the admin\'s, needs a Baby Jubjub key, and turning it on waits the rotation delay', async () => {
+  const zkAddr = q.pda([Buffer.from('zk')]), regAddr = q.pda([Buffer.from('zkreg')]);
+  ok(!(await k.exists(zkAddr)), 'no ZkConfig at launch');
+  const u = Keypair.generate(); await fund([u], 2);
+  const args = { subject_kind: 0, asset: 0, tier: 1, nonce: rand(16), proof: Buffer.alloc(256), state_root: rand(32), null_root: rand(32), registry_root: rand(32), eph: [Buffer.alloc(32), Buffer.alloc(32)], tags: [field()], cts: [field()] };
+  const czk = () => send([q.P.ix('certify_zk', { args }, { payer: u.publicKey, controller: u.publicKey, zk: zkAddr, registry: regAddr, certificate: q.certPda(subjectHash(0, u.publicKey.toBase58()), 0), holder_token: u.publicKey, tree: TREE })], [u], 600_000);
+  await refuses(czk());   // the ZkConfig does not exist: nothing to certify against
+  const B8 = [Buffer.from('0bb77a6ad63e739b4eacb2e09d6277c12ab8d8010534e0b62893f3f6bb957051', 'hex'), Buffer.from('25797203f7a0b24925572e1cd16bf9edfce0051fb9e133774b3c257a872d7d8b', 'hex')];
+  const sz = (s2, en, key) => send([q.P.ix('set_zk', { enabled: en, escrow: key }, { admin: s2.publicKey, zk: zkAddr, registry: regAddr })], [s2], 400_000);
+  await refuses(sz(outsider, true, B8), 'admin');
+  await refuses(sz(admin, false, [B8[0], rand(32)]), 'baby jubjub');
+  await sz(admin, true, B8);
+  unit('set_zk');
+  const z = await k.decode('ZkConfig', zkAddr);
+  ok(!z.enabled && z.next_enabled && z.next_slot > 0n, 'on only after the rotation delay');
+  await refuses(czk(), 'turned off');
 });
 
 /* ------------------------------------------------------------------ counters */
