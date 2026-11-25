@@ -51,7 +51,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + "\n
   const logUrl = o.log || env.POF_LOG_URL || (origin ? `${origin}/api/attest/log` : null);
   const client = () => {
     if (!rpcUrl) throw new Usage("set --rpc <url> or SOLANA_RPC: pof reads the chain itself");
-    return new sdk.PofClient({ rpc: new sdk.Rpc(rpcUrl, { fetch: io.fetch }), programId: o.program });
+    return new sdk.PofClient({ rpc: new sdk.Rpc(rpcUrl, { fetch: io.fetch }), programId: o.program, allowOtherDeployment: !!o.program });
   };
   const reader = () => {
     if (!logUrl) throw new Usage("set --origin <site> (or --log <url>) to read the transparency log");

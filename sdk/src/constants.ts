@@ -7,6 +7,19 @@ export const MEMO_PROGRAM_ID = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
 export const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 export const SYSVAR_INSTRUCTIONS_ID = "Sysvar1nstructions1111111111111111111111111";
 
+/**
+ * Refuse a program id other than POF's unless the caller says so: reading "certificates" owned by another program, or
+ * passing another program to a CPI, accepts a fake POF (fuzz FZ-17).
+ */
+export function assertPinned(programId: string, gateProgramId: string = POF_GATE_PROGRAM_ID, allow = false): void {
+  if (allow) return;
+  if (programId !== POF_PROGRAM_ID || gateProgramId !== POF_GATE_PROGRAM_ID)
+    throw new Error(
+      `refusing program id ${programId !== POF_PROGRAM_ID ? programId : gateProgramId}: POF is ${POF_PROGRAM_ID} (pof_gate ${POF_GATE_PROGRAM_ID}). ` +
+        "Pass allowOtherDeployment: true only for your own test deployment.",
+    );
+}
+
 /** §1 subject kinds. */
 export const SubjectKind = { Wallet: 0, X: 1, Badge: 2 } as const;
 export type SubjectKind = (typeof SubjectKind)[keyof typeof SubjectKind];

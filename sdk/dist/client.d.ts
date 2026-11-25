@@ -6,8 +6,14 @@ import { type PofConfig, type Treasury, type Certificate, type Member, type Room
 export interface PofClientOptions {
     /** an RPC URL or anything implementing RpcLike */
     rpc: string | RpcLike;
+    /**
+     * Another deployment of pof. Pinned to POF's program id by default: an account owned by any other program is never read
+     * as a certificate (a consumer that does not pin it accepts a fake POF). Overriding needs `allowOtherDeployment: true`.
+     */
     programId?: AddressLike;
     gateProgramId?: AddressLike;
+    /** set only for your own local or test deployment of pof */
+    allowOtherDeployment?: boolean;
     commitment?: Commitment;
 }
 export interface LiveCertificate extends Certificate {
@@ -100,6 +106,12 @@ export declare class PofClient {
         fromHistory: boolean;
         rpcCalls: number;
     }>;
+    /**
+     * Whether this deployment runs the zk path: the zk config PDA exists under the pof program. The launch build has no zk
+     * instructions; zk certificates (and the "settling" state) only appear where this is true. The zk build's IDL is
+     * exported as POF_ZK_IDL when the repository carries one.
+     */
+    zkEnabled(): Promise<boolean>;
     /** The Treasury's public counters, and the transparency log head anchored on chain. */
     getTreasury(): Promise<(Treasury & {
         address: string;

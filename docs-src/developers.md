@@ -23,6 +23,18 @@ conveniences on top of it, and every one of them can be replaced by a direct rea
 | SDK | `@pof/sdk`, from `https://github.com/liakh10/pof/raw/main/sdk/release/pof-sdk-0.3.0.tgz` |
 | Source | `https://github.com/liakh10/pof` |
 
+> **Pin POF's program id.** A certificate is only a certificate if the account is owned by the pof program
+> `pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`, at its PDA, and the Config you check it against is pof's own
+> `["config"]` PDA. Anyone can deploy a program that writes accounts with the same layout. A reader or a gate that does
+> not pin the program id accepts a fake POF.
+> - **On chain:** take the pof program as `Program<'info, pof::program::Pof>` (Anchor checks its id), never an
+>   `UncheckedAccount` you CPI into; `require_certificate` checks the certificate's PDA and owner and the Config's seeds.
+>   Without the CPI, `pof::read_certificate` checks the owner and the PDA, and you must check the Config's PDA yourself.
+> - **Off chain:** `@pof/sdk` pins the id by default: `PofClient`, `requireCertificateAccounts`, `joinRoomInstruction` and
+>   `evictMemberInstruction` refuse another program id unless you pass `allowOtherDeployment: true` (for your own test
+>   deployment only), and an account owned by any other program never reads as a certificate. If you read accounts with
+>   other code, check `owner == pofP4QR…` and the PDA every time.
+
 ## What a certificate is
 
 One account per subject and asset, at the PDA `["cert", subject_hash, [asset]]` of the `pof` program.
@@ -144,7 +156,8 @@ fails:    NotLive · KeyRevoked · ZkSettling · CertificateExpired · TierTooLo
 ```
 
 It checks the account's owner and PDA, the status, the expiry against the current slot, the asset and the tier. It does
-**not** know who is calling: compare `controller` with your signer, or anyone could use anyone's certificate.
+**not** know who is calling: compare `controller` with your signer, or anyone could use anyone's certificate. And it is
+only POF if the program you call is POF: take it as `Program<'info, pof::program::Pof>` (see the warning at the top).
 
 ```toml
 pof = { git = "https://github.com/liakh10/pof", features = ["cpi"] }   # Anchor 1.2

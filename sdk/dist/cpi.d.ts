@@ -24,7 +24,9 @@ export declare function requireCertificateAccounts(args: {
     subject: Subject | Uint8Array;
     asset: number | string;
     minTier: number;
+    /** pinned to POF by default; another id needs allowOtherDeployment */
     programId?: AddressLike;
+    allowOtherDeployment?: boolean;
 }): Promise<{
     subjectHash: Uint8Array;
     certificate: string;
@@ -45,6 +47,7 @@ export declare function joinRoomInstruction(args: {
     gateProgramId?: AddressLike;
     /** extra or renamed accounts if the program's IDL names them differently */
     extra?: Record<string, AddressLike>;
+    allowOtherDeployment?: boolean;
 }): Promise<Instruction & {
     member: string;
     certificate: string;
@@ -64,4 +67,5 @@ export declare function evictMemberInstruction(args: {
     caller: AddressLike;
     programId?: AddressLike;
     gateProgramId?: AddressLike;
+    allowOtherDeployment?: boolean;
 }): Promise<Instruction>;

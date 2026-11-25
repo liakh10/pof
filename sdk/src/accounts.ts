@@ -297,7 +297,8 @@ export function effectiveStatus(
 ): StatusName {
   if (c.status !== 0) return CERT_STATUS_NAMES[c.status] ?? "voided";
   if (c.verifier && revokedKeys.includes(c.verifier)) return "voided";
-  if (c.issuedSlot && currentSlot < c.issuedSlot) return "settling";
+  // only a zk certificate can be ahead of its issue slot (it settles first); the launch build has none
+  if (c.verifier === ZK_CONFIG && c.issuedSlot && currentSlot < c.issuedSlot) return "settling";
   if (currentSlot > c.expirySlot) return "expired";
   return "live";
 }

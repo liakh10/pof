@@ -7,7 +7,7 @@
 import { POF_IDL, POF_GATE_IDL } from "./idl/index.js";
 import { encodeInstruction, type Idl } from "./borsh.js";
 import { toAddress, type AddressLike } from "./base58.js";
-import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, SYSTEM_PROGRAM_ID, SYSVAR_INSTRUCTIONS_ID, parseAsset, tierMinimum } from "./constants.js";
+import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, SYSTEM_PROGRAM_ID, SYSVAR_INSTRUCTIONS_ID, parseAsset, tierMinimum, assertPinned } from "./constants.js";
 import { subjectHash, type Subject } from "./subject.js";
 import { certificateAddress, configAddress, memberAddress } from "./accounts.js";
 
@@ -65,11 +65,14 @@ export async function requireCertificateAccounts(args: {
   subject: Subject | Uint8Array;
   asset: number | string;
   minTier: number;
+  /** pinned to POF by default; another id needs allowOtherDeployment */
   programId?: AddressLike;
+  allowOtherDeployment?: boolean;
 }): Promise<{ subjectHash: Uint8Array; certificate: string; accounts: AccountMeta[]; data: Uint8Array; programId: string }> {
   const asset = parseAsset(args.asset);
   tierMinimum(asset, args.minTier);
   const programId = toAddress(args.programId ?? POF_PROGRAM_ID);
+  assertPinned(programId, POF_GATE_PROGRAM_ID, args.allowOtherDeployment);
   const c = await common(args.subject, asset, programId);
   const idl = POF_IDL as unknown as Idl;
   const accounts = [...resolveAccounts(idl, "require_certificate", c), { pubkey: programId, isSigner: false, isWritable: false }];
@@ -90,10 +93,12 @@ export async function joinRoomInstruction(args: {
   gateProgramId?: AddressLike;
   /** extra or renamed accounts if the program's IDL names them differently */
   extra?: Record<string, AddressLike>;
+  allowOtherDeployment?: boolean;
 }): Promise<Instruction & { member: string; certificate: string }> {
   const asset = parseAsset(args.asset);
   const programId = toAddress(args.programId ?? POF_PROGRAM_ID);
   const gateProgramId = toAddress(args.gateProgramId ?? POF_GATE_PROGRAM_ID);
+  assertPinned(programId, gateProgramId, args.allowOtherDeployment);
   const c = await common(args.subject, asset, programId);
   const room = toAddress(args.room);
   const [member] = await memberAddress(room, c.hash, gateProgramId);
@@ -128,9 +133,11 @@ export async function evictMemberInstruction(args: {
   caller: AddressLike;
   programId?: AddressLike;
   gateProgramId?: AddressLike;
+  allowOtherDeployment?: boolean;
 }): Promise<Instruction> {
   const programId = toAddress(args.programId ?? POF_PROGRAM_ID);
   const gateProgramId = toAddress(args.gateProgramId ?? POF_GATE_PROGRAM_ID);
+  assertPinned(programId, gateProgramId, args.allowOtherDeployment);
   const [config] = await configAddress(programId);
   const idl = POF_GATE_IDL as unknown as Idl;
   const keys = resolveAccounts(idl, "evict", {

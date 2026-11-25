@@ -232,3 +232,29 @@ test("status 4 voided, a certificate signed by a revoked verifier key, and a zk 
   assert.equal(e.programId, sdk.POF_GATE_PROGRAM_ID);
   assert.ok(e.keys.some((k) => k.pubkey === cfg));
 });
+
+test("zk support is optional: zkEnabled reads the zk config PDA; without zk, a certificate ahead of its issue slot is not 'settling'", async () => {
+  const { client, rpc } = await world();
+  assert.equal(await client.zkEnabled(), false);
+  rpc.put(sdk.ZK_CONFIG, sdk.POF_PROGRAM_ID, new Uint8Array(64));
+  assert.equal(await client.zkEnabled(), true);
+  assert.equal(sdk.effectiveStatus({ status: 0, expirySlot: 9000, issuedSlot: 6000, verifier: Keypair.generate().publicKey.toBase58() }, 5000), "live");
+  assert.equal(sdk.effectiveStatus({ status: 0, expirySlot: 9000, issuedSlot: 6000, verifier: sdk.ZK_CONFIG }, 5000), "settling");
+  assert.ok(sdk.POF_ZK_IDL === null || typeof sdk.POF_ZK_IDL === "object");
+});
+
+test("FZ-17: the program id is pinned to POF by default; another deployment needs an explicit allowOtherDeployment", async () => {
+  const fake = Keypair.generate().publicKey.toBase58();
+  assert.throws(() => new sdk.PofClient({ rpc: "http://x", programId: fake }), /refusing program id/);
+  assert.throws(() => new sdk.PofClient({ rpc: "http://x", gateProgramId: fake }), /refusing program id/);
+  assert.ok(new sdk.PofClient({ rpc: "http://x", programId: fake, allowOtherDeployment: true }));
+  const subject = sdk.walletSubject(Keypair.generate().publicKey);
+  await assert.rejects(sdk.requireCertificateAccounts({ subject, asset: 0, minTier: 1, programId: fake }), /refusing program id/);
+  await assert.rejects(sdk.joinRoomInstruction({ room: fake, asset: 0, subject, payer: fake, gateProgramId: fake }), /refusing program id/);
+  // a certificate-shaped account owned by another program is never a certificate
+  const { rpc } = await world();
+  const client = new sdk.PofClient({ rpc });
+  const [addr] = await sdk.certificateAddress(await sdk.subjectHash(subject), 0);
+  rpc.put(addr, fake, sdk.encodeAccountPartial(sdk.POF_IDL, "Certificate", { subject_hash: await sdk.subjectHash(subject), tier: 5, expiry_slot: 9000 }));
+  assert.equal(await client.getCertificate(subject, 0), null);
+});

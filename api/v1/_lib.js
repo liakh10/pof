@@ -28,6 +28,8 @@ export function getClient(env = process.env) {
     rpc: new sdk.Rpc(rpc, { commitment: "confirmed", timeoutMs: 15_000 }),
     programId: env.POF_PROGRAM_ID || undefined,
     gateProgramId: env.POF_GATE_PROGRAM_ID || undefined,
+    // an operator who sets POF_PROGRAM_ID in env runs another deployment on purpose
+    allowOtherDeployment: !!(env.POF_PROGRAM_ID || env.POF_GATE_PROGRAM_ID),
   });
   return cached;
 }

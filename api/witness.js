@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   try {
     const w = new Witness({
       reader: new LogReader(env.POF_LOG_URL, fetch, env.POF_INTERNAL_SECRET ? { "x-pof-internal": env.POF_INTERNAL_SECRET } : {}),
-      client: new PofClient({ rpc: env.SOLANA_RPC, programId: env.POF_PROGRAM_ID || undefined }),
+      client: new PofClient({ rpc: env.SOLANA_RPC, programId: env.POF_PROGRAM_ID || undefined, allowOtherDeployment: !!env.POF_PROGRAM_ID }),
       signer: signerFromSecret(secret),
       state: new BlobState(),
       name: env.WITNESS_NAME || "pof-witness",

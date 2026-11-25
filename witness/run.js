@@ -33,7 +33,7 @@ const signer = signerFromSecret(Uint8Array.from(JSON.parse(fs.readFileSync(keyFi
 const w = new Witness({
   // POF_INTERNAL_SECRET: only for the project's own server-side witness; an independent witness reads the public log
   reader: new LogReader(logUrl, fetch, process.env.POF_INTERNAL_SECRET ? { "x-pof-internal": process.env.POF_INTERNAL_SECRET } : {}),
-  client: new PofClient({ rpc, programId: opt("program", undefined) }),
+  client: new PofClient({ rpc, programId: opt("program", undefined), allowOtherDeployment: !!opt("program", undefined) }),
   signer,
   state: new FileState(opt("out", "witness.json")),
   name: opt("name", "pof-witness"),

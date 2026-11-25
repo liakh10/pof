@@ -3,6 +3,11 @@ export declare const POF_GATE_PROGRAM_ID: string;
 export declare const MEMO_PROGRAM_ID = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
 export declare const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 export declare const SYSVAR_INSTRUCTIONS_ID = "Sysvar1nstructions1111111111111111111111111";
+/**
+ * Refuse a program id other than POF's unless the caller says so: reading "certificates" owned by another program, or
+ * passing another program to a CPI, accepts a fake POF (fuzz FZ-17).
+ */
+export declare function assertPinned(programId: string, gateProgramId?: string, allow?: boolean): void;
 /** §1 subject kinds. */
 export declare const SubjectKind: {
     readonly Wallet: 0;

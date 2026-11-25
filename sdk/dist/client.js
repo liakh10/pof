@@ -2,7 +2,7 @@
 import { Rpc, memcmp } from "./rpc.js";
 import { toHex, fromHex } from "./bytes.js";
 import { toAddress, toAddressBytes } from "./base58.js";
-import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, ASSETS, tierMinimum, parseAsset } from "./constants.js";
+import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, ASSETS, tierMinimum, parseAsset, ZK_CONFIG, assertPinned } from "./constants.js";
 import { parseSubjectQuery, subjectHash } from "./subject.js";
 import { certificateAddress, configAddress, treasuryAddress, decodeConfig, decodeTreasury, activeVerifier, decodeCertificate, decodeEvents, decodeMember, decodeRoom, effectiveStatus, layout, } from "./accounts.js";
 export class PofClient {
@@ -13,6 +13,7 @@ export class PofClient {
         this.rpc = typeof opts.rpc === "string" ? new Rpc(opts.rpc, { commitment: opts.commitment }) : opts.rpc;
         this.programId = toAddress(opts.programId ?? POF_PROGRAM_ID);
         this.gateProgramId = toAddress(opts.gateProgramId ?? POF_GATE_PROGRAM_ID);
+        assertPinned(this.programId, this.gateProgramId, opts.allowOtherDeployment);
     }
     /** accounts and the slot in one RPC call when the RPC supports it, else two in parallel */
     async accountsAt(addrs) {
@@ -196,6 +197,15 @@ export class PofClient {
         const a = c ? activeVerifier(c, c.slot) : null;
         const active = a && !revoked.has(a) ? a : null;
         return { active, current: active, next: c?.nextVerifier ?? null, all: [...keys], revoked: [...revoked], fromHistory, rpcCalls: calls };
+    }
+    /**
+     * Whether this deployment runs the zk path: the zk config PDA exists under the pof program. The launch build has no zk
+     * instructions; zk certificates (and the "settling" state) only appear where this is true. The zk build's IDL is
+     * exported as POF_ZK_IDL when the repository carries one.
+     */
+    async zkEnabled() {
+        const acc = await this.rpc.getAccount(ZK_CONFIG);
+        return !!acc && acc.owner === this.programId;
     }
     /** The Treasury's public counters, and the transparency log head anchored on chain. */
     async getTreasury() {

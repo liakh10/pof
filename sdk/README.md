@@ -11,6 +11,18 @@ Verifier's transparency log, and builds the accounts for gating your own program
 - ESM with types. Programs: `pof` = `pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`,
   `pof_gate` = `gatSToJMD8ZPLa85fKj6seYHUtYx4ah3ptZvLkisLPU`.
 
+> **Pin POF's program id.** A certificate is only a certificate if the account is owned by the pof program
+> `pofP4QRRDXnmDN9CNYiAGHfwMEgM7sLWhVcUMpsbynT`, at its PDA, and the Config you check it against is pof's own
+> `["config"]` PDA. Anyone can deploy a program that writes accounts with the same layout. A reader or a gate that does
+> not pin the program id accepts a fake POF.
+> - **On chain:** take the pof program as `Program<'info, pof::program::Pof>` (Anchor checks its id), never an
+>   `UncheckedAccount` you CPI into; `require_certificate` checks the certificate's PDA and owner and the Config's seeds.
+>   Without the CPI, `pof::read_certificate` checks the owner and the PDA, and you must check the Config's PDA yourself.
+> - **Off chain:** `@pof/sdk` pins the id by default: `PofClient`, `requireCertificateAccounts`, `joinRoomInstruction` and
+>   `evictMemberInstruction` refuse another program id unless you pass `allowOtherDeployment: true` (for your own test
+>   deployment only), and an account owned by any other program never reads as a certificate. If you read accounts with
+>   other code, check `owner == pofP4QR…` and the PDA every time.
+
 ## Install
 
 The package is not on npm. Install the release tarball from the repository:

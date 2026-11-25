@@ -7,7 +7,7 @@
 import { POF_IDL, POF_GATE_IDL } from "./idl/index.js";
 import { encodeInstruction } from "./borsh.js";
 import { toAddress } from "./base58.js";
-import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, SYSTEM_PROGRAM_ID, SYSVAR_INSTRUCTIONS_ID, parseAsset, tierMinimum } from "./constants.js";
+import { POF_PROGRAM_ID, POF_GATE_PROGRAM_ID, SYSTEM_PROGRAM_ID, SYSVAR_INSTRUCTIONS_ID, parseAsset, tierMinimum, assertPinned } from "./constants.js";
 import { subjectHash } from "./subject.js";
 import { certificateAddress, configAddress, memberAddress } from "./accounts.js";
 const camel = (s) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -52,6 +52,7 @@ export async function requireCertificateAccounts(args) {
     const asset = parseAsset(args.asset);
     tierMinimum(asset, args.minTier);
     const programId = toAddress(args.programId ?? POF_PROGRAM_ID);
+    assertPinned(programId, POF_GATE_PROGRAM_ID, args.allowOtherDeployment);
     const c = await common(args.subject, asset, programId);
     const idl = POF_IDL;
     const accounts = [...resolveAccounts(idl, "require_certificate", c), { pubkey: programId, isSigner: false, isWritable: false }];
@@ -63,6 +64,7 @@ export async function joinRoomInstruction(args) {
     const asset = parseAsset(args.asset);
     const programId = toAddress(args.programId ?? POF_PROGRAM_ID);
     const gateProgramId = toAddress(args.gateProgramId ?? POF_GATE_PROGRAM_ID);
+    assertPinned(programId, gateProgramId, args.allowOtherDeployment);
     const c = await common(args.subject, asset, programId);
     const room = toAddress(args.room);
     const [member] = await memberAddress(room, c.hash, gateProgramId);
@@ -86,6 +88,7 @@ export function toWeb3Instruction(ix, web3) {
 export async function evictMemberInstruction(args) {
     const programId = toAddress(args.programId ?? POF_PROGRAM_ID);
     const gateProgramId = toAddress(args.gateProgramId ?? POF_GATE_PROGRAM_ID);
+    assertPinned(programId, gateProgramId, args.allowOtherDeployment);
     const [config] = await configAddress(programId);
     const idl = POF_GATE_IDL;
     const keys = resolveAccounts(idl, "evict", {
